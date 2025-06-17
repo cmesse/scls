@@ -1,0 +1,22 @@
+# Linux GCC + Intel MKL flavor configuration
+name: gcc-mkl
+platform: linux
+description: "Production build with GCC compilers and Intel MKL"
+prefix: /opt/scls/gcc-mkl
+
+compilers:
+  cc: gcc
+  cxx: g++
+  fc: gfortran
+
+flags:
+  cflags: "-march=x86-64-v3 -fPIC -fno-fast-math"
+  cxxflags: "-march=x86-64-v3 -fPIC -fno-fast-math"
+  fflags: "-march=x86-64-v3 -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
+  ldflags: "-Wl,-rpath,/opt/scls/gcc-mkl/lib"
+  configure: "--enable-shared --disable-static"
+
+math:
+  linalg: mkl
+  threading: openmp
+  interface: lp64  # 32-bit integers

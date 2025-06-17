@@ -1,0 +1,22 @@
+# Linux GCC + Intel MKL flavor configuration
+name: gcc-debug
+platform: linux
+description: "Developer build with GCC compilers and reference BLAS/LAPACK"
+prefix: /opt/scls/gcc-debug
+
+compilers:
+  cc: gcc
+  cxx: g++
+  fc: gfortran
+
+flags:
+  cflags: "-g -march=x86-64-v3 -fPIC -fno-fast-math"
+  cxxflags: "-g -march=x86-64-v3 -fPIC -fno-fast-math"
+  fflags: "-g march=x86-64-v3 -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
+  ldflags: "-Wl,-rpath,/opt/scls/intel-mkl/lib"
+  configure: "--enable-shared --disable-static"
+
+math:
+  linalg: lapack
+  threading: openmp
+  interface: lp64  # 32-bit integers

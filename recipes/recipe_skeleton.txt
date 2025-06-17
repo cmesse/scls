@@ -1,0 +1,67 @@
+# Lets reiterate our skeleton. Are we happy with it?
+
+name: <package_name>
+version: <package_version>
+description: <package_description>
+homepage: <package_homepage>
+license: <package_license>
+
+source:
+  url: <source_url>
+  patch0: ... # we do this exactly as we would do it in the rpm spec
+
+
+requires:
+# lists required packages. This way, we can extract a build order
+# Unlike with the RPM specific setups, We don't need to differ between build and runtime here.
+
+features:
+  fortran: true  # or false, indicates if Fortran compiler is required
+  mpi: true      # or false, indicates if MPI compilers (mpicc, mpicxx, mpifort) are needed
+  openmp: true   # or false, indicates if OpenMP is required
+  math: parallel # or none/serial/parallel, specifies math library requirements (e.g., BLAS/LAPACK, MKL as specified by flavor, or if ScaLAPACK has to be added additionally)
+
+patch:
+	-p1 < $patch0
+	-p1 < $patch1
+	
+# should provide a list 
+configure:
+  type: autotools  # or cmake 
+  args:
+  optimization:
+  O_level: 2 # Options: 0, 1, 2, 3
+  strict_aliasing: true (default)
+    linux:
+      extra:
+      cflags:
+      cxxflags
+      fcflags:
+      ldflags:
+    macos:
+      extra:
+      cflags:
+      cxxflags:
+      fcflags:
+      ldflags:
+    pre:
+    post:
+
+build:
+  parallel: true (default)
+  args:
+  pre:
+  post:
+
+
+install:
+  args:
+  pre:
+  post:
+
+test:
+  commands:
+  pre:
+  post:
+
+# each package will also have an RPM skeleton containing platform specific build and runtime requirements, the package description and the logfile. To have one single source of truth, information provided here must be parsed into the specfile, and not be provided by the specfile skeleton.

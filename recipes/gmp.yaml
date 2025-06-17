@@ -1,0 +1,49 @@
+name: gmp
+version: 6.3.0
+summary: GNU arbitrary precision library
+homepage: https://gmplib.org/
+license: LGPLv3+ or GPLv2+
+
+source:
+  url: https://gmplib.org/download/gmp/gmp-%{version}.tar.xz
+
+requires:
+  - autoconf
+  - automake
+  - libtool
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: autotools
+  args:
+    - --enable-cxx
+    - --with-pic
+  # Flavor-specific configure arguments
+  flavor_args:
+    gcc-debug:
+      - --enable-fat
+    clang-debug:
+      - --enable-fat
+    gcc-mkl:
+      - --enable-fat
+    intel-mkl:
+      - --enable-fat
+    macos:
+      - --disable-assembly  # Avoid assembly issues on macOS
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make check 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"

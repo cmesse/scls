@@ -1,0 +1,6 @@
+Automake is a tool for automatically generating `Makefile.in'
+files compliant with the GNU Coding Standards.
+
+You should install Automake if you are developing software and would
+like to use its ability to automatically generate GNU standard
+Makefiles.

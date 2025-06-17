@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+if [ $(uname) = "Linux" ]; then
+    python3 python/rpm_builder.py ---package $1 --flavor gcc-debug $2
+elif [ $(uname) = "Darwin" ]; then
+    /Users/christian/Applications/python/bin/python3 python/mac_builder.py --package $1 --flavor macos $2
+else
+    echo "Unknown operating system"
+fi

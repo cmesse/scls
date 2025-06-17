@@ -1,0 +1,23 @@
+# macOS development flavor configuration
+name: macos
+platform: macos
+description: "GNU toolkit and SCLS libraries for macOS"
+prefix: /opt/scls
+
+compilers:
+  cc: clang
+  cxx: clang++
+  fc: gfortran
+
+flags:
+  cflags: "-g -fPIC -fno-fast-math -march=native"
+  cxxflags: "-g -fPIC -fno-fast-math -march=native"
+  fflags: "-g -fPIC -fno-fast-math -march=native"
+  ldflags: "-Wl,-rpath,/opt/scls/lib"
+  configure: "--enable-shared --disable-static --host=x86_64-apple-darwin${DARWIN_VERSION}"
+
+# Math libraries configuration
+math:
+  linalg: accelerate
+  threading: openmp  # Link against gomp from gfortran
+  interface: lp64

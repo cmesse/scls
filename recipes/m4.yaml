@@ -1,0 +1,37 @@
+name: m4
+version: 1.4.20
+summary: GNU M4 macro processor
+homepage: https://www.gnu.org/software/m4/
+license: GPLv3+
+
+source:
+  url: https://ftp.gnu.org/gnu/m4/m4-%{version}.tar.xz
+
+# Only build for these flavors
+flavors:
+  - macos
+
+requires: []
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: autotools
+  args:
+    - --disable-nls
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make check 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"
