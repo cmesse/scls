@@ -1,0 +1,337 @@
+# SCLS Build System - Project Context and Instructions
+
+## Project Overview
+
+I'm working on SCLS (Scientific Core Libraries Supercomputer), a repository of commonly used numerical libraries for HPC environments. The project provides pre-compiled, interdependent scientific computing packages for Enterprise Linux 9, with plans to support macOS via pkgutil.
+
+**Website**: https://belfem.lbl.gov/scls.html  
+**Current Release**: 2024, planning next release with simplified architecture
+
+## What Are We Doing?
+
+We're refactoring the SCLS build system to be more maintainable and consistent by:
+
+1. **Reducing complexity**: From ~10 flavors to 5 core flavors plus one mac flavor
+2. **Centralizing configuration**: Moving from hand-edited SPEC files to YAML-driven templates
+3. **Optimizing intelligently**: Using package-specific compiler flags based on empirical knowledge
+4. **Supporting multiple platforms**: Linux (primary) via RPM, macOS (secondary) via pkgutil
+
+## Flavors Explained
+
+A "flavor" is a complete stack of libraries compiled with specific compilers and dependencies:
+
+- **gcc-debug** (gcc + reference BLAS/LAPACK): For development, debugging with valgrind, AddressSanitizer (still has optimization flags plus -g symbols )
+- **clang-debug** (clang + reference BLAS/LAPACK): For development, debugging with valgrind, AddressSanitizer, allows for faster compiling (still has optimization flags plus -g symbols )
+- **gcc-mkl** (gcc + Intel MKL): Production performance with GNU compilers
+- **intel-mkl** (Intel OneAPI compilers + OpenMPI + Intel MKL): Maximum Intel optimization
+- **gcc-mkl-cuda** (gcc + Intel MKL + CUDA): GPU-enabled computing
+- **macos-devel** (clang/gfortran + accellerate): additional, non-rpm based flavor for mac development
+
+**Important**: We use OpenMPI for ALL flavors, including intel-mkl. Intel MPI (their MPICH variant) has compatibility issues with PETSc and other packages.
+
+Each flavor installs to `/opt/scls/<flavor>/` to allow multiple flavors to coexist.
+
+## Why This Approach?
+
+1. **Template-based generation reduces errors**: One source of truth for build logic
+2. **YAML configuration is maintainable**: Easier to update versions and flags than editing 100+ SPEC files
+3. **Compiler-aware optimization**: Different compilers need different flags (e.g., `-fno-strict-aliasing` vs `-fno-ansi-alias`)
+4. **Scientific computing requires careful optimization**: Some packages need `-O3`, others break with it
+5. **Dependencies are complex**: Using existing `dependencies.py` for correct build order
+
+## Key Design Decisions
+
+### Optimization Strategy
+- Default to `-O2` (safe), use `-O3` only for pure computational kernels (BLAS, LAPACK)
+- Always use `-fno-fast-math` for numerical correctness
+- Many packages need `-fno-strict-aliasing` due to pointer aliasing
+- Optimization flags are stored in the package specific YAML files, suggested flags are provided in the csv file I have shared.
+
+### MKL Integration
+- **NO pkg-config for MKL**: We explicitly choose linking strategy
+- **Always use 32-bit integers (LP64)**: Never use ILP64 interface (although we maintain a flag in the YAML so that future users could compile it themselves should they chose to)
+- **Prefer explicit linking**: Link against individual MKL libraries, NOT libmkl_rt
+- **Consistency critical**: If one library uses explicit linking, ALL must
+- **Python function**: Will handle MKL link line generation based on Intel's advisor
+
+Example MKL linking strategy:
+```python
+def get_mkl_link_line(compiler='gcc', threading='openmp', static=False):
+    """Generate MKL link line - always LP64 (32-bit integers)"""
+    if compiler == 'gcc':
+        if threading == 'openmp':
+            return "-lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl"
+        else:
+            return "-lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl"
+    elif compiler == 'intel':
+        if threading == 'openmp':
+            return "-lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl"
+        # ... etc
+```
+
+### Build System Architecture
+```
+YAML Config → Jinja2 Templates → SPEC Files → RPM Build
+     ↓              ↓                              ↓
+packages.yaml   gmp.spec.j2              rpmbuild command
+```
+
+### Package-Specific Templates
+- Keep package descriptions and changelogs in templates
+- Preserve RPM-specific metadata
+- Allow fine control over sub-packages and file lists
+
+### Compiler Handling
+- Auto-detect compiler from CC/CXX/FC environment variables
+- Translate generic flags to compiler-specific equivalents
+- Intel OneAPI (icx/icpx/ifx) replaces Intel Classic (icc/icpc/ifort)
+
+## Technical Components
+
+1. **dependencies.py**: Existing dependency graph for build order (already implemented)
+2. **Optimization approach**: embedded in YAML
+3. **scls_build_config.py**: Unified configuration system with MKL link line logic
+4. **packages/<n>.yaml**: Per-package configuration files
+5. **templates/<n>.spec.j2**: Package-specific SPEC templates
+
+## macOS Support Plan
+
+- **Compiler**: Must support Clang (Apple's default)
+- **Fortran**: Compile gfortran ourselves or provide in toolkit
+- **Missing tools**: Provide SCLS toolkit with GNU make, bison, automake, autoconf, pkgconf, gsed plus recompiled zlib from Apple that has include files
+- Use same YAML configuration files
+- Export to JSON format for pkgutil conversion script
+- Handle platform differences (e.g., no valgrind on macOS)
+
+### Clang Flavor for Linux?
+- **Rationale**: Faster C++ compilation during development
+- **Benefits**: Different diagnostics, faster edit-compile-test cycle
+- **Consideration**: Would be focused on development, not production, we need to add optimization flags, but also the "-g" flag
+
+## Current Status
+
+- Defined optimization flags for all 35+ packages (may revise approach)
+- Designed unified build system architecture
+- Created working example with GMP package
+- Identified compiler-specific flag mappings
+
+## Next Steps
+
+Work on package groups in order:
+1. **Base libraries**: cmake, gmp, mpfr, mpc
+2. **MPI stack**: openmpi (all flavors including Intel-compiled)
+3. **BLAS/LAPACK**: Reference implementations for debug, MKL integration for others
+4. **Complex packages**: PETSc, MUMPS, SuiteSparse
+
+## Key Questions to Address
+
+1. **Optimization config**: CSV file or embed in package YAML?
+2. **Clang flavor**: Worth adding for faster C++ development?
+3. **macOS toolkit**: Bundle missing GNU tools or document installation?
+4. **Module files?** Should we generate environment modules alongside packages?
+5. **Testing?** How extensive should automated testing be?
+6. **Versioning?** How to handle ABI compatibility between releases?
+
+## Important Context
+
+- **Project scope**: One-person project - focusing on EL9 RPMs and macOS development support only
+- **No Docker/Debian**: Not planning container or Debian package support to keep scope manageable
+- We use OpenMPI exclusively (no MPICH, no Intel MPI) due to compatibility
+- Intel MKL always uses LP64 (32-bit integers), ILP64 available but not in our flavors
+- MKL linking must be explicit and consistent across all packages
+- Some packages have known issues (documented on website)
+- Build must be reproducible (SOURCE_DATE_EPOCH, consistent paths)
+- Target architecture is x86-64-v3 (AVX2) as baseline, v4 (AVX-512) optional
+
+## Additional Context for Assistant
+
+### Project Resources
+- **Website**: https://belfem.lbl.gov/scls.html (package documentation, known issues)
+- **Repository structure**: Currently ~100+ individual SPEC files being consolidated
+- **User base**: HPC users on RHEL/Rocky/Alma Linux 9 systems
+- **Dependencies graph**: Maintained in `dependencies.py` (critical for build order)
+
+### Design Philosophy
+- **Stability over features**: Better to have fewer, well-tested flavors
+- **Explicit over implicit**: Especially for MKL linking and compiler flags
+- **Maintainability**: One person must be able to manage everything
+- **Scientific correctness**: Never sacrifice numerical accuracy for performance
+
+### What Success Looks Like
+- Researchers can install one flavor and have all dependencies work
+- Build system generates consistent packages across flavors
+- New package versions can be added by editing YAML, not SPEC files
+- macOS developers can use the same libraries for development	
+- Build process is reproducible and documented 
+
+## Working Style
+
+- Prefer concrete examples over abstract discussions
+- Start with simple packages, iterate to complex ones
+- Test each component before moving to the next
+- Where possible, check on https://www.linuxfromscratch.org/lfs/view/stable/ or https://www.linuxfromscratch.org/blfs/view/stable/ for recommended test routines
+- Keep macOS compatibility in mind but focus on Linux first
+- Question complexity - simpler is often better
+
+# SCLS macOS Support Strategy
+
+## Overview
+
+macOS support for SCLS (Scientific Core Libraries Supercomputer) uses a simplified approach compared to Linux, with only two main packages and leveraging Apple's Accelerate framework instead of Intel MKL.
+
+## Package Structure
+
+### 1. Package Design
+
+```
+scls-2025.pkg 
+```
+
+### 2. Installation Paths (Matching Linux)
+
+- SCLS Libraries: `/opt/scls/`
+
+## GNU Toolkit Components
+
+The GNU toolkit includes all necessary build tools not provided by macOS:
+
+1. **Core Build Tools**
+   - m4 (1.4.19) - Required by autoconf
+   - gsed (4.9) - GNU sed with 'g' prefix
+   - make (4.4.1) - GNU make
+   - bison (3.8.2) - Parser generator
+   - pkg-config (0.29.2) - With internal glib
+
+2. **Autotools Suite**
+   - libtool (2.4.7)
+   - autoconf (2.72) - Depends on m4
+   - automake (1.16.5) - Depends on autoconf
+
+3. **Compiler Infrastructure**
+   - gmp (6.2.1) - GNU Multiple Precision
+   - mpfr (4.2.0) - Multiple Precision Floating-Point
+   - mpc (1.3.1) - Multiple Precision Complex
+   - gfortran (13.2.0) - GNU Fortran compiler
+
+### Build Configuration for GNU Tools
+
+```bash
+# Standard configuration for all GNU tools
+./configure \
+    --prefix=/opt/gnu \
+    --host=x86_64-apple-darwin$(uname -r) \
+    --build=x86_64-apple-darwin$(uname -r) \
+    --target=x86_64-apple-darwin$(uname -r)
+
+# Special cases:
+# sed: Add --program-prefix=g --with-libiconv-prefix=$SDK/usr
+# pkg-config: Add --with-internal-glib
+# bison: Add --with-libiconv-prefix=$SDK/usr --with-libintl-prefix=$SDK/usr
+```
+
+## SCLS Core Configuration
+
+### Compiler Setup
+- **C/C++**: Apple Clang (system default)
+- **Fortran**: gfortran from GNU toolkit (`/opt/gnu/bin/gfortran`)
+- **No CUDA**: Not supported on modern macOS
+- **No Intel compilers**: Focus on Clang/GCC compatibility
+
+### BLAS/LAPACK Strategy
+- **Primary**: Apple Accelerate Framework
+- **Fallback**: Reference BLAS/LAPACK for debugging
+- **No MKL**: Intel discontinued macOS support
+
+### Optimization Flags
+```bash
+# Universal flags for all packages
+CFLAGS="-O2 -g -march=native"
+CXXFLAGS="-O2 -g -march=native"
+FFLAGS="-O2 -g -march=native"
+LDFLAGS="-Wl,-rpath,/opt/scls/lib"
+```
+
+## Package Management
+
+### Using pkgutil Format
+- Individual PKG files for toolkit and core
+- Dependencies handled at install time (not automatic)
+- No complex dependency resolution like RPM
+
+### Distribution Methods
+
+1. **Direct PKG Installation**
+   ```bash
+   sudo installer -pkg scls-gnu-toolkit-2024.pkg -target /
+   sudo installer -pkg scls-core-2024.pkg -target /
+   ```
+
+2. **DMG Distribution (Alternative)**
+   - Mount DMG containing `/opt` structure
+   - Option to symlink or copy to system `/opt`
+   - Useful for users without admin rights
+
+## Build System Integration
+
+### YAML Configuration
+Use same YAML structure as Linux but with platform-specific sections:
+
+```yaml
+platforms:
+  macos:
+    supported: true
+    configure_args:
+      - "--with-blas-lapack-lib=-framework Accelerate"
+    notes: "Uses Apple Accelerate instead of MKL"
+```
+
+## Environment Setup
+
+### Activation Script
+```bash
+#!/bin/bash
+# activate-scls.sh
+export PATH=/opt/scls/bin:$PATH
+export DYLD_LIBRARY_PATH=/opt/scls/lib:$DYLD_LIBRARY_PATH
+export PKG_CONFIG_PATH=/opt/scls/lib/pkgconfig:$PKG_CONFIG_PATH
+```
+
+### RPATH Handling
+macOS uses `@rpath` for dynamic library loading:
+```bash
+# Set during build
+export LDFLAGS="-Wl,-rpath,/opt/scls/lib"
+
+# Or fix post-build
+install_name_tool -add_rpath /opt/scls/lib binary_name
+```
+
+## Future Considerations
+
+### Apple Silicon Support
+- Current focus: Intel (x86_64)
+- Future: Build universal binaries or separate ARM64 packages
+- Build flags would add: `-arch arm64 -arch x86_64`
+
+### Potential Third Package
+If needed, could add `scls-debug-2024.pkg` with:
+- Reference BLAS/LAPACK instead of Accelerate
+- Additional debugging tools
+- Valgrind alternative (since valgrind doesn't work on macOS)
+
+## Key Decisions Summary
+
+1. **No Homebrew dependency** - Complete self-contained packages
+2. **Simplified flavor system** - One optimized build serves all needs
+3. **Standard /opt paths** - Consistency with Linux installation
+4. **Accelerate Framework** - Leverage Apple's optimized libraries
+5. **Combined optimization + debug** - Single build good for development and production
+6. **GNU toolkit ** - Essential Build tools missing in macOS
+6. **gfortran ** - Provided as extra package
+
+## Implementation Notes
+
+- Handle config.guess/config.sub updates for newer macOS versions
+- Test on both Intel and Apple Silicon (when available)
+- Consider code signing requirements for distribution
+- Document any macOS-specific build issues in package YAML files
