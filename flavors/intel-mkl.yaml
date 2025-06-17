@@ -10,10 +10,11 @@ compilers:
   fc: ifx
 
 flags:
-  cflags: "-xHost -fPIC -fp-model=precise"
-  cxxflags: "-xHost -fPIC -fp-model=precise"
-  fflags: "-xHost -fPIC -fp-model=precise"
+  cflags: "-mcpu=x86-64-v3 -fPIC -fp-model=precise"
+  cxxflags: "-mcpu=x86-64-v3 -fPIC -fp-model=precise"
+  fflags: "-mcpu=x86-64-v3 -fPIC -fp-model=precise"
   ldflags: "-Wl,-rpath,/opt/scls/intel-mkl/lib"
+  configure: "--enable-shared --disable-static --host=%{host} --build=%{host} --target=%{host}"
 
 # Math libraries configuration
 math:

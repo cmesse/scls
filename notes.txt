@@ -1,0 +1,24 @@
+# GCC PATCH
+for f in $(find . -name configure); do
+	gsed -i 's/--version -v -V -qversion/--version -v/g' configure ;
+done
+
+# GCC CONFIG
+../configure \
+	--prefix=/opt/scls \
+	--enable-shared \
+	--disable-static \
+	--host=x86_64-apple-darwin24.5.0 \
+	--with-gmp-include=/opt/scls/include \
+    --with-gmp-lib=/opt/scls/lib \
+    --with-mpfr-include=/opt/scls/include \
+    --with-mpfr-lib=/opt/scls/lib \
+    --with-mpc-include=/opt/scls/include \
+    --with-mpc-lib=/opt/scls/lib \
+    --enable-checking=release \
+    --enable-languages=fortran,lto \
+    --with-native-system-header-dir=/usr/include \
+    --with-sysroot=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk \
+    --with-system-zlib \
+    --disable-nls \
+    --disable-multilib

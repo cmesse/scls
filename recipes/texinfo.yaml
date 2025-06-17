@@ -1,14 +1,17 @@
-name: m4
-version: 1.4.20
-summary: GNU M4 macro processor
-homepage: https://www.gnu.org/software/m4/
-license: GPLv3+
+name: texinfo
+version: 7.2
+summary: Tools needed to create Texinfo format documentation files
+homepage: https://www.gnu.org/software/texinfo/
+license: GPL-3.0-or-later
 
 source:
-  url: https://ftp.gnu.org/gnu/m4/m4-%{version}.tar.xz
+  url: https://ftp.gnu.org/gnu/texinfo/texinfo-%{version}.tar.xz
 
+# Only build for these flavors
 flavors:
   - macos
+
+requires: []
 
 features:
   fortran: false
@@ -18,8 +21,6 @@ features:
 
 configure:
   type: autotools
-  args:
-    - --disable-nls
   optimization:
     O_level: 2
     strict_aliasing: true

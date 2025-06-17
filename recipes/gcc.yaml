@@ -1,0 +1,58 @@
+name: gcc
+version: 15.1.0
+summary: The GNU Compiler Collection
+homepage: https://gcc.gnu.org/
+license: GPL-2.0
+
+source:
+  url: https://ftp.gnu.org/gnu/gcc/gcc-15.1/gcc-%{version}.tar.xz
+
+flavors:
+  - macos
+
+requires:
+  - gmp
+  - mpfr
+  - mpc
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  pre:
+    - "for f in $(find . -name configure); do gsed -i 's/--version -v -V -qversion/--version -v/g' configure ; done"
+  post:
+    - "ln -s %{prefix}/bin/gfortran-scls %{prefix}/bin/gfortran"
+
+  type: autotools
+  args:
+    - --with-gmp-include=%{prefix}/include
+    - --with-gmp-lib=%{prefix}/lib
+    - --with-mpfr-include=%{prefix}/include
+    - --with-mpfr-lib=%{prefix}/lib
+    - --with-mpc-include=%{prefix}/include
+    - --with-mpc-lib=%{prefix}/lib
+    - --enable-checking=release
+    - --enable-languages=c,c++,fortran,lto
+    - --with-native-system-header-dir=/usr/include
+    - --with-sysroot=%{sdk}
+    - --with-system-zlib
+    - --disable-nls
+    - --disable-multilib
+    - --program-suffix=scls
+
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make check 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"

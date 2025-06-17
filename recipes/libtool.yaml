@@ -26,6 +26,8 @@ configure:
   optimization:
     O_level: 2
     strict_aliasing: true
+  args:
+    - "--disable-silent-rules"
 
 build:
   parallel: false

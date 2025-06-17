@@ -1,0 +1,47 @@
+name: mpc
+version: 1.3.1
+summary: C library for multiple-precision complex computations
+homepage: https://www.multiprecision.org/
+license: LGPL-3.0-or-later
+
+source:
+  url: https://ftp.gnu.org/gnu/mpc/mpc-%{version}.tar.gz
+
+requires:
+  - make
+  - sed
+  - gmp
+  - mpfr
+
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: autotools
+  args:
+    - --enable-thread-safe
+    - --with-gmp-include=%{prefix}/include
+    - --with-gmp-lib=%{prefix}/lib
+    - --with-mpfr-include=%{prefix}/include
+    - --with-mpfr-lib=%{prefix}/lib
+
+  # Flavor-specific configure arguments
+  flavor_env:
+    macos:
+      - SED: "%{prefix}/bin/gsed"
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make check 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"

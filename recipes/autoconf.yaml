@@ -25,7 +25,9 @@ configure:
   optimization:
     O_level: 2
     strict_aliasing: true
-
+  flavor_env:
+    macos:
+      - M4: "%{prefix}/bin/m4"
 build:
   parallel: true
 

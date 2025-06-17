@@ -14,7 +14,7 @@ flags:
   cxxflags: "-g -fPIC -fno-fast-math -march=native"
   fflags: "-g -fPIC -fno-fast-math -march=native"
   ldflags: "-Wl,-rpath,/opt/scls/lib"
-  configure: "--enable-shared --disable-static --host=x86_64-apple-darwin${DARWIN_VERSION}"
+  configure: "--enable-shared --disable-static --host=%{host} --build=%{host} --target=%{host}"
 
 # Math libraries configuration
 math:

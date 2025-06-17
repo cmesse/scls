@@ -11,6 +11,7 @@ requires:
   - autoconf
   - automake
   - libtool
+  - bison
 
 features:
   fortran: false

@@ -1,11 +1,13 @@
+#!/usr/bin/env python3
 import os
 import glob
 import yaml
 from collections import defaultdict, deque
 import sys
+import argparse
 
 
-def load_yaml_files(directory):
+def load_yaml_files(directory, flavor=None):
     """Load all YAML files from the specified directory and extract package info."""
     packages = []
     for filepath in glob.glob(os.path.join(directory, "*.yaml")):
@@ -15,14 +17,45 @@ def load_yaml_files(directory):
                 if not isinstance(data, dict) or 'name' not in data:
                     print(f"Warning: {filepath} does not contain a valid package name, skipping.")
                     continue
+
+                # Check if package should be built for this flavor
+                if flavor:
+                    # If 'flavors' key exists, check if our flavor is in the list
+                    if 'flavors' in data and flavor not in data['flavors']:
+                        print(f"Skipping {data['name']} - not built for flavor '{flavor}'")
+                        continue
+                    # If no 'flavors' key, package is built for all flavors (default behavior)
+
                 package = {
                     'name': data['name'],
                     'requires': data.get('requires', []),
-                    'filepath': filepath
+                    'filepath': filepath,
+                    'flavors': data.get('flavors', [])  # Empty list means all flavors
                 }
                 packages.append(package)
         except Exception as e:
             print(f"Error reading {filepath}: {e}")
+    return packages
+
+
+def filter_dependencies_by_flavor(packages, flavor=None):
+    """Filter dependencies to only include packages that are built for the given flavor."""
+    if not flavor:
+        return packages
+
+    # Get list of package names that are built for this flavor
+    available_packages = {pkg['name'] for pkg in packages}
+
+    # Filter dependencies
+    for pkg in packages:
+        original_deps = pkg['requires'].copy()
+        pkg['requires'] = [dep for dep in pkg['requires'] if dep in available_packages]
+
+        # Report filtered dependencies
+        filtered_deps = set(original_deps) - set(pkg['requires'])
+        if filtered_deps:
+            print(f"Info: {pkg['name']} dependencies filtered for flavor '{flavor}': {', '.join(filtered_deps)}")
+
     return packages
 
 
@@ -40,7 +73,7 @@ def build_dependency_graph(packages):
     for pkg in packages:
         for dep in pkg['requires']:
             if dep not in all_nodes:
-                print(f"Warning: Dependency '{dep}' for package '{pkg['name']}' not found in any YAML file.")
+                print(f"Warning: Dependency '{dep}' for package '{pkg['name']}' not found in available packages.")
             else:
                 graph[dep].add(pkg['name'])
                 in_degree[pkg['name']] += 1
@@ -101,13 +134,16 @@ def validate_build_order(build_order, dependencies):
                 f"Invalid build order: '{dependent}' depends on '{dependency}' but is built before or at the same time.")
 
 
-def build_order(directory):
+def build_order(directory, flavor=None):
     """Main function to generate build order from YAML files."""
-    # Load YAML files
-    packages = load_yaml_files(directory)
+    # Load YAML files with flavor filtering
+    packages = load_yaml_files(directory, flavor)
     if not packages:
-        print("No valid YAML files found in the directory.")
+        print(f"No valid YAML files found in the directory{' for flavor ' + flavor if flavor else ''}.")
         return
+
+    # Filter dependencies based on flavor
+    packages = filter_dependencies_by_flavor(packages, flavor)
 
     # Build dependency graph
     graph, in_degree, nodes = build_dependency_graph(packages)
@@ -124,15 +160,15 @@ def build_order(directory):
         ranks = topological_sort(graph, in_degree, nodes)
 
         # Get build order
-        build_order = get_build_order(ranks)
+        build_order_list = get_build_order(ranks)
 
         # Validate the build order
-        validate_build_order(build_order, dependencies)
+        validate_build_order(build_order_list, dependencies)
 
         # Print the build order
         current_rank = -1
-        print("\nBuild Order:")
-        for rank, package in build_order:
+        print(f"\nBuild Order{' for flavor: ' + flavor if flavor else ' (all packages)'}:")
+        for rank, package in build_order_list:
             if rank != current_rank:
                 current_rank = rank
                 print(f"--- Group {rank + 1} ---")
@@ -145,12 +181,19 @@ def build_order(directory):
         sys.exit(1)
 
 
+def main():
+    parser = argparse.ArgumentParser(description='Generate build order for SCLS packages')
+    parser.add_argument('directory', help='Directory containing recipe YAML files')
+    parser.add_argument('--flavor', '-f', help='Filter packages by flavor (e.g., macos, gcc-debug)')
+
+    args = parser.parse_args()
+
+    if not os.path.isdir(args.directory):
+        print(f"Error: '{args.directory}' is not a valid directory.")
+        sys.exit(1)
+
+    build_order(args.directory, args.flavor)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python build_order.py <directory>")
-        sys.exit(1)
-    directory = sys.argv[1]
-    if not os.path.isdir(directory):
-        print(f"Error: '{directory}' is not a valid directory.")
-        sys.exit(1)
-    build_order(directory)
+    main()

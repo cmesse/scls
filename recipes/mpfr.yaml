@@ -1,0 +1,43 @@
+name: mpfr
+version: 4.2.2
+summary: C library for multiple-precision floating-point computations
+homepage: https://www.mpfr.org/
+license: LGPL-3.0-or-later
+
+source:
+  url: https://www.mpfr.org/mpfr-current/mpfr-%{version}.tar.xz
+
+requires:
+  - make
+  - sed
+  - gmp
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: autotools
+  args:
+    - --enable-thread-safe
+    - --with-gmp-include=%{prefix}/include
+    - --with-gmp-lib=%{prefix}/lib
+
+  # Flavor-specific configure arguments
+  flavor_env:
+    macos:
+      - SED: "%{prefix}/bin/gsed"
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make check 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"

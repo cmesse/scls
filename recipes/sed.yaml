@@ -1,14 +1,20 @@
-name: m4
-version: 1.4.20
-summary: GNU M4 macro processor
-homepage: https://www.gnu.org/software/m4/
-license: GPLv3+
+name: sed
+version: 4.9
+summary: A GNU stream text editor
+homepage: http://sed.sourceforge.net/
+license: GPL-3.0-or-later
 
 source:
-  url: https://ftp.gnu.org/gnu/m4/m4-%{version}.tar.xz
+  url: https://ftp.gnu.org/pub/gnu/sed/sed-%{version}.tar.xz
 
+# Only build for these flavors
 flavors:
   - macos
+
+requires:
+  - automake
+  - autoconf
+  - make
 
 features:
   fortran: false
@@ -25,9 +31,8 @@ configure:
     strict_aliasing: true
   flavor_args:
     macos:
-      - "--with-libiconv-prefix=%{sdk}/usr"
+      - "--program-prefix=g"
       - "--with-libintl-prefix=%{sdk}/usr"
-
 build:
   parallel: true
 

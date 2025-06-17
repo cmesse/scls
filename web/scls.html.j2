@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The BELFEM project's Scientific Core Libraries repository offers open-source numerical libraries optimized for Intel Core and Intel Xeon architectures on Enterprise Linux systems.">
+    <meta name="keywords" content="scientific libraries, open-source numerical libraries, high-performance computing, Intel Core, Intel Xeon, Enterprise Linux, Rocky Linux, Alma Linux, Amazon Linux, numerical computations, MPI, CUDA support">
+    <meta name="generator" content="SCLS Website Generator {{ generation_time }}">
+
+    <title>BELFEM Project - SCLS</title>
+    <link rel="stylesheet" media="all" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script type="text/javascript">
+        function displayEmail() {
+            var asciiEmail = '&#99;&#109;&#101;&#115;&#115;&#101;&#64;&#108;&#98;&#108;&#46;&#103;&#111;&#118;'; // Encoded email address
+            var element = document.getElementById('email');
+            element.innerHTML = '<a href="mailto:' + asciiEmail + '">' + asciiEmail + '</a>';
+        }
+    </script>
+    <style>
+        /* Additional styles for the flavor matrix */
+        .package-table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .package-table th {
+            background-color: #f0f0f0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .package-table td.center-check {
+            text-align: center;
+            font-size: 1.2em;
+        }
+        .flavor-header {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            white-space: nowrap;
+            padding: 8px 4px;
+            min-width: 30px;
+        }
+        .package-name {
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body onload="displayEmail();">
+<header>
+<nav>
+    <a href="index.html" title="BELFEM">BELFEM</a>
+    <a href="scls.html" title="SCLs">SCLS</a>
+    <a href="publications.html" title="Publications">Publications</a>
+    <a href="contact.html" title="Contact">Contact</a>
+</nav>
+</header>
+<main class="container">
+    <h1>Scientific Core Libraries {{ release_version }} Repository</h1>
+    <table class="invisible-table" style="border: none;">
+        <tr>
+            <td class="left" style="border: none;">
+                <img src="logo.gif" alt="SCLS Logo" style="width: 100%;">
+            </td>
+            <td class="right" style="border: none;">
+                <p>The Scientific Core Libraries repository is a collection of open-source numerical libraries. They are meant to be used on an Intel Core or Intel Xeon <code>x86_64</code> Architecture running an Enterprise Linux system such as <a href="https://www.redhat.com/en/technologies/linux-platforms/enterprise-linux">RedHat</a>, <a href="https://rockylinux.org">Rocky</a> or <a href="https://almalinux.org">Alma</a>.</p>
+
+                <p>The installations are kept in <code>/opt/scls/&lt;flavor&gt;</code> to not interfere with the operating system.</p>
+                <p>Send comments, questions or suggestions to <b id="email">Christian Messe: [javascript protected email]</b></p>
+            </td>
+        </tr>
+    </table>
+
+    <h3>SCLS Flavors for Enterprise Linux 9</h3>
+    <ul>
+        {% for group in flavor_groups %}
+        <li><strong>{{ group.title }}</strong>
+            <p>{{ group.description }}</p>
+            <ul>
+                {% for flavor in group.flavors %}
+                <li><code><b>{{ flavor.name }}</b></code> - {{ flavor.description }}</li>
+                {% endfor %}
+            </ul>
+            <br>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <h3>Installation on Enterprise Linux 9</h3>
+    <p>To install a flavor, <a href="https://belfem.lbl.gov/scls/el9/x86_64/scls-release-{{ release_version }}-1.el9.noarch.rpm">download the release package</a> and type this into your bash:</p>
+    <code><b>sudo dnf install <a href="https://belfem.lbl.gov/scls/el9/x86_64/scls-release-{{ release_version }}-1.el9.noarch.rpm">scls-release-{{ release_version }}-1.el9.noarch.rpm</a></b></code><br>
+    <code><b>sudo dnf update</b></code><br>
+    <code><b>sudo dnf install scls-&lt;flavor&gt;</b></code><br>
+    <p>After installation, call the following command to set up your paths:</p>
+    <code><b>source /opt/scls/&lt;flavor&gt;/bin/activate</b></code><br>
+    <p>This script will add the <code>*/bin</code> directory to your path and set the <code>SCLS</code> environment variable to point to <code>/opt/scls/&lt;flavor&gt;</code></p>
+
+    <h3>SCLS Flavor for Amazon Linux 2023</h3>
+    <p>For Amazon Linux, only selected flavors are available. To install, you can type:</p>
+    <code><b>sudo yum install <a href="https://belfem.lbl.gov/scls/amzn2023/x86_64/scls-release-{{ release_version }}-1.amzn2023.noarch.rpm">scls-release-{{ release_version }}-1.amzn2023.noarch.rpm</a></b></code><br>
+    <code><b>sudo yum update</b></code><br>
+    <code><b>sudo yum install scls-&lt;flavor&gt;</b></code><br>
+
+    <h3>Integer Indexing</h3>
+    <p>All libraries within this repository are compiled with 32-bit integers, ensuring compatibility with a wide range of applications. If you require libraries with 64-bit integers, the compilation files and instructions will be provided in the GitHub repository associated with this collection.</p>
+
+    <h3>Git Repository</h3>
+    <p>If you want to build your own flavor, feel free to check out the git repository with the build recipes:<br><br>
+    <code><b><a href="https://github.com/cmesse/scls">git clone https://github.com/cmesse/scls.git</a></b></code></p>
+
+    <h3>Packages</h3>
+    <table class="package-table">
+        <tr class="gray-bg">
+            <th>Name</th>
+            <th>Version</th>
+            <th>Description</th>
+            {% for flavor in flavors %}
+            <th class="flavor-header">{{ flavor.name }}</th>
+            {% endfor %}
+        </tr>
+        {% for package in packages %}
+        <tr {% if loop.index is odd %}class="gray-bg"{% endif %}>
+            <td class="left">
+                {% if package.homepage %}
+                <a href="{{ package.homepage }}" class="package-name">{{ package.name }}</a>
+                {% else %}
+                <span class="package-name">{{ package.name }}</span>
+                {% endif %}
+            </td>
+            <td class="center">{{ package.version }}</td>
+            <td class="left">{{ package.summary }}</td>
+            {% for flavor in flavors %}
+            <td class="center-check">
+                {% if package|package_available(flavor.name) %}
+                ✓
+                {% else %}
+                -
+                {% endif %}
+            </td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+    <br>
+
+    <h3>Known Issues</h3>
+    <ul>
+        <li><b>PETSc</b>
+            <ul>
+                <li>For the Intel compiler, compilation fails with both CUDA and OpenMP enabled. The Intel version of PETSc is compiled with either CUDA or OpenMP, not both.</li>
+            </ul>
+        </li>
+        <li><b>Strumpack</b>
+            <ul>
+                <li>Tests <code>Sparse_HOLDR_mpi_1</code> and <code>Sparse_mpi_16</code> fail</li>
+            </ul>
+        </li>
+        <li><b>SuiteSparse</b>
+            <ul>
+                <li>Experimental tests of <code>LAGraph</code> fail when using the Intel Compiler</li>
+            </ul>
+        </li>
+        <li><b>Slate</b>
+            <ul>
+                <li>The tests for <code>heev</code> fail</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h3>License Information</h3>
+    <p>This software is provided by the copyright holders and contributors <b>"AS IS,"</b> with no warranties of merchantability or fitness for a particular purpose. The copyright owner and contributors shall not be liable for any direct, indirect, incidental, special, or consequential damages resulting from the use of this software.</p>
+
+    <footer class="container">
+        © {{ release_version }} The Regents of the University of California, through Lawrence Berkeley National Laboratory<br>
+        (subject to receipt of any required approvals from the U.S. Dept. of Energy).<br>
+        All rights reserved.
+        <br>
+    </footer>
+    Latest update: {{ generation_date }}
+</main>
+</body>
+</html>

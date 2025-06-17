@@ -220,24 +220,37 @@ def run_command(cmd: List[str], cwd: Path, env: Dict[str, str], phase: str) -> N
     print(f"Command: {' '.join(cmd)}")
     print(f"Directory: {cwd}")
 
-    # Start the bash script with stdout piped for real-time reading
-    process = subprocess.Popen(cmd,cwd=cwd,env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    # Start the process
+    process = subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        universal_newlines=True
+    )
 
-    # Read and print stdout line by line as it’s produced
-    for line in process.stdout:
-        print(line.strip())  # strip() removes trailing newlines
+    # Read output line by line
+    while True:
+        line = process.stdout.readline()
+        if not line and process.poll() is not None:
+            break
+        if line:
+            print(line.rstrip())
 
-    # Optionally, handle stderr if your script produces error output
-    for line in process.stderr:
-        print(line.strip())
+    # Get the return code
+    returncode = process.poll()
 
-    # Wait for the script to finish (optional, if you need the exit code)
-    process.wait()
-
+    if returncode != 0:
+        raise BuildError(f"{phase} failed with return code {returncode}")
 
 def setup_environment(flavor: Dict, prefix: Path, recipe: Dict = None) -> Dict[str, str]:
     """Setup build environment variables"""
     env = os.environ.copy()
+
+    flavor_name = flavor.get('name', '')
 
     # Compiler setup
     compilers = flavor.get('compilers', {})
@@ -264,7 +277,11 @@ def setup_environment(flavor: Dict, prefix: Path, recipe: Dict = None) -> Dict[s
             value = str(value).replace('%{prefix}', str(prefix))
             env[key] = value
             print(f"Setting {key}={value}")
-
+        if 'flavor_env' in recipe['configure']:
+            if flavor_name in recipe['configure']['flavor_env']:
+                for key, value in recipe['configure']['flavor_env'][flavor_name].items():
+                    env[key] = value.replace('%{prefix}', str(prefix))
+                    print(f"Setting {key}={value}")
     return env
 
 

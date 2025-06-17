@@ -55,11 +55,12 @@ class MacOSBuilder:
         self.sdk = subprocess.check_output(
             ["xcrun", "--sdk", "macosx", "--show-sdk-path"],text=True).strip()
 
+        self.host = "x86_64-apple-darwin" + subprocess.check_output(
+            ["uname", "-r"],text=True).strip()
+
         # Create directories
         for d in [self.sources_dir, self.build_dir, self.rpms_dir, self.srpms_dir, self.specs_dir]:
             d.mkdir(parents=True, exist_ok=True)
-
-
 
     def update_config_scripts(self, source_dir: Path) -> None:
         """Update config.guess and config.sub for macOS compatibility"""
@@ -100,7 +101,9 @@ class MacOSBuilder:
             # Run any pre-configure commands
             if 'configure' in self.recipe and 'pre' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['pre']:
-                    run_command(cmd.split(), source_dir, env, "pre-configure")
+                    # Apply check_args to replace %{sdk} and %{host}
+                    checked_cmd = self.check_args([cmd])[0]
+                    run_command(['sh', '-c', checked_cmd], source_dir, env, "pre-configure")
 
             # Run configure
             cmd = self.check_args(['./configure'] + args)
@@ -109,7 +112,9 @@ class MacOSBuilder:
             # Run any post-configure commands
             if 'configure' in self.recipe and 'post' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['post']:
-                    run_command(cmd.split(), source_dir, env, "post-configure")
+                    # Apply check_args to replace %{sdk} and %{host}
+                    checked_cmd = self.check_args([cmd])[0]
+                    run_command(['sh', '-c', checked_cmd], source_dir, env, "post-configure")
 
         elif configure_type == 'cmake':
             # Create build directory
@@ -141,7 +146,10 @@ class MacOSBuilder:
         return source_dir
 
     def check_args(self, cmd):
-        return [ s.replace('%{sdk}', self.sdk) for s in cmd ]
+        cmd0 = [s.replace('%{prefix}', str(self.prefix)) for s in cmd]
+        cmd1 =  [ s.replace('%{sdk}', self.sdk) for s in cmd0 ]
+        cmd2 = [s.replace('%{host}', self.host) for s in cmd1]
+        return cmd2
 
     def build(self, build_dir: Path, env: Dict[str, str]) -> None:
         """Run build step"""
