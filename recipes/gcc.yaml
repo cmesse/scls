@@ -24,10 +24,9 @@ features:
 configure:
   pre:
     - "for f in $(find . -name configure); do gsed -i 's/--version -v -V -qversion/--version -v/g' configure ; done"
-  post:
-    - "ln -s %{prefix}/bin/gfortran-scls %{prefix}/bin/gfortran"
 
   type: autotools
+  install_prefix: "gcc"
   args:
     - --with-gmp-include=%{prefix}/include
     - --with-gmp-lib=%{prefix}/lib
@@ -42,7 +41,7 @@ configure:
     - --with-system-zlib
     - --disable-nls
     - --disable-multilib
-    - --program-suffix=scls
+    - --program-suffix=-scls
 
   optimization:
     O_level: 2
@@ -50,6 +49,10 @@ configure:
 
 build:
   parallel: true
+
+install:
+  post:
+    - "pushd %{prefix} && mkdir -p bin && cd bin && ln -s ../gcc/bin/%{host}-gfortran-scls ./gfortran && popd"
 
 test:
   commands:

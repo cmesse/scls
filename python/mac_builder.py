@@ -16,12 +16,16 @@ from typing import Dict, List
 from build_common import (
     BuildError, load_recipe, load_flavor, load_description,
     get_optimization_flags, download_source, extract_source,
-    apply_patches, run_command, setup_environment,
+    run_command, setup_environment,
     get_configure_args, get_cmake_args, get_parallel_jobs,
-    clean_libtool_files, copy_patches_to_sources,
+    clean_libtool_files,
     should_build_package
 )
 
+from patch_common import (
+    copy_patches_to_sources,
+    apply_patches
+)
 
 class MacOSBuilder:
     def __init__(self, package: str, flavor: str = "macos"):
@@ -42,6 +46,7 @@ class MacOSBuilder:
 
         # Setup paths - mirror rpmbuild structure
         self.prefix = Path(self.flavor['prefix'])
+        self.install_prefix = None
         self.project_root = Path(__file__).parent.parent  # Go up from python/ to project root
         self.rpmbuild = self.project_root / "work"
         self.sources_dir = self.rpmbuild / "sources"
@@ -50,6 +55,9 @@ class MacOSBuilder:
         self.rpms_dir = self.rpmbuild / "pkgs"
         self.srpms_dir = self.rpmbuild / "spkgs"
         self.specs_dir = self.rpmbuild / "specs" # actually not needed on mac
+        self.patch_dir = self.project_root / "patches" / package
+
+        self.nprocs = os.cpu_count()
 
         # get the sdk
         self.sdk = subprocess.check_output(
@@ -57,6 +65,8 @@ class MacOSBuilder:
 
         self.host = "x86_64-apple-darwin" + subprocess.check_output(
             ["uname", "-r"],text=True).strip()
+
+
 
         # Create directories
         for d in [self.sources_dir, self.build_dir, self.rpms_dir, self.srpms_dir, self.specs_dir]:
@@ -81,12 +91,19 @@ class MacOSBuilder:
         """Run configure step"""
         configure_type = self.recipe.get('configure', {}).get('type', 'autotools')
 
+        pkg_config_path = str(self.prefix / 'lib/pkgconfig') + ':' + "/opt/X11/lib/pkgconfig:/usr/lib/pkgconfig"
+
         if configure_type == 'autotools':
             # Update config scripts
             self.update_config_scripts(source_dir)
 
+            if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
+                self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
+            else:
+                self.install_prefix = self.prefix
+
             # Get configure arguments
-            args = get_configure_args(self.recipe, self.flavor, self.prefix)
+            args = get_configure_args(self.recipe, self.flavor, self.prefix, self.install_prefix)
 
             # Get optimization flags
             cflags, cxxflags, fflags = get_optimization_flags(
@@ -97,6 +114,16 @@ class MacOSBuilder:
             env['FFLAGS'] = fflags
             env['FCFLAGS'] = fflags
             env['LDFLAGS'] = self.flavor['flags'].get('ldflags', '')
+            env['PKG_CONFIG_PATH'] = pkg_config_path
+
+            # Apply enhanced configure environment (supports +=, -=, etc.)
+            from build_common import apply_configure_environment
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
+
+
+            # apply special clang hack
+            cmd = "for f in $(find . -name configure); do sed -i '' 's/--version -v -V -qversion/--version -v/g' $f; done"
+            run_command(['sh', '-c', cmd], source_dir, env, "pre-configure")
 
             # Run any pre-configure commands
             if 'configure' in self.recipe and 'pre' in self.recipe['configure']:
@@ -121,8 +148,13 @@ class MacOSBuilder:
             build_dir = source_dir / 'build'
             build_dir.mkdir(exist_ok=True)
 
+            if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
+                self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
+            else:
+                self.install_prefix = self.prefix
+
             # Get CMake arguments
-            args = get_cmake_args(self.recipe, self.flavor, self.prefix)
+            args = get_cmake_args(self.recipe, self.flavor, self.prefix, self.install_prefix)
 
             # Get optimization flags
             cflags, cxxflags, fflags = get_optimization_flags(
@@ -132,13 +164,88 @@ class MacOSBuilder:
             env['CXXFLAGS'] = cxxflags
             env['FFLAGS'] = fflags
             env['LDFLAGS'] = self.flavor['flags'].get('ldflags', '')
+            env['PKG_CONFIG_PATH'] = pkg_config_path
+
+            # Apply enhanced configure environment (supports +=, -=, etc.)
+            from build_common import apply_configure_environment
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
 
             # Run CMake
-            cmd = self.check_args( ['cmake', '..'] + args )
+            cmd = self.check_args(['cmake', '..'] + args)
             run_command(cmd, build_dir, env, "cmake configure")
 
             # Update source_dir to build_dir for subsequent steps
             return build_dir
+
+        elif configure_type == 'custom':
+            # Custom configuration system (like OpenSSL's ./config)
+            if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
+                self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
+            else:
+                self.install_prefix = self.prefix
+
+            # Get optimization flags
+            cflags, cxxflags, fflags = get_optimization_flags(
+                self.recipe, self.flavor, env['CC']
+            )
+            env['CFLAGS'] = cflags
+            env['CXXFLAGS'] = cxxflags
+            env['FFLAGS'] = fflags
+            env['FCFLAGS'] = fflags
+            env['LDFLAGS'] = self.flavor['flags'].get('ldflags', '')
+            env['PKG_CONFIG_PATH'] = pkg_config_path
+
+            # Run any pre-configure commands
+            if 'configure' in self.recipe and 'pre' in self.recipe['configure']:
+                for cmd in self.recipe['configure']['pre']:
+                    checked_cmd = self.check_args([cmd])[0]
+                    run_command(['sh', '-c', checked_cmd], source_dir, env, "pre-configure")
+
+            # Get custom configure command and arguments
+            configure_cmd = self.recipe.get('configure', {}).get('command', './config')
+            args = self.recipe.get('configure', {}).get('args', [])
+
+            # Add prefix to args if not already present
+            prefix_arg = f"--prefix={self.install_prefix}"
+            if not any(arg.startswith('--prefix') for arg in args):
+                args.insert(0, prefix_arg)
+
+            # Apply flavor-specific args
+            if 'configure' in self.recipe and 'flavor_args' in self.recipe['configure']:
+                flavor_name = self.flavor.get('name', '')
+                if flavor_name in self.recipe['configure']['flavor_args']:
+                    args.extend(self.recipe['configure']['flavor_args'][flavor_name])
+
+            # Run custom configure command
+            cmd = self.check_args([configure_cmd] + args)
+            run_command(cmd, source_dir, env, "custom configure")
+
+            # Run any post-configure commands
+            if 'configure' in self.recipe and 'post' in self.recipe['configure']:
+                for cmd in self.recipe['configure']['post']:
+                    checked_cmd = self.check_args([cmd])[0]
+                    run_command(['sh', '-c', checked_cmd], source_dir, env, "post-configure")
+
+        elif configure_type == 'none':
+            # No configuration step needed (e.g., simple Makefiles)
+            if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
+                self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
+            else:
+                self.install_prefix = self.prefix
+
+            # Get optimization flags and set environment
+            cflags, cxxflags, fflags = get_optimization_flags(
+                self.recipe, self.flavor, env['CC']
+            )
+            env['CFLAGS'] = cflags
+            env['CXXFLAGS'] = cxxflags
+            env['FFLAGS'] = fflags
+            env['FCFLAGS'] = fflags
+            env['LDFLAGS'] = self.flavor['flags'].get('ldflags', '')
+            env['PREFIX'] = str(self.install_prefix)
+            env['PKG_CONFIG_PATH'] = pkg_config_path
+
+            print("Skipping configure step (type: none)")
 
         else:
             raise BuildError(f"Unknown configure type: {configure_type}")
@@ -147,9 +254,11 @@ class MacOSBuilder:
 
     def check_args(self, cmd):
         cmd0 = [s.replace('%{prefix}', str(self.prefix)) for s in cmd]
-        cmd1 =  [ s.replace('%{sdk}', self.sdk) for s in cmd0 ]
-        cmd2 = [s.replace('%{host}', self.host) for s in cmd1]
-        return cmd2
+        cmd1 = [s.replace('%{install_prefix}', str(self.install_prefix)) for s in cmd0]
+        cmd2 =  [ s.replace('%{sdk}', self.sdk) for s in cmd1 ]
+        cmd3 = [s.replace('%{host}', self.host) for s in cmd2]
+        cmd4 = [s.replace('%{nprocs}', str(self.nprocs)) for s in cmd3]
+        return cmd4
 
     def build(self, build_dir: Path, env: Dict[str, str]) -> None:
         """Run build step"""
@@ -333,7 +442,7 @@ class MacOSBuilder:
             )
 
             # Copy patches to sources directory
-            copy_patches_to_sources(self.recipe, Path("patches"), self.sources_dir)
+            copy_patches_to_sources(self.recipe, Path("patches"), self.sources_dir, self.package)
 
             # Extract source
             source_dir = extract_source(
@@ -342,7 +451,7 @@ class MacOSBuilder:
             )
 
             # Apply patches
-            apply_patches(source_dir, self.recipe)
+            apply_patches(source_dir, self.recipe, self.package, self.patch_dir)
 
             # Setup environment
             env = setup_environment(self.flavor, self.prefix)

@@ -1,0 +1,38 @@
+name: openssl
+version: 3.5.0
+summary: The OpenSSL cryptography and TLS library
+homepage: https://www.openssl.org/
+license: Apache 2.0
+
+source:
+  url: https://github.com/openssl/openssl/releases/download/openssl-%{version}/openssl-%{version}.tar.gz
+
+flavors:
+  - macos
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: custom
+  command: ./Configure
+  args:
+    - "--prefix=%{prefix}"
+    - "--libdir=%{prefix}/lib"
+    - shared
+    - zlib-dynamic
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "HARNESS_JOBS=%{nprocs} make test 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(ok|fail|skipped|error):' check.log || echo 'No test results found'"

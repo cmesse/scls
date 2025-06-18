@@ -1,0 +1,4 @@
+The OpenSSL toolkit provides support for secure communications between
+machines. OpenSSL includes a certificate management tool and shared
+libraries which provide various cryptographic algorithms and
+protocols.

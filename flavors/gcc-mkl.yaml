@@ -13,7 +13,7 @@ flags:
   cflags: "-march=x86-64-v3 -fPIC -fno-fast-math"
   cxxflags: "-march=x86-64-v3 -fPIC -fno-fast-math"
   fflags: "-march=x86-64-v3 -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
-  ldflags: "-Wl,-rpath,/opt/scls/gcc-mkl/lib"
+  ldflags: "-Wl,-rpath,/opt/scls/lib -L/opt/scls/lib"
   configure: "--enable-shared --disable-static --host=%{host} --build=%{host} --target=%{host}"
 
 math:

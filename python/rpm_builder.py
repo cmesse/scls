@@ -18,6 +18,11 @@ from build_common import (
     get_optimization_flags, download_source, should_build_package
 )
 
+from patch_common import (
+    copy_patches_to_sources,
+    get_all_patches
+)
+
 
 class RPMBuilder:
     def __init__(self, package: str, flavor: str):
@@ -63,36 +68,112 @@ class RPMBuilder:
         self.scls_name = f"scls-{self.flavor_name}-{self.package}"
 
     def get_rpm_requires(self) -> tuple[list, list]:
-        """Get RPM BuildRequires and Requires from recipe"""
+        """Get RPM BuildRequires and Requires from recipe and flavor-specific settings"""
         build_requires = []
         requires = []
+
+        # Get flavor-specific RPM requirements from recipe
+        flavor_name = self.flavor_name
+
+        # Add flavor-specific build requirements
+        if 'rpm_build_requires' in self.recipe:
+            if isinstance(self.recipe['rpm_build_requires'], dict):
+                # Flavor-specific format
+                if flavor_name in self.recipe['rpm_build_requires']:
+                    build_requires.extend(self.recipe['rpm_build_requires'][flavor_name])
+                # Also add 'all' flavors requirements if present
+                if 'all' in self.recipe['rpm_build_requires']:
+                    build_requires.extend(self.recipe['rpm_build_requires']['all'])
+            elif isinstance(self.recipe['rpm_build_requires'], list):
+                # Simple list format (applies to all flavors)
+                build_requires.extend(self.recipe['rpm_build_requires'])
+
+        # Add flavor-specific runtime requirements
+        if 'rpm_requires' in self.recipe:
+            if isinstance(self.recipe['rpm_requires'], dict):
+                # Flavor-specific format
+                if flavor_name in self.recipe['rpm_requires']:
+                    requires.extend(self.recipe['rpm_requires'][flavor_name])
+                # Also add 'all' flavors requirements if present
+                if 'all' in self.recipe['rpm_requires']:
+                    requires.extend(self.recipe['rpm_requires']['all'])
+            elif isinstance(self.recipe['rpm_requires'], list):
+                # Simple list format (applies to all flavors)
+                requires.extend(self.recipe['rpm_requires'])
 
         # Compiler requirements based on features
         features = self.recipe.get('features', {})
 
-        # Add compiler requirements
-        if self.flavor['compilers']['cc'] == 'gcc':
+        # Add compiler requirements based on flavor
+        compiler_cc = self.flavor['compilers']['cc']
+        if compiler_cc == 'gcc':
             build_requires.append('gcc')
             build_requires.append('gcc-c++')
             if features.get('fortran', False):
                 build_requires.append('gfortran')
-        elif self.flavor['compilers']['cc'] == 'icx':
-            # Intel compilers would need different handling
+        elif compiler_cc == 'icx':
+            # Intel compilers - could be added later
             pass
 
         # Standard build tools
         build_requires.extend(['make', 'git'])
 
-        # Add recipe-specific requirements
+        # Add recipe-specific requirements (our own packages) - with flavor support
         if 'requires' in self.recipe:
-            for req in self.recipe['requires']:
-                # For packages we build, add scls- prefix
-                if req in ['cmake', 'autoconf', 'automake', 'libtool']:
-                    build_requires.append(req)  # Use system versions for now
-                else:
-                    scls_req = f"scls-{self.flavor_name}-{req}"
-                    build_requires.append(scls_req)
-                    requires.append(scls_req)
+            recipe_requires = self.recipe['requires']
+
+            # Handle flavor-sensitive requires
+            if isinstance(recipe_requires, dict):
+                # Flavor-specific format
+                if flavor_name in recipe_requires:
+                    for req in recipe_requires[flavor_name]:
+                        scls_req = f"scls-{self.flavor_name}-{req}"
+                        build_requires.append(scls_req)
+                        requires.append(scls_req)
+                # Also add 'all' flavors requirements if present
+                if 'all' in recipe_requires:
+                    for req in recipe_requires['all']:
+                        scls_req = f"scls-{self.flavor_name}-{req}"
+                        build_requires.append(scls_req)
+                        requires.append(scls_req)
+            elif isinstance(recipe_requires, list):
+                # Simple list format (applies to all flavors)
+                for req in recipe_requires:
+                    # For packages we build, add scls- prefix
+                    if req in ['cmake', 'autoconf', 'automake', 'libtool', 'pkg-config']:
+                        build_requires.append(req)  # Use system versions for build tools
+                    else:
+                        scls_req = f"scls-{self.flavor_name}-{req}"
+                        build_requires.append(scls_req)
+                        requires.append(scls_req)
+
+        # Math library requirements based on flavor
+        math_feature = features.get('math', 'none')
+        if math_feature in ['serial', 'parallel']:
+            math_config = self.flavor.get('math', {})
+            if math_config.get('type') == 'mkl':
+                # Intel MKL requirements
+                if 'gcc-mkl' in flavor_name or 'intel-mkl' in flavor_name:
+                    requires.append('intel-mkl')
+                    build_requires.append('intel-mkl-devel')
+            elif math_config.get('type') == 'reference':
+                # Reference BLAS/LAPACK
+                requires.extend(['blas', 'lapack'])
+                build_requires.extend(['blas-devel', 'lapack-devel'])
+                if math_feature == 'parallel':
+                    requires.append('scalapack')
+                    build_requires.append('scalapack-devel')
+
+        # MPI requirements
+        if features.get('mpi', False):
+            mpi_impl = self.flavor.get('mpi', 'openmpi')
+            if mpi_impl == 'openmpi':
+                requires.extend(['openmpi', 'openmpi-devel'])
+                build_requires.extend(['openmpi-devel'])
+
+        # Remove duplicates while preserving order
+        build_requires = list(dict.fromkeys(build_requires))
+        requires = list(dict.fromkeys(requires))
 
         return build_requires, requires
 
@@ -143,10 +224,19 @@ class RPMBuilder:
         # Get file list
         files = self.get_file_list()
 
-        # Load description
+        # Load description from descriptions directory
         description = load_description(self.package)
         if not description:
-            description = self.recipe.get('description', '')
+            description = self.recipe.get('description', self.recipe.get('summary', ''))
+
+        # For RPM, ensure description is properly formatted (no leading/trailing whitespace per line)
+        description_lines = []
+        for line in description.split('\n'):
+            description_lines.append(line.strip())
+        formatted_description = '\n'.join(description_lines).strip()
+
+        # Process configure environment for SPEC file
+        configure_env_vars = self.get_configure_env_vars()
 
         # Prepare template variables
         context = {
@@ -155,7 +245,7 @@ class RPMBuilder:
             'package_name': self.package,
             'scls_name': self.scls_name,
             'version': self.recipe['version'],
-            'description': description,
+            'description': formatted_description,
             'homepage': self.recipe.get('homepage', ''),
             'license': self.recipe.get('license', ''),
             'source_url': self.recipe['source']['url'],
@@ -173,6 +263,7 @@ class RPMBuilder:
             'configure_type': self.recipe.get('configure', {}).get('type', 'autotools'),
             'configure_args': self.get_configure_args(),
             'cmake_args': self.get_cmake_args() if self.recipe.get('configure', {}).get('type') == 'cmake' else [],
+            'configure_env_vars': configure_env_vars,
             'patches': self.get_patches(),
             'test_commands': self.recipe.get('test', {}).get('commands', []),
         }
@@ -221,20 +312,45 @@ class RPMBuilder:
 
         return args
 
+    def get_configure_env_vars(self) -> List[Dict[str, str]]:
+        """Get configure environment variables for SPEC file"""
+        env_vars = []
+
+        if 'configure' not in self.recipe or 'env' not in self.recipe['configure']:
+            return env_vars
+
+        env_config = self.recipe['configure']['env']
+
+        # Handle both dict and list formats
+        if isinstance(env_config, dict):
+            for var, val in env_config.items():
+                # Replace %{prefix} with RPM macro
+                val = str(val).replace('%{prefix}', '%{prefix}')
+                env_vars.append({'name': var, 'value': val})
+        elif isinstance(env_config, list):
+            for env_item in env_config:
+                if isinstance(env_item, dict):
+                    for var, val in env_item.items():
+                        val = str(val).replace('%{prefix}', '%{prefix}')
+                        env_vars.append({'name': var, 'value': val})
+
+        return env_vars
+
     def get_patches(self) -> list:
-        """Get list of patches from recipe"""
-        patches = []
+        """Get list of patches for SPEC file generation"""
+        patches = get_all_patches(self.recipe, self.package)
 
-        # Check for patches in source
-        source = self.recipe.get('source', {})
-        for key, value in source.items():
-            if key.startswith('patch'):
-                patches.append({
-                    'number': key.replace('patch', ''),
-                    'file': value
-                })
+        # Convert to RPM SPEC format
+        rpm_patches = []
+        for i, patch in enumerate(patches):
+            rpm_patches.append({
+                'number': i,
+                'file': patch['file'],
+                'strip': patch['strip'],
+                'source': patch['source']
+            })
 
-        return patches
+        return rpm_patches
 
     def setup_rpmbuild(self) -> None:
         """Ensure rpmbuild directory structure exists"""
@@ -242,20 +358,15 @@ class RPMBuilder:
             (self.rpm_base / subdir).mkdir(parents=True, exist_ok=True)
 
     def download_sources(self) -> None:
-        """Download source tarball to rpmbuild/SOURCES"""
+        """Download source tarball and copy patches to rpmbuild/SOURCES"""
         source_url = self.recipe['source']['url'].replace('%{version}', self.recipe['version'])
         download_source(
             source_url, self.sources_dir,
             self.package, self.recipe['version']
         )
 
-        # Copy patches if any
-        patches_dir = Path("patches") / self.package
-        if patches_dir.exists():
-            for patch_file in patches_dir.glob("*.patch"):
-                dest = self.sources_dir / patch_file.name
-                shutil.copy2(patch_file, dest)
-                print(f"Copied patch: {patch_file.name}")
+        # Copy patches using improved patching system
+        copy_patches_to_sources(self.recipe, Path("patches"), self.sources_dir, self.package)
 
     def build_rpm(self, spec_file: Path) -> None:
         """Run rpmbuild to create the RPM"""
@@ -356,7 +467,11 @@ Requires:       {{ req }}
 %prep
 %setup -q -n {{ package_name }}-{{ version }}
 {% for patch in patches %}
+{% if patch.strip == 1 %}
 %patch{{ patch.number }} -p1
+{% else %}
+%patch{{ patch.number }} -p{{ patch.strip }}
+{% endif %}
 {% endfor %}
 
 %build
@@ -370,6 +485,18 @@ export CXXFLAGS="{{ cxxflags }}"
 export FFLAGS="{{ fflags }}"
 export FCFLAGS="{{ fcflags }}"
 export LDFLAGS="{{ ldflags }}"
+
+# Configure-specific environment variables
+{% for env_var in configure_env_vars %}
+{% if '+=' in env_var.value %}
+export {{ env_var.name }}="${{{ env_var.name }}:-} {{ env_var.value.replace('+=', '').strip() }}"
+{% elif '-=' in env_var.value %}
+# Remove operation for {{ env_var.name }} (manual implementation needed)
+export {{ env_var.name }}="${{{ env_var.name }}}"
+{% else %}
+export {{ env_var.name }}="{{ env_var.value }}"
+{% endif %}
+{% endfor %}
 
 {% if configure_type == 'autotools' %}
 %configure \\
@@ -390,6 +517,32 @@ make
 {% endfor %}
 
 %cmake_build
+
+{% elif configure_type == 'custom' %}
+# Custom configuration system
+{% if recipe.configure.command is defined %}
+{{ recipe.configure.command }} \\
+{% else %}
+./config \\
+{% endif %}
+{% for arg in configure_args %}
+    {{ arg }}{% if not loop.last %} \\{% endif %}
+{% endfor %}
+
+{% if parallel_build %}
+make -j%{?_smp_mflags}
+{% else %}
+make
+{% endif %}
+
+{% elif configure_type == 'none' %}
+# No configure step - direct build
+{% if parallel_build %}
+make -j%{?_smp_mflags} PREFIX=%{prefix}
+{% else %}
+make PREFIX=%{prefix}
+{% endif %}
+
 {% endif %}
 
 %check
@@ -404,6 +557,8 @@ make
 %make_install
 {% elif configure_type == 'cmake' %}
 %cmake_install
+{% else %}
+make install DESTDIR=%{buildroot}
 {% endif %}
 
 # Remove libtool archives
@@ -417,6 +572,12 @@ find %{buildroot} -name '*.la' -delete
 %changelog
 * {{ changelog_date }} SCLS Build System <scls@lbl.gov> - {{ version }}-1
 - Initial package for {{ flavor.name }} flavor
+{% if patches %}
+- Applied {{ patches|length }} patch(es):
+{% for patch in patches %}
+  - {{ patch.file }}{% if patch.strip != 1 %} (-p{{ patch.strip }}){% endif %}
+{% endfor %}
+{% endif %}
 '''
         with open(default_template, 'w') as f:
             f.write(template_content)

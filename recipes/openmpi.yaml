@@ -1,0 +1,43 @@
+name: openmpi
+version: 5.0.8
+summary: A powerful implementation of MPI/SHMEM
+homepage: https://www.mpfr.org/
+license: BSD
+
+source:
+  url: https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-%{version}.tar.gz
+
+requires:
+  - gmp
+  - mpfr
+  - mpc
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: autotools
+  args:
+    - --enable-thread-safe
+    - --with-gmp-include=%{prefix}/include
+    - --with-gmp-lib=%{prefix}/lib
+
+  # Flavor-specific configure arguments
+  flavor_env:
+    macos:
+      - SED: "%{prefix}/bin/gsed"
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make check 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"

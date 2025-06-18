@@ -1,0 +1,60 @@
+name: libevent
+version: 2.1.12
+summary: Abstract asynchronous event notification library
+homepage: https://libevent.org/
+license: BSD and ISC
+
+source:
+  url: https://github.com/libevent/libevent/releases/download/release-%{version}-stable/libevent-%{version}-stable.tar.gz
+
+patches:
+  - file: libevent_fix_python_shebang.patch
+  - file: libevent-nonettests.patch
+  - file: libevent-build-do-not-try-install-doxygen-man-pages-if-they-w.patch
+  - file: libevent-build-add-doxygen-to-all.patch
+  - file: libevent-Revert-Fix-checking-return-value-of-the-evdns_base_r.patch
+
+requires:
+  macos:
+    - openssl
+
+rpm_build_requires:
+  all:
+      - openssl-devel
+      - python3-devel
+
+rpm_requires:
+  all:
+      - openssl
+      - python3
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+
+configure:
+  type: autotools
+  env:
+    - CFLAGS: "+=-I%{prefix}/include"
+    - CXXFLAGS: "+=-I%{prefix}/include"
+    - LDFLAGS: "+=-lssl -lcrypto"
+  pre:
+    - "autoreconf -f -i"
+  args:
+    - -disable-dependency-tracking
+
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make verify 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(OKAY|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"

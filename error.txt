@@ -1,0 +1,50 @@
+ ./scls libevent build
+
+============================================================
+Building libevent 2.1.12 for macos
+============================================================
+
+Cleaning existing work directory: /Users/christian/codes/scls/work/build
+Source already downloaded: /Users/christian/codes/scls/work/sources/libevent-2.1.12-stable.tar.gz
+Copied patch to sources: libevent_fix_python_shebang.patch (strip level: 1)
+Copied patch to sources: libevent-nonettests.patch (strip level: 1)
+Copied patch to sources: libevent-build-do-not-try-install-doxygen-man-pages-if-they-w.patch (strip level: 1)
+Copied patch to sources: libevent-build-add-doxygen-to-all.patch (strip level: 1)
+Copied patch to sources: libevent-Revert-Fix-checking-return-value-of-the-evdns_base_r.patch (strip level: 1)
+Extracting /Users/christian/codes/scls/work/sources/libevent-2.1.12-stable.tar.gz...
+
+=== Applying 5 patches ===
+[1/5] Applying libevent_fix_python_shebang.patch (-p1) [recipe_patches]
+  Using patch from: patches/libevent/libevent_fix_python_shebang.patch
+  WARNING: Patch libevent_fix_python_shebang.patch failed to apply
+    Return code: 2
+    Error: patch: **** patch file 'patches/libevent/libevent_fix_python_shebang.patch' not found: No such file or directory
+[2/5] Applying libevent-nonettests.patch (-p1) [recipe_patches]
+  Using patch from: patches/libevent/libevent-nonettests.patch
+  WARNING: Patch libevent-nonettests.patch failed to apply
+    Return code: 2
+    Error: patch: **** patch file 'patches/libevent/libevent-nonettests.patch' not found: No such file or directory
+[3/5] Applying libevent-build-do-not-try-install-doxygen-man-pages-if-they-w.patch (-p1) [recipe_patches]
+  Using patch from: patches/libevent/libevent-build-do-not-try-install-doxygen-man-pages-if-they-w.patch
+  WARNING: Patch libevent-build-do-not-try-install-doxygen-man-pages-if-they-w.patch failed to apply
+    Return code: 2
+    Error: patch: **** patch file 'patches/libevent/libevent-build-do-not-try-install-doxygen-man-pages-if-they-w.patch' not found: No such file or directory
+[4/5] Applying libevent-build-add-doxygen-to-all.patch (-p1) [recipe_patches]
+  Using patch from: patches/libevent/libevent-build-add-doxygen-to-all.patch
+  WARNING: Patch libevent-build-add-doxygen-to-all.patch failed to apply
+    Return code: 2
+    Error: patch: **** patch file 'patches/libevent/libevent-build-add-doxygen-to-all.patch' not found: No such file or directory
+[5/5] Applying libevent-Revert-Fix-checking-return-value-of-the-evdns_base_r.patch (-p1) [recipe_patches]
+  Using patch from: patches/libevent/libevent-Revert-Fix-checking-return-value-of-the-evdns_base_r.patch
+  WARNING: Patch libevent-Revert-Fix-checking-return-value-of-the-evdns_base_r.patch failed to apply
+    Return code: 2
+    Error: patch: **** patch file 'patches/libevent/libevent-Revert-Fix-checking-return-value-of-the-evdns_base_r.patch' not found: No such file or directory
+Found config.guess at /Users/christian/codes/scls/work/build/libevent-2.1.12-stable/build-aux/config.guess
+Found config.sub at /Users/christian/codes/scls/work/build/libevent-2.1.12-stable/build-aux/config.sub
+
+=== Running configure ===
+Command: ./configure --prefix=/opt/scls --enable-shared --disable-static --host=x86_64-apple-darwin24.5.0 --build=x86_64-apple-darwin24.5.0 --target=x86_64-apple-darwin24.5.0 -disable-dependency-tracking
+Directory: /Users/christian/codes/scls/work/build/libevent-2.1.12-stable
+^C
+Build interrupted by user
+
