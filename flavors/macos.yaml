@@ -14,7 +14,6 @@ flags:
   cxxflags: "-g -fPIC -fno-fast-math -march=native"
   fflags: "-g -fPIC -fno-fast-math -march=native"
   ldflags: "-Wl,-rpath,/opt/scls/lib -L/opt/scls/lib"
-  configure: "--enable-shared --disable-static --host=%{host} --build=%{host} --target=%{host}"
 
 # Math libraries configuration
 math:

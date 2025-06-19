@@ -57,6 +57,9 @@ class MacOSBuilder:
         self.specs_dir = self.rpmbuild / "specs" # actually not needed on mac
         self.patch_dir = self.project_root / "patches" / package
 
+        # this is set in run after extracting the package
+        self.source_dir = ""
+
         self.nprocs = os.cpu_count()
 
         # get the sdk
@@ -103,7 +106,7 @@ class MacOSBuilder:
                 self.install_prefix = self.prefix
 
             # Get configure arguments
-            args = get_configure_args(self.recipe, self.flavor, self.prefix, self.install_prefix)
+            args = get_configure_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix )
 
             # Get optimization flags
             cflags, cxxflags, fflags = get_optimization_flags(
@@ -118,8 +121,8 @@ class MacOSBuilder:
 
             # Apply enhanced configure environment (supports +=, -=, etc.)
             from build_common import apply_configure_environment
-            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
 
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
 
             # apply special clang hack
             cmd = "for f in $(find . -name configure); do sed -i '' 's/--version -v -V -qversion/--version -v/g' $f; done"
@@ -247,6 +250,29 @@ class MacOSBuilder:
 
             print("Skipping configure step (type: none)")
 
+        elif configure_type == 'custom_makefile':
+            # Set install_prefix
+            if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
+                self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
+            else:
+                self.install_prefix = self.prefix
+
+            # Get optimization flags and set environment
+            cflags, cxxflags, fflags = get_optimization_flags(self.recipe, self.flavor, env['CC'])
+            env['CFLAGS'] = cflags
+            env['CXXFLAGS'] = cxxflags
+            env['FFLAGS'] = fflags
+            env['FCFLAGS'] = fflags
+            env['LDFLAGS'] = self.flavor['flags'].get('ldflags', '')
+            env['PREFIX'] = str(self.install_prefix)
+            env['PKG_CONFIG_PATH'] = pkg_config_path
+
+            # Apply enhanced configure environment
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
+
+            # *** CALL IT HERE ***
+            self.process_custom_makefile(source_dir, env)
+
         else:
             raise BuildError(f"Unknown configure type: {configure_type}")
 
@@ -258,7 +284,8 @@ class MacOSBuilder:
         cmd2 =  [ s.replace('%{sdk}', self.sdk) for s in cmd1 ]
         cmd3 = [s.replace('%{host}', self.host) for s in cmd2]
         cmd4 = [s.replace('%{nprocs}', str(self.nprocs)) for s in cmd3]
-        return cmd4
+        cmd5 = [s.replace('%{srcdir}', str(self.source_dir)) for s in cmd4]
+        return cmd5
 
     def build(self, build_dir: Path, env: Dict[str, str]) -> None:
         """Run build step"""
@@ -325,6 +352,10 @@ class MacOSBuilder:
         install_cmd = ['make', 'install', f'DESTDIR={destdir}']
         if 'install' in self.recipe and 'args' in self.recipe['install']:
             install_cmd.extend(self.recipe['install']['args'])
+
+        # special case for Apple zlib
+        if self.package == 'zlib':
+            build_dir = build_dir / 'zlib'
 
         run_command(install_cmd, build_dir, env, "install")
 
@@ -450,11 +481,18 @@ class MacOSBuilder:
                 self.package, self.recipe['version']
             )
 
+            # remember source directory
+            self.source_dir = source_dir
+
+            # special case for Apple zlib
+            if self.package == 'zlib':
+                source_dir = source_dir / 'zlib'
+
             # Apply patches
             apply_patches(source_dir, self.recipe, self.package, self.patch_dir)
 
             # Setup environment
-            env = setup_environment(self.flavor, self.prefix)
+            env = setup_environment(self.flavor, self.prefix, self.source_dir )
 
             # Configure
             build_dir = self.configure(source_dir, env)
@@ -487,6 +525,156 @@ class MacOSBuilder:
         print(f"Successfully completed: {', '.join(commands)}")
         print(f"{'=' * 60}\n")
 
+    def process_custom_makefile(self, source_dir: Path, env: Dict[str, str]) -> None:
+        """Process custom makefile template if needed"""
+        if self.recipe.get('configure', {}).get('type') != 'custom_makefile':
+            return
+
+        template_name = self.recipe.get('configure', {}).get('template')
+        if not template_name:
+            raise BuildError("custom_makefile type requires 'template' field in configure section")
+
+        # Setup Jinja2 environment for templates
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+        jinja_env = Environment(
+            loader=FileSystemLoader('templates'),
+            autoescape=select_autoescape(),
+            trim_blocks=True,
+            lstrip_blocks=True
+        )
+
+        # Load the makefile template
+        try:
+            makefile_template = jinja_env.get_template(template_name)
+        except Exception as e:
+            raise BuildError(f"Failed to load makefile template '{template_name}': {e}")
+
+        # Calculate additional variables for makefile generation
+        makefile_context = self.get_makefile_context(env)
+
+        # Render the makefile
+        try:
+            rendered_makefile = makefile_template.render(**makefile_context)
+
+            # Write the makefile to the source directory
+            makefile_path = source_dir / "Makefile.inc"
+            with open(makefile_path, 'w') as f:
+                f.write(rendered_makefile)
+
+            print(f"Generated custom Makefile: {makefile_path}")
+
+        except Exception as e:
+            raise BuildError(f"Failed to render makefile template '{template_name}': {e}")
+
+    def get_makefile_context(self, env: Dict[str, str]) -> Dict:
+        """Get context variables for custom makefile templates"""
+        context = {
+            'recipe': self.recipe,
+            'flavor': self.flavor,
+            'package_name': self.package,
+            'version': self.recipe['version'],
+            'features': self.recipe.get('features', {}),
+            'prefix': str(self.prefix),
+            'install_prefix': str(self.install_prefix),
+        }
+
+        # Add compiler information
+        compilers = self.flavor.get('compilers', {})
+        context.update({
+            'cc': compilers.get('cc', 'clang'),
+            'cxx': compilers.get('cxx', 'clang++'),
+            'fc': compilers.get('fc', 'gfortran'),
+        })
+
+        # Add MPI compilers if MPI is enabled
+        features = self.recipe.get('features', {})
+        if features.get('mpi', False):
+            context.update({
+                'mpicc': 'mpicc',
+                'mpicxx': 'mpicxx',
+                'mpifort': 'mpifort',
+            })
+
+        # Add optimization flags (get from environment since they're already calculated)
+        context.update({
+            'cflags': env.get('CFLAGS', ''),
+            'cxxflags': env.get('CXXFLAGS', ''),
+            'fflags': env.get('FFLAGS', ''),
+            'fcflags': env.get('FCFLAGS', ''),
+            'ldflags': env.get('LDFLAGS', ''),
+        })
+
+        # Add macOS-specific variables
+        context.update({
+            'sdk': self.sdk,
+            'host': self.host,
+            'nprocs': str(self.nprocs),
+        })
+
+        # Add math library information
+        math_config = self.flavor.get('math', {})
+        context['math_type'] = math_config.get('linalg', 'reference')
+
+        # Generate math library link lines
+        if math_config.get('linalg') == 'accelerate':
+            if features.get('math') == 'parallel':
+                context['math_libs'] = '-lscalapack -framework Accelerate'
+            else:
+                context['math_libs'] = '-framework Accelerate'
+            context['use_accelerate'] = True
+            context['use_mkl'] = False
+        elif math_config.get('linalg') == 'mkl':
+            context['mkl_link_line'] = self.get_mkl_link_line()
+            context['use_mkl'] = True
+            context['use_accelerate'] = False
+        else:
+            context['use_mkl'] = False
+            context['use_accelerate'] = False
+            if features.get('math') == 'parallel':
+                context['math_libs'] = '-lscalapack -llapack -lblas'
+            else:
+                context['math_libs'] = '-llapack -lblas'
+
+        # Add threading information
+        threading = math_config.get('threading', 'openmp')
+        context['threading'] = threading
+        if threading == 'openmp':
+            context['openmp_flag'] = '-fopenmp'
+        else:
+            context['openmp_flag'] = ''
+
+        # Add library type (always shared on macOS)
+        context['shared_libs'] = True
+        context['lib_ext'] = '.dylib'
+
+        # Add index size for packages that support it
+        context['index_size'] = features.get('index_size', 32)
+
+        return context
+
+    def get_mkl_link_line(self) -> str:
+        """Generate Intel MKL link line for macOS (if MKL is used)"""
+        math_config = self.flavor.get('math', {})
+        threading = math_config.get('threading', 'openmp')
+
+        # MKL on macOS (if available)
+        interface_lib = 'mkl_intel_lp64'
+
+        if threading == 'openmp':
+            threading_lib = 'mkl_intel_thread'
+            extra_libs = '-liomp5'
+        else:
+            threading_lib = 'mkl_sequential'
+            extra_libs = ''
+
+        link_line = f"-l{interface_lib} -l{threading_lib} -lmkl_core {extra_libs} -lpthread -lm -ldl"
+
+        # Add MPI-specific MKL libraries if MPI is enabled
+        features = self.recipe.get('features', {})
+        if features.get('mpi', False) and features.get('math') == 'parallel':
+            link_line = f"-lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64 {link_line}"
+
+        return link_line
 
 def main():
     parser = argparse.ArgumentParser(description='Build SCLS packages for macOS')
@@ -511,3 +699,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

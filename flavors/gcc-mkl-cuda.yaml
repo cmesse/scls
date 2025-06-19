@@ -1,0 +1,53 @@
+name: gcc-mkl-cuda
+platform: linux
+description: "Production build with GCC compilers, Intel MKL, and NVIDIA CUDA support"
+prefix: /opt/scls/gcc-mkl-cuda
+
+# Version configuration for NVIDIA HPC SDK
+nvidia:
+  hpc_version: "25.5"      # nvhpc-25-5 package version
+  gds_version: "2.17.5"    # Different versioning for math libs
+
+# Pre-build setup commands
+pre_build_setup:
+  - "source /opt/intel/oneapi/setvars.sh intel64"
+  # NVIDIA paths should be set by nvhpc package installation
+
+# RPM package dependencies
+rpm_build_requires:
+  - gcc
+  - gcc-c++
+  - gfortran
+  - intel-oneapi-mkl-devel
+  - nvhpc-25-5
+
+rpm_requires:
+  - intel-oneapi-mkl
+  - nvhpc-25-5
+
+compilers:
+  cc: gcc
+  cxx: g++
+  fc: gfortran
+  nvcc: nvcc  # Should be in PATH after nvhpc install
+
+flags:
+  cflags: "-march=x86-64-v3 -fPIC -fno-fast-math"
+  cxxflags: "-march=x86-64-v3 -fPIC -fno-fast-math"
+  fflags: "-march=x86-64-v3 -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
+  ldflags: "-Wl,-rpath,/opt/scls/lib -L/opt/scls/lib"
+
+# Math libraries configuration
+math:
+  linalg: mkl
+  threading: openmp
+  interface: lp64  # 32-bit integers
+  cuda: true  # Enable CUDA support
+
+# MPI implementation
+mpi: openmpi
+
+# CUDA-specific configuration
+cuda:
+  gpu_target: "sm_80"  # Default GPU architecture target
+  version: "12.0"  # Managed by nvhpc package

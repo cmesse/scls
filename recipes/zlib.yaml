@@ -1,0 +1,43 @@
+name: zlib
+version: 1.2.12
+summary: Compression and decompression library
+homepage: https://www.zlip.net
+license: zlib and boost
+
+source:
+  url: https://github.com/apple-oss-distributions/zlib/archive/zlib-98.tar.gz
+
+flavors:
+  - macos
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: autotools
+  defaults:
+    host_flags: false
+    shared: false
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+  pre:
+    - "ln -s %{srcdir}/libz.exp %{srcdir}/zlib/libz.exp"
+  env:
+     - SRCROOT: "%{srcdir}/zlib"
+
+install:
+  post:
+    - "rm -v %{prefix}/lib/libz.a"
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make check 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"

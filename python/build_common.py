@@ -130,7 +130,9 @@ def download_source(url: str, dest_dir: Path, package_name: str, version: str) -
 
     print(f"Downloading {url}...")
     try:
-        urllib.request.urlretrieve(url, dest_path)
+        #urllib.request.urlretrieve(url, dest_path)
+        cmd = ['sh', '-c', 'curl', '-O', '-L', url]
+        run_command(cmd, cwd=dest_dir, env={}, phase="Download source")
         print(f"Downloaded to {dest_path}")
         return dest_path
     except Exception as e:
@@ -263,10 +265,46 @@ def should_build_package(recipe: Dict, flavor: Dict) -> bool:
     return flavor_name in recipe['flavors']
 
 
-def get_configure_args(recipe: Dict, flavor: Dict, prefix: Path, install_prefix: Path ) -> List[str]:
+def get_configure_args(recipe: Dict, host, flavor: Dict, prefix: Path, install_prefix: Path ) -> List[str]:
     """Get configure arguments for autotools packages"""
     args = [f"--prefix={install_prefix}"]
 
+    if 'defaults' in recipe['configure']:
+
+        # Check for default overrides
+        defaults = recipe.get('configure', {}).get('defaults', {})
+
+        # Add shared/static flags unless overridden
+        if 'shared' in defaults :
+            if defaults.get('shared', True):
+                args.extend(["--enable-shared", "--disable-static"])
+        else:
+            if defaults.get('shared', True):
+                args.extend(["--enable-shared", "--disable-static"])
+
+        # Add host flags unless overridden
+        if 'host_flags' in defaults:
+            if defaults.get('host_flags', True):
+                args.extend([
+                    f"--host={host}",
+                    f"--build={host}",
+                    f"--target={host}"
+                ])
+        else:
+            if defaults.get('host_flags', True):
+                args.extend([
+                    f"--host={host}",
+                    f"--build={host}",
+                    f"--target={host}"
+                ])
+    else:
+        args.extend([
+            "--enable-shared",
+            "--disable-static",
+            f"--host={host}",
+            f"--build={host}",
+            f"--target={host}"
+        ])
     # Add flavor-specific configure args from flavor definition
     if 'configure' in flavor['flags']:
         args.extend(flavor['flags']['configure'].split())
@@ -687,7 +725,7 @@ def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict,
 
     return env
 
-def setup_environment(flavor: Dict, prefix: Path, recipe: Dict = None) -> Dict[str, str]:
+def setup_environment(flavor: Dict, prefix: Path, srcdir: Path, recipe: Dict = None) -> Dict[str, str]:
     """Setup build environment variables"""
     env = os.environ.copy()
 
@@ -719,8 +757,8 @@ def setup_environment(flavor: Dict, prefix: Path, recipe: Dict = None) -> Dict[s
         if isinstance(env_config, dict):
             # Dictionary format: {"VAR": "value"}
             for key, value in env_config.items():
-                # Replace %{prefix} with actual prefix
                 value = str(value).replace('%{prefix}', str(prefix))
+                value = str(value).replace('%{srcdir}', str(srcdir))
                 env[key] = value
                 print(f"Setting {key}={value}")
         elif isinstance(env_config, list):
@@ -729,6 +767,7 @@ def setup_environment(flavor: Dict, prefix: Path, recipe: Dict = None) -> Dict[s
                 if isinstance(env_item, dict):
                     for key, value in env_item.items():
                         value = str(value).replace('%{prefix}', str(prefix))
+                        value = str(value).replace('%{srcdir}', str(srcdir))
                         env[key] = value
                         print(f"Setting {key}={value}")
 
@@ -736,7 +775,9 @@ def setup_environment(flavor: Dict, prefix: Path, recipe: Dict = None) -> Dict[s
         if 'flavor_env' in recipe['configure']:
             if flavor_name in recipe['configure']['flavor_env']:
                 for key, value in recipe['configure']['flavor_env'][flavor_name].items():
-                    env[key] = value.replace('%{prefix}', str(prefix))
+                    value = str(value).replace('%{prefix}', str(prefix))
+                    value = str(value).replace('%{srcdir}', str(srcdir))
+                    env[key] = value
                     print(f"Setting {key}={value}")
 
     return env

@@ -31,6 +31,11 @@ configure:
 build:
   parallel: true
 
+install:
+  post:
+    - "rm -vf %{prefix}/lib/libcrypto.a"
+    - "rm -vf %{prefix}/lib/libssl.a"
+
 test:
   commands:
     - "HARNESS_JOBS=%{nprocs} make test 2>&1 | tee check.log"

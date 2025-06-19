@@ -1,0 +1,40 @@
+########################################################################
+#              SCLS Makefile.inc for MUMPS                           #
+########################################################################
+
+VERSION = {{ version }}
+SOVERSION = {{ version.split('.')[0] }}.{{ version.split('.')[1] }}
+
+# Compiler Settings
+CC  = {{ flavor.compilers.cc if not features.mpi else 'mpicc' }}
+FC  = {{ flavor.compilers.fc if not features.mpi else 'mpifort' }}
+
+# Optimization Flags
+{% if flavor.compilers.cc == 'gcc' %}
+OPTF = {{ fflags }} -fallow-argument-mismatch
+{% else %}
+OPTF = {{ fflags }}
+{% endif %}
+OPTC = {{ cflags }}
+
+LIBEXT = {{ lib_ext }}
+{% if lib_ext == '.dylib' %}
+SONAME = -install_name
+{% else %}
+SONAME = -soname
+{% endif %}
+
+{% if use_accelerate %}
+LIBPAR = -framework Accelerate
+{% elif use_mkl %}
+LIBPAR = {{ mkl_link_line }}
+{% else %}
+LIBPAR = -lscalapack -llapack -lblas
+{% endif %}
+
+# Index Size Configuration
+{% if features.index_size == 64 %}
+CDEFS = -DAdd_ -DINTSIZE64
+{% else %}
+CDEFS = -DAdd_
+{% endif %}

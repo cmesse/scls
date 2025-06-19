@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-RPM SPEC file generator for SCLS packages
-Generates SPEC files from recipes and flavors, then builds RPMs
+Enhanced RPM builder with release tags, proper parallel builds, and changelog logs
 """
 
 import os
@@ -12,16 +11,41 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from typing import Dict, List
 
 from build_common import (
     BuildError, load_recipe, load_flavor, load_description,
-    get_optimization_flags, download_source, should_build_package
+    get_optimization_flags, download_source, should_build_package,
+    get_configure_args, get_cmake_args
 )
-
 from patch_common import (
     copy_patches_to_sources,
     get_all_patches
 )
+
+def load_changelog(package_name: str, logs_dir: Path = Path("logs")) -> str:
+    """Load package changelog from logs directory"""
+    changelog_path = logs_dir / f"{package_name}.md"
+    if changelog_path.exists():
+        with open(changelog_path, 'r') as f:
+            content = f.read().strip()
+
+        # Convert Markdown to basic RPM changelog format
+        # This is a simple conversion - could be enhanced
+        changelog_lines = []
+        for line in content.split('\n'):
+            line = line.strip()
+            if line.startswith('##'):  # Version headers
+                # Convert "## Version 1.2.3 - 2024-01-15" to RPM format
+                changelog_lines.append(line.replace('##', '*').strip())
+            elif line.startswith('-'):  # Bullet points
+                changelog_lines.append(line)
+            elif line and not line.startswith('#'):  # Regular text
+                changelog_lines.append(f"- {line}")
+
+        return '\n'.join(changelog_lines)
+
+    return ""
 
 
 class RPMBuilder:
@@ -41,18 +65,20 @@ class RPMBuilder:
         if not should_build_package(self.recipe, self.flavor):
             raise BuildError(f"Package {package} not built for {flavor}")
 
-        # Setup paths - can symlink to ~/rpmbuild on Linux
+        # Setup paths
         self.prefix = Path(self.flavor['prefix'])
         self.project_root = Path(__file__).parent.parent
-        self.rpm_base = self.project_root / "rpmbuild"
+        self.rpm_base = self.project_root / "work"  # Changed to match directory structure
         self.sources_dir = self.rpm_base / "sources"
         self.specs_dir = self.rpm_base / "specs"
-        self.generated_dir = Path("generated") / "specs"
 
         self.host = "x86_64-redhat-linux"
+        self.nprocs = os.cpu_count()
+        self.cuda = None
+        self.install_prefix = None
 
         # Create directories
-        self.generated_dir.mkdir(parents=True, exist_ok=True)
+        self.specs_dir.mkdir(parents=True, exist_ok=True)
         for d in [self.sources_dir, self.specs_dir]:
             d.mkdir(parents=True, exist_ok=True)
 
@@ -66,6 +92,110 @@ class RPMBuilder:
 
         # SPEC name
         self.scls_name = f"scls-{self.flavor_name}-{self.package}"
+
+    def get_release_string(self) -> str:
+        """Get release string from recipe or default"""
+        return str(self.recipe.get('release', '1'))
+
+    def get_parallel_make_flags(self) -> str:
+        """Get appropriate make flags for parallel builds"""
+        if self.recipe.get('build', {}).get('parallel', True):
+            return 'make %{?_smp_mflags}'
+        else:
+            return 'make'
+
+    def generate_spec(self) -> Path:
+        """Generate RPM SPEC file from template"""
+        # Load template
+        template_name = self.recipe.get('template', 'default.spec.j2')
+        try:
+            template = self.jinja_env.get_template(template_name)
+        except:
+            template = self.jinja_env.get_template('default.spec.j2')
+
+        # Get optimization flags
+        cflags, cxxflags, fflags = get_optimization_flags(
+            self.recipe, self.flavor, self.flavor['compilers']['cc']
+        )
+
+        # Get requirements
+        build_requires, requires = self.get_rpm_requires()
+
+        # Get file list
+        files = self.get_file_list()
+
+        # Load description and changelog
+        description = load_description(self.package)
+        if not description:
+            description = self.recipe.get('description', self.recipe.get('summary', ''))
+
+        # Format description for RPM
+        description_lines = []
+        for line in description.split('\n'):
+            description_lines.append(line.strip())
+        formatted_description = '\n'.join(description_lines).strip()
+
+        # Load changelog from logs directory
+        changelog = load_changelog(self.package)
+
+        # Process configure environment for SPEC file
+        configure_env_vars = self.get_configure_env_vars()
+
+        # Get parallel make command
+        make_command = self.get_parallel_make_flags()
+
+        if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
+            self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
+        else:
+            self.install_prefix = self.prefix
+
+        # Prepare template variables
+        context = {
+            'flavor': self.flavor,
+            'recipe': self.recipe,
+            'package_name': self.package,
+            'scls_name': self.scls_name,
+            'version': self.recipe['version'],
+            'release': self.get_release_string(),
+            'description': formatted_description,
+            'changelog': changelog,
+            'homepage': self.recipe.get('homepage', ''),
+            'license': self.recipe.get('license', ''),
+            'source_url': self.recipe['source']['url'],
+            'build_requires': build_requires,
+            'requires': requires,
+            'prefix': str(self.prefix),
+            'cflags': cflags,
+            'cxxflags': cxxflags,
+            'fflags': fflags,
+            'fcflags': fflags,
+            'ldflags': self.flavor['flags'].get('ldflags', ''),
+            'files': files,
+            'changelog_date': datetime.now().strftime('%a %b %d %Y'),
+            'parallel_build': self.recipe.get('build', {}).get('parallel', True),
+            'make_command': make_command,
+            'configure_type': self.recipe.get('configure', {}).get('type', 'autotools'),
+            'configure_args': get_configure_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix) if self.recipe.get('configure', {}).get('type') == 'configure' else [],
+            'cmake_args': get_cmake_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix) if self.recipe.get('configure', {}).get('type') == 'cmake' else [],
+            'configure_env_vars': configure_env_vars,
+            'patches': self.get_patches(),
+            'test_commands': self.recipe.get('test', {}).get('commands', []),
+            'pre_build_setup': self.flavor.get('pre_build_setup', []),
+            'cuda': self.cuda,
+            'nprocs': "$(nproc)"
+        }
+
+        # Render template
+        spec_content = template.render(**context)
+
+        # Write to generated directory first
+        spec_filename = f"{self.scls_name}.spec"
+        generated_spec = self.specs_dir / spec_filename
+        with open(generated_spec, 'w') as f:
+            f.write(spec_content)
+
+        print(f"Generated SPEC file: {generated_spec}")
+        return generated_spec
 
     def get_rpm_requires(self) -> tuple[list, list]:
         """Get RPM BuildRequires and Requires from recipe and flavor-specific settings"""
@@ -204,114 +334,6 @@ class RPMBuilder:
 
         return files
 
-    def generate_spec(self) -> Path:
-        """Generate RPM SPEC file from template"""
-        # Load template
-        template_name = self.recipe.get('template', 'default.spec.j2')
-        try:
-            template = self.jinja_env.get_template(template_name)
-        except:
-            template = self.jinja_env.get_template('default.spec.j2')
-
-        # Get optimization flags
-        cflags, cxxflags, fflags = get_optimization_flags(
-            self.recipe, self.flavor, self.flavor['compilers']['cc']
-        )
-
-        # Get requirements
-        build_requires, requires = self.get_rpm_requires()
-
-        # Get file list
-        files = self.get_file_list()
-
-        # Load description from descriptions directory
-        description = load_description(self.package)
-        if not description:
-            description = self.recipe.get('description', self.recipe.get('summary', ''))
-
-        # For RPM, ensure description is properly formatted (no leading/trailing whitespace per line)
-        description_lines = []
-        for line in description.split('\n'):
-            description_lines.append(line.strip())
-        formatted_description = '\n'.join(description_lines).strip()
-
-        # Process configure environment for SPEC file
-        configure_env_vars = self.get_configure_env_vars()
-
-        # Prepare template variables
-        context = {
-            'flavor': self.flavor,
-            'recipe': self.recipe,
-            'package_name': self.package,
-            'scls_name': self.scls_name,
-            'version': self.recipe['version'],
-            'description': formatted_description,
-            'homepage': self.recipe.get('homepage', ''),
-            'license': self.recipe.get('license', ''),
-            'source_url': self.recipe['source']['url'],
-            'build_requires': build_requires,
-            'requires': requires,
-            'prefix': str(self.prefix),
-            'cflags': cflags,
-            'cxxflags': cxxflags,
-            'fflags': fflags,
-            'fcflags': fflags,  # Same as fflags
-            'ldflags': self.flavor['flags'].get('ldflags', ''),
-            'files': files,
-            'changelog_date': datetime.now().strftime('%a %b %d %Y'),
-            'parallel_build': self.recipe.get('build', {}).get('parallel', True),
-            'configure_type': self.recipe.get('configure', {}).get('type', 'autotools'),
-            'configure_args': self.get_configure_args(),
-            'cmake_args': self.get_cmake_args() if self.recipe.get('configure', {}).get('type') == 'cmake' else [],
-            'configure_env_vars': configure_env_vars,
-            'patches': self.get_patches(),
-            'test_commands': self.recipe.get('test', {}).get('commands', []),
-        }
-
-        # Render template
-        spec_content = template.render(**context)
-
-        # Write to generated directory first
-        spec_filename = f"{self.scls_name}.spec"
-        generated_spec = self.generated_dir / spec_filename
-        with open(generated_spec, 'w') as f:
-            f.write(spec_content)
-
-        print(f"Generated SPEC file: {generated_spec}")
-        return generated_spec
-
-    def get_configure_args(self) -> list:
-        """Get configure arguments as a list"""
-        args = []
-
-        # Standard arguments
-        args.append("--prefix=%{prefix}")
-
-        # Shared libraries only
-        args.append("--enable-shared")
-        args.append("--disable-static")
-
-        # Recipe-specific arguments
-        if 'configure' in self.recipe and 'args' in self.recipe['configure']:
-            args.extend(self.recipe['configure']['args'])
-
-        return args
-
-    def get_cmake_args(self) -> list:
-        """Get CMake arguments as a list"""
-        args = []
-
-        # Standard CMake arguments
-        args.append("-DCMAKE_INSTALL_PREFIX=%{prefix}")
-        args.append("-DCMAKE_BUILD_TYPE=Release")
-        args.append("-DCMAKE_INSTALL_LIBDIR=lib")
-
-        # Recipe-specific arguments
-        if 'configure' in self.recipe and 'args' in self.recipe['configure']:
-            args.extend(self.recipe['configure']['args'])
-
-        return args
-
     def get_configure_env_vars(self) -> List[Dict[str, str]]:
         """Get configure environment variables for SPEC file"""
         env_vars = []
@@ -424,9 +446,8 @@ class RPMBuilder:
         print("Build completed successfully!")
         print(f"{'=' * 60}\n")
 
-
 def create_default_template():
-    """Create a default SPEC template if it doesn't exist"""
+    """Create a default SPEC template with enhanced features"""
     template_dir = Path("templates")
     template_dir.mkdir(exist_ok=True)
 
@@ -441,7 +462,7 @@ def create_default_template():
 
 Name:           %{scls_name}
 Version:        {{ version }}
-Release:        1%{?dist}
+Release:        {{ release }}%{?dist}
 Summary:        {{ description | truncate(70) }}
 
 License:        {{ license }}
@@ -475,6 +496,11 @@ Requires:       {{ req }}
 {% endfor %}
 
 %build
+# Pre-build setup (Intel OneAPI, NVIDIA HPC SDK, etc.)
+{% for setup_cmd in pre_build_setup %}
+{{ setup_cmd }}
+{% endfor %}
+
 # Setup environment
 export CC={{ flavor.compilers.cc }}
 export CXX={{ flavor.compilers.cxx }}
@@ -489,10 +515,10 @@ export LDFLAGS="{{ ldflags }}"
 # Configure-specific environment variables
 {% for env_var in configure_env_vars %}
 {% if '+=' in env_var.value %}
-export {{ env_var.name }}="${{{ env_var.name }}:-} {{ env_var.value.replace('+=', '').strip() }}"
+export {{ env_var.name }}="${{ env_var.name }}:-} {{ env_var.value.replace('+=', '').strip() }}"
 {% elif '-=' in env_var.value %}
 # Remove operation for {{ env_var.name }} (manual implementation needed)
-export {{ env_var.name }}="${{{ env_var.name }}}"
+export {{ env_var.name }}="${{ env_var.name }}"
 {% else %}
 export {{ env_var.name }}="{{ env_var.value }}"
 {% endif %}
@@ -504,11 +530,7 @@ export {{ env_var.name }}="{{ env_var.value }}"
     {{ arg }}{% if not loop.last %} \\{% endif %}
 {% endfor %}
 
-{% if parallel_build %}
-%make_build
-{% else %}
-make
-{% endif %}
+{{ make_command }}
 
 {% elif configure_type == 'cmake' %}
 %cmake \\
@@ -529,16 +551,12 @@ make
     {{ arg }}{% if not loop.last %} \\{% endif %}
 {% endfor %}
 
-{% if parallel_build %}
-make -j%{?_smp_mflags}
-{% else %}
-make
-{% endif %}
+{{ make_command }}
 
 {% elif configure_type == 'none' %}
 # No configure step - direct build
 {% if parallel_build %}
-make -j%{?_smp_mflags} PREFIX=%{prefix}
+make %{?_smp_mflags} PREFIX=%{prefix}
 {% else %}
 make PREFIX=%{prefix}
 {% endif %}
@@ -570,7 +588,10 @@ find %{buildroot} -name '*.la' -delete
 {% endfor %}
 
 %changelog
-* {{ changelog_date }} SCLS Build System <scls@lbl.gov> - {{ version }}-1
+{% if changelog %}
+{{ changelog }}
+{% else %}
+* {{ changelog_date }} SCLS Build System <scls@lbl.gov> - {{ version }}-{{ release }}
 - Initial package for {{ flavor.name }} flavor
 {% if patches %}
 - Applied {{ patches|length }} patch(es):
@@ -578,11 +599,40 @@ find %{buildroot} -name '*.la' -delete
   - {{ patch.file }}{% if patch.strip != 1 %} (-p{{ patch.strip }}){% endif %}
 {% endfor %}
 {% endif %}
+{% endif %}
 '''
         with open(default_template, 'w') as f:
             f.write(template_content)
         print(f"Created default template: {default_template}")
 
+
+def create_example_changelog():
+    """Create an example changelog file"""
+    logs_dir = Path("logs")
+    logs_dir.mkdir(exist_ok=True)
+
+    example_changelog = logs_dir / "example.md"
+    if not example_changelog.exists():
+        changelog_content = '''# Package Changelog
+
+## Version 1.2.3 - Wed Jan 15 2025
+- Updated to upstream version 1.2.3
+- Fixed compilation issues on ARM64
+- Added support for new feature X
+
+## Version 1.2.2 - Mon Jan 10 2025  
+- Security patch for CVE-2024-12345
+- Performance improvements in core algorithms
+- Updated documentation
+
+## Version 1.2.1 - Fri Jan 05 2025
+- Initial SCLS package
+- Built with GCC optimization flags
+- Added comprehensive test suite
+'''
+        with open(example_changelog, 'w') as f:
+            f.write(changelog_content)
+        print(f"Created example changelog: {example_changelog}")
 
 def main():
     parser = argparse.ArgumentParser(description='Generate RPM SPEC files for SCLS packages')

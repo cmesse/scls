@@ -1,0 +1,43 @@
+name: pmix
+version: 5.0.8
+summary: An extended/exascale implementation of the PMIx Standard
+homepage: https://github.com/openpmix/openpmix
+license: BSD
+
+source:
+  url: https://github.com/pmix/pmix/releases/download/v%{version}/pmix-%{version}.tar.bz2
+
+requires:
+  all:
+    - libevent
+    - hwloc
+  macos:
+    - zlib
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: autotools
+  defaults:
+    host_flags: false
+  args:
+    - --with-pmix-headers
+    - --with-libevent=%{prefix}
+    - --with-hwloc=%{prefix}
+    - --with-slurm
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make check 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"

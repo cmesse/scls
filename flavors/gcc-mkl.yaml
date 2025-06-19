@@ -1,8 +1,21 @@
-# Linux GCC + Intel MKL flavor configuration
-name: gcc-mkl
+ame: gcc-mkl
 platform: linux
 description: "Production build with GCC compilers and Intel MKL"
 prefix: /opt/scls/gcc-mkl
+
+# Pre-build setup commands
+pre_build_setup:
+  - "source /opt/intel/oneapi/setvars.sh intel64"
+
+# RPM package dependencies
+rpm_build_requires:
+  - gcc
+  - gcc-c++
+  - gfortran
+  - intel-oneapi-mkl-devel
+
+rpm_requires:
+  - intel-oneapi-mkl
 
 compilers:
   cc: gcc
@@ -14,8 +27,6 @@ flags:
   cxxflags: "-march=x86-64-v3 -fPIC -fno-fast-math"
   fflags: "-march=x86-64-v3 -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
   ldflags: "-Wl,-rpath,/opt/scls/lib -L/opt/scls/lib"
-  configure: "--enable-shared --disable-static --host=%{host} --build=%{host} --target=%{host}"
-
 math:
   linalg: mkl
   threading: openmp

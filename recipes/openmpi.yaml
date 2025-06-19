@@ -8,9 +8,9 @@ source:
   url: https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-%{version}.tar.gz
 
 requires:
-  - gmp
-  - mpfr
-  - mpc
+    - gmp
+    - mpfr
+    - mpc
 
 features:
   fortran: false

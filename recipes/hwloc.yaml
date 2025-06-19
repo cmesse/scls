@@ -5,7 +5,7 @@ homepage: https://www-lb.open-mpi.org/software/hwloc/
 license: BSD
 
 source:
-  url: https://download.open-mpi.org/release/hwloc/v2.12/hwloc-{%version}.tar.bz2
+  url: https://download.open-mpi.org/release/hwloc/v2.12/hwloc-%{version}.tar.bz2
 
 requires:
   - libevent
@@ -17,22 +17,43 @@ features:
   math: false
 
 configure:
+  env:
+    - CFLAGS: "+=-DHAVE_UNIX_BYTESWAP"
+    - CXXFLAGS: "+=-DHAVE_UNIX_BYTESWAP"
+    - LDFLAGS: "+=-DHAVE_UNIX_BYTESWAP"
+
   type: autotools
   args:
-    - --enable-cxx
-    - --with-pic
-  # Flavor-specific configure arguments
+    - --disable-rocm
+    - --disable-opencl
+    - --disable-gl
+    - --disable-levelzero
+    - --disable-embedded-mode
+    - --disable-libxml2
+    - --disable-doxygen
+    - --disable-cairo
+    - --disable-readme
+
   flavor_args:
     gcc-debug:
-      - --enable-fat
+      - --disable-cuda
+      - --disable-nvml
     clang-debug:
-      - --enable-fat
+      - --disable-cuda
+      - --disable-nvml
     gcc-mkl:
-      - --enable-fat
+      - --disable-cuda
+      - --disable-nvml
+    gcc-mkl-cuda:
+      - -with-cuda=%{cuda}
+      - -enable-nvml
     intel-mkl:
-      - --enable-fat
+      - --disable-cuda
+      - --disable-nvml
     macos:
-      - --disable-assembly  # Avoid assembly issues on macOS
+      - --disable-cuda
+      - --disable-nvml
+
   optimization:
     O_level: 2
     strict_aliasing: true

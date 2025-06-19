@@ -1,0 +1,147 @@
+#######################################################################
+# SCLS {{ flavor.name }} - {{ package_name }}                        #
+#######################################################################
+
+%define prefix {{ prefix }}
+%define scls_name {{ scls_name }}
+
+Name:           %{scls_name}
+Version:        {{ version }}
+Release:        {{ release }}%{?dist}
+Summary:        {{ description | truncate(70) }}
+
+License:        {{ license }}
+URL:            {{ homepage }}
+Source0:        {{ source_url }}
+{% for patch in patches %}
+Patch{{ patch.number }}:         {{ patch.file }}
+{% endfor %}
+
+# Build requirements
+{% for req in build_requires %}
+BuildRequires:  {{ req }}
+{% endfor %}
+
+# Runtime requirements
+{% for req in requires %}
+Requires:       {{ req }}
+{% endfor %}
+
+%description
+{{ description }}
+
+%prep
+%setup -q -n {{ package_name }}-{{ version }}
+{% for patch in patches %}
+{% if patch.strip == 1 %}
+%patch{{ patch.number }} -p1
+{% else %}
+%patch{{ patch.number }} -p{{ patch.strip }}
+{% endif %}
+{% endfor %}
+
+%build
+# Pre-build setup (Intel OneAPI, NVIDIA HPC SDK, etc.)
+{% for setup_cmd in pre_build_setup %}
+{{ setup_cmd }}
+{% endfor %}
+
+# Setup environment
+export CC={{ flavor.compilers.cc }}
+export CXX={{ flavor.compilers.cxx }}
+export FC={{ flavor.compilers.fc }}
+export F77={{ flavor.compilers.fc }}
+export CFLAGS="{{ cflags }}"
+export CXXFLAGS="{{ cxxflags }}"
+export FFLAGS="{{ fflags }}"
+export FCFLAGS="{{ fcflags }}"
+export LDFLAGS="{{ ldflags }}"
+
+# Configure-specific environment variables
+{% for env_var in configure_env_vars %}
+{% if '+=' in env_var.value %}
+export {{ env_var.name }}="${{ env_var.name }}:-} {{ env_var.value.replace('+=', '').strip() }}"
+{% elif '-=' in env_var.value %}
+# Remove operation for {{ env_var.name }} (manual implementation needed)
+export {{ env_var.name }}="${{ env_var.name }}"
+{% else %}
+export {{ env_var.name }}="{{ env_var.value }}"
+{% endif %}
+{% endfor %}
+
+{% if configure_type == 'autotools' %}
+%configure \
+{% for arg in configure_args %}
+    {{ arg }}{% if not loop.last %} \{% endif %}
+{% endfor %}
+
+{{ make_command }}
+
+{% elif configure_type == 'cmake' %}
+%cmake \
+{% for arg in cmake_args %}
+    {{ arg }}{% if not loop.last %} \{% endif %}
+{% endfor %}
+
+%cmake_build
+
+{% elif configure_type == 'custom' %}
+# Custom configuration system
+{% if recipe.configure.command is defined %}
+{{ recipe.configure.command }} \
+{% else %}
+./config \
+{% endif %}
+{% for arg in configure_args %}
+    {{ arg }}{% if not loop.last %} \{% endif %}
+{% endfor %}
+
+{{ make_command }}
+
+{% elif configure_type == 'none' %}
+# No configure step - direct build
+{% if parallel_build %}
+make %{?_smp_mflags} PREFIX=%{prefix}
+{% else %}
+make PREFIX=%{prefix}
+{% endif %}
+
+{% endif %}
+
+%check
+{% if test_commands %}
+{% for cmd in test_commands %}
+{{ cmd }}
+{% endfor %}
+{% endif %}
+
+%install
+{% if configure_type == 'autotools' %}
+%make_install
+{% elif configure_type == 'cmake' %}
+%cmake_install
+{% else %}
+make install DESTDIR=%{buildroot}
+{% endif %}
+
+# Remove libtool archives
+find %{buildroot} -name '*.la' -delete
+
+%files
+{% for file in files %}
+{{ file }}
+{% endfor %}
+
+%changelog
+{% if changelog %}
+{{ changelog }}
+{% else %}
+* {{ changelog_date }} SCLS Build System <scls@lbl.gov> - {{ version }}-{{ release }}
+- Initial package for {{ flavor.name }} flavor
+{% if patches %}
+- Applied {{ patches|length }} patch(es):
+{% for patch in patches %}
+  - {{ patch.file }}{% if patch.strip != 1 %} (-p{{ patch.strip }}){% endif %}
+{% endfor %}
+{% endif %}
+{% endif %}

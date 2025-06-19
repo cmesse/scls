@@ -1,8 +1,24 @@
 # Linux Intel OneAPI + MKL flavor configuration
+# Enhanced intel-mkl.yaml
 name: intel-mkl
 platform: linux
 description: "Intel OneAPI compilers with OpenMPI and Intel MKL"
 prefix: /opt/scls/intel-mkl
+
+# Pre-build setup commands
+pre_build_setup:
+  - "source /opt/intel/oneapi/setvars.sh intel64"
+
+# RPM package dependencies
+rpm_build_requires:
+  - intel-oneapi-compiler-fortran
+  - intel-oneapi-compiler-dpcpp-cpp
+  - intel-oneapi-mkl-devel
+  - openmpi-devel
+
+rpm_requires:
+  - intel-oneapi-mkl
+  - openmpi
 
 compilers:
   cc: icx
@@ -14,7 +30,6 @@ flags:
   cxxflags: "-mcpu=x86-64-v3 -fPIC -fp-model=precise"
   fflags: "-mcpu=x86-64-v3 -fPIC -fp-model=precise"
   ldflags: "-Wl,-rpath,/opt/scls/lib -L/opt/scls/lib"
-  configure: "--enable-shared --disable-static --host=%{host} --build=%{host} --target=%{host}"
 
 # Math libraries configuration
 math:
