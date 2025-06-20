@@ -23,6 +23,7 @@ from patch_common import (
     get_all_patches
 )
 
+
 def load_changelog(package_name: str, logs_dir: Path = Path("logs")) -> str:
     """Load package changelog from logs directory"""
     changelog_path = logs_dir / f"{package_name}.md"
@@ -75,7 +76,31 @@ class RPMBuilder:
         self.host = "x86_64-redhat-linux"
         self.nprocs = os.cpu_count()
         self.cuda = None
-        self.install_prefix = None
+        self.mpi = False
+
+        # Set install prefix
+        if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
+            configure_config = self.recipe['configure']
+            self.install_prefix = self.prefix / configure_config['install_prefix']
+
+        # check for MPI
+        features = self.recipe.get('features', {})
+        if 'mpi' in features:
+            if features['mpi'] == True:
+                self.mpi = True
+
+                # override compilers with mpi wrappers
+                comp = self.flavor['compilers']
+                comp['cc'] = 'mpicc'
+                comp['cxx'] = 'mpicxx'
+                comp['fc'] = 'mpifort'
+                comp['f77'] = 'mpifort'
+                comp['f90'] = 'mpifort'
+                self.flavor['compilers'] = comp
+        else:
+            self.install_prefix = self.prefix
+
+
 
         # Create directories
         self.specs_dir.mkdir(parents=True, exist_ok=True)
@@ -144,10 +169,17 @@ class RPMBuilder:
         # Get parallel make command
         make_command = self.get_parallel_make_flags()
 
-        if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
-            self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
-        else:
-            self.install_prefix = self.prefix
+        # Get configure type
+        configure_type = self.recipe.get('configure', {}).get('type', 'autotools')
+
+        # Get configure/cmake args based on type
+        configure_args = []
+        cmake_args = []
+
+        if configure_type == 'autotools':
+            configure_args = get_configure_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
+        elif configure_type == 'cmake':
+            cmake_args = get_cmake_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
 
         # Prepare template variables
         context = {
@@ -165,6 +197,7 @@ class RPMBuilder:
             'build_requires': build_requires,
             'requires': requires,
             'prefix': str(self.prefix),
+            'install_prefix': str(self.install_prefix),
             'cflags': cflags,
             'cxxflags': cxxflags,
             'fflags': fflags,
@@ -174,9 +207,9 @@ class RPMBuilder:
             'changelog_date': datetime.now().strftime('%a %b %d %Y'),
             'parallel_build': self.recipe.get('build', {}).get('parallel', True),
             'make_command': make_command,
-            'configure_type': self.recipe.get('configure', {}).get('type', 'autotools'),
-            'configure_args': get_configure_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix) if self.recipe.get('configure', {}).get('type') == 'configure' else [],
-            'cmake_args': get_cmake_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix) if self.recipe.get('configure', {}).get('type') == 'cmake' else [],
+            'configure_type': configure_type,
+            'configure_args': configure_args,
+            'cmake_args': cmake_args,
             'configure_env_vars': configure_env_vars,
             'patches': self.get_patches(),
             'test_commands': self.recipe.get('test', {}).get('commands', []),
@@ -338,6 +371,8 @@ class RPMBuilder:
         """Get configure environment variables for SPEC file"""
         env_vars = []
 
+        env_vars.append({'name': 'PKG_CONFIG_PATH', 'value': "%{prefix}/lib/pkgconfig:/usr/lib/pkgconfig"})
+
         if 'configure' not in self.recipe or 'env' not in self.recipe['configure']:
             return env_vars
 
@@ -446,6 +481,7 @@ class RPMBuilder:
         print("Build completed successfully!")
         print(f"{'=' * 60}\n")
 
+
 def create_default_template():
     """Create a default SPEC template with enhanced features"""
     template_dir = Path("templates")
@@ -458,6 +494,7 @@ def create_default_template():
 #######################################################################
 
 %define prefix {{ prefix }}
+%define install_prefix {{ install_prefix }}
 %define scls_name {{ scls_name }}
 
 Name:           %{scls_name}
@@ -525,7 +562,7 @@ export {{ env_var.name }}="{{ env_var.value }}"
 {% endfor %}
 
 {% if configure_type == 'autotools' %}
-%configure \\
+./configure \\
 {% for arg in configure_args %}
     {{ arg }}{% if not loop.last %} \\{% endif %}
 {% endfor %}
@@ -547,18 +584,20 @@ export {{ env_var.name }}="{{ env_var.value }}"
 {% else %}
 ./config \\
 {% endif %}
-{% for arg in configure_args %}
+{% if 'configure' in recipe and 'args' in recipe['configure'] %}
+{% for arg in recipe['configure']['args'] %}
     {{ arg }}{% if not loop.last %} \\{% endif %}
 {% endfor %}
+{% endif %}
 
 {{ make_command }}
 
 {% elif configure_type == 'none' %}
 # No configure step - direct build
 {% if parallel_build %}
-make %{?_smp_mflags} PREFIX=%{prefix}
+make %{?_smp_mflags} PREFIX=%{install_prefix}
 {% else %}
-make PREFIX=%{prefix}
+make PREFIX=%{install_prefix}
 {% endif %}
 
 {% endif %}
@@ -633,6 +672,7 @@ def create_example_changelog():
         with open(example_changelog, 'w') as f:
             f.write(changelog_content)
         print(f"Created example changelog: {example_changelog}")
+
 
 def main():
     parser = argparse.ArgumentParser(description='Generate RPM SPEC files for SCLS packages')

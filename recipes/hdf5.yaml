@@ -1,0 +1,44 @@
+name: hdf5
+version: 1.14.6
+summary: A general purpose library and file format for storing scientific data
+homepage: https://www.hdfgroup.org/solutions/hdf5
+
+license: BSD
+
+source:
+  url: https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5_%{version}.tar.gz
+
+requires:
+  all:
+    - openmpi
+  macos:
+    - zlib
+features:
+  fortran: true
+  mpi: true
+  openmp: false
+  math: false
+
+configure:
+  pre:
+    - "echo $CC"
+    - "echo $CXX"
+    - "echo $FC"
+
+  type: autotools
+
+  args:
+    - --enable-parallel
+
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:%{scls}/lib make check 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"

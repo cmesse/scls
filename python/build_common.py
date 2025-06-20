@@ -131,7 +131,7 @@ def download_source(url: str, dest_dir: Path, package_name: str, version: str) -
     print(f"Downloading {url}...")
     try:
         #urllib.request.urlretrieve(url, dest_path)
-        cmd = ['sh', '-c', 'curl', '-O', '-L', url]
+        cmd = ['curl', '-O', '-L', url]
         run_command(cmd, cwd=dest_dir, env={}, phase="Download source")
         print(f"Downloaded to {dest_path}")
         return dest_path
@@ -265,48 +265,34 @@ def should_build_package(recipe: Dict, flavor: Dict) -> bool:
     return flavor_name in recipe['flavors']
 
 
-def get_configure_args(recipe: Dict, host, flavor: Dict, prefix: Path, install_prefix: Path ) -> List[str]:
+def get_configure_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_prefix: Path) -> List[str]:
     """Get configure arguments for autotools packages"""
     args = [f"--prefix={install_prefix}"]
 
-    if 'defaults' in recipe['configure']:
+    # Get defaults configuration if it exists
+    defaults = recipe.get('configure', {}).get('defaults', {})
 
-        # Check for default overrides
-        defaults = recipe.get('configure', {}).get('defaults', {})
-
-        # Add shared/static flags unless overridden
-        if 'shared' in defaults :
-            if defaults.get('shared', True):
-                args.extend(["--enable-shared", "--disable-static"])
-        else:
-            if defaults.get('shared', True):
-                args.extend(["--enable-shared", "--disable-static"])
-
-        # Add host flags unless overridden
-        if 'host_flags' in defaults:
-            if defaults.get('host_flags', True):
-                args.extend([
-                    f"--host={host}",
-                    f"--build={host}",
-                    f"--target={host}"
-                ])
-        else:
-            if defaults.get('host_flags', True):
-                args.extend([
-                    f"--host={host}",
-                    f"--build={host}",
-                    f"--target={host}"
-                ])
+    # Always check the value of 'shared' - default to True if not specified
+    # This means: if 'defaults' doesn't exist, use True
+    #            if 'defaults' exists but 'shared' is not in it, use True
+    #            if 'defaults' exists and 'shared' is in it, use its value
+    use_shared = defaults.get('shared', True)
+    if use_shared:
+        args.extend(["--enable-shared", "--disable-static"])
     else:
+        args.extend(["--disable-shared", "--enable-static"])
+
+    # Same logic for host_flags
+    use_host_flags = defaults.get('host_flags', True)
+    if use_host_flags:
         args.extend([
-            "--enable-shared",
-            "--disable-static",
             f"--host={host}",
             f"--build={host}",
             f"--target={host}"
         ])
+
     # Add flavor-specific configure args from flavor definition
-    if 'configure' in flavor['flags']:
+    if 'configure' in flavor.get('flags', {}):
         args.extend(flavor['flags']['configure'].split())
 
     # Add recipe-specific configure args
@@ -314,18 +300,23 @@ def get_configure_args(recipe: Dict, host, flavor: Dict, prefix: Path, install_p
         for arg in recipe['configure']['args']:
             # Substitute variables
             arg = arg.replace('%{prefix}', str(prefix))
+            arg = arg.replace('%{install_prefix}', str(install_prefix))
             args.append(arg)
 
     # Add flavor-specific args from recipe
     if 'configure' in recipe and 'flavor_args' in recipe['configure']:
         flavor_name = flavor.get('name', '')
         if flavor_name in recipe['configure']['flavor_args']:
-            args.extend(recipe['configure']['flavor_args'][flavor_name])
+            for arg in recipe['configure']['flavor_args'][flavor_name]:
+                # Substitute variables in flavor args too
+                arg = arg.replace('%{prefix}', str(prefix))
+                arg = arg.replace('%{install_prefix}', str(install_prefix))
+                args.append(arg)
 
     return args
 
 
-def get_cmake_args(recipe: Dict, flavor: Dict, prefix: Path, install_prefix: Path) -> List[str]:
+def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_prefix: Path) -> List[str]:
     """Get CMake arguments"""
     args = [
         f"-DCMAKE_INSTALL_PREFIX={install_prefix}",
@@ -333,17 +324,50 @@ def get_cmake_args(recipe: Dict, flavor: Dict, prefix: Path, install_prefix: Pat
         "-DCMAKE_INSTALL_LIBDIR=lib",
     ]
 
+    # Get defaults configuration if it exists
+    defaults = recipe.get('configure', {}).get('defaults', {})
+
+    # Check if we should add host/cross-compilation flags
+    use_host_flags = defaults.get('host_flags', True)
+    if use_host_flags:
+        # For CMake, we can set the system name based on the host triple
+        if 'darwin' in host:
+            args.append("-DCMAKE_SYSTEM_NAME=Darwin")
+        elif 'linux' in host:
+            args.append("-DCMAKE_SYSTEM_NAME=Linux")
+
+        # Add processor based on host triple
+        if host.startswith('x86_64'):
+            args.append("-DCMAKE_SYSTEM_PROCESSOR=x86_64")
+        elif host.startswith('aarch64'):
+            args.append("-DCMAKE_SYSTEM_PROCESSOR=aarch64")
+        elif host.startswith('arm'):
+            args.append("-DCMAKE_SYSTEM_PROCESSOR=arm")
+
+    # Handle shared/static libraries
+    use_shared = defaults.get('shared', True)
+    if use_shared:
+        args.append("-DBUILD_SHARED_LIBS=ON")
+    else:
+        args.append("-DBUILD_SHARED_LIBS=OFF")
+
     # Add recipe-specific cmake args
     if 'configure' in recipe and 'args' in recipe['configure']:
         for arg in recipe['configure']['args']:
+            # Substitute variables
             arg = arg.replace('%{prefix}', str(prefix))
+            arg = arg.replace('%{install_prefix}', str(install_prefix))
             args.append(arg)
 
     # Add flavor-specific args from recipe
     if 'configure' in recipe and 'flavor_args' in recipe['configure']:
         flavor_name = flavor.get('name', '')
         if flavor_name in recipe['configure']['flavor_args']:
-            args.extend(recipe['configure']['flavor_args'][flavor_name])
+            for arg in recipe['configure']['flavor_args'][flavor_name]:
+                # Substitute variables in flavor args too
+                arg = arg.replace('%{prefix}', str(prefix))
+                arg = arg.replace('%{install_prefix}', str(install_prefix))
+                args.append(arg)
 
     return args
 

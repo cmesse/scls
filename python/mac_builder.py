@@ -13,6 +13,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List
 
+from numpy.f2py.auxfuncs import throw_error
+
 from build_common import (
     BuildError, load_recipe, load_flavor, load_description,
     get_optimization_flags, download_source, extract_source,
@@ -69,7 +71,7 @@ class MacOSBuilder:
         self.host = "x86_64-apple-darwin" + subprocess.check_output(
             ["uname", "-r"],text=True).strip()
 
-
+        self.mpi = False
 
         # Create directories
         for d in [self.sources_dir, self.build_dir, self.rpms_dir, self.srpms_dir, self.specs_dir]:
@@ -92,9 +94,17 @@ class MacOSBuilder:
 
     def configure(self, source_dir: Path, env: Dict[str, str]) -> None:
         """Run configure step"""
+
         configure_type = self.recipe.get('configure', {}).get('type', 'autotools')
 
         pkg_config_path = str(self.prefix / 'lib/pkgconfig') + ':' + "/opt/X11/lib/pkgconfig:/usr/lib/pkgconfig"
+
+        # check for MPI
+        features = self.recipe.get('features', {})
+        if 'mpi' in features:
+            if features['mpi'] == True:
+                self.mpi = True
+
 
         if configure_type == 'autotools':
             # Update config scripts
@@ -112,6 +122,15 @@ class MacOSBuilder:
             cflags, cxxflags, fflags = get_optimization_flags(
                 self.recipe, self.flavor, env['CC']
             )
+
+            # override compilers
+            if self.mpi:
+                env['CC'] = 'mpicc'
+                env['CXX'] = 'mpicxx'
+                env['FC'] = 'mpifort'
+                env['FF'] = 'mpifort'
+                env['F77'] = 'mpifort'
+
             env['CFLAGS'] = cflags
             env['CXXFLAGS'] = cxxflags
             env['FFLAGS'] = fflags
@@ -147,6 +166,15 @@ class MacOSBuilder:
                     run_command(['sh', '-c', checked_cmd], source_dir, env, "post-configure")
 
         elif configure_type == 'cmake':
+
+            # override compilers
+            if self.mpi:
+                env['CC'] = 'mpicc'
+                env['CXX'] = 'mpicxx'
+                env['FC'] = 'mpifort'
+                env['FF'] = 'mpifort'
+                env['F77'] = 'mpifort'
+
             # Create build directory
             build_dir = source_dir / 'build'
             build_dir.mkdir(exist_ok=True)
@@ -157,7 +185,7 @@ class MacOSBuilder:
                 self.install_prefix = self.prefix
 
             # Get CMake arguments
-            args = get_cmake_args(self.recipe, self.flavor, self.prefix, self.install_prefix)
+            args = get_cmake_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
 
             # Get optimization flags
             cflags, cxxflags, fflags = get_optimization_flags(
@@ -191,6 +219,15 @@ class MacOSBuilder:
             cflags, cxxflags, fflags = get_optimization_flags(
                 self.recipe, self.flavor, env['CC']
             )
+
+            # override compilers
+            if self.mpi:
+                env['CC'] = 'mpicc'
+                env['CXX'] = 'mpicxx'
+                env['FC'] = 'mpifort'
+                env['FF'] = 'mpifort'
+                env['F77'] = 'mpifort'
+
             env['CFLAGS'] = cflags
             env['CXXFLAGS'] = cxxflags
             env['FFLAGS'] = fflags
@@ -259,6 +296,13 @@ class MacOSBuilder:
 
             # Get optimization flags and set environment
             cflags, cxxflags, fflags = get_optimization_flags(self.recipe, self.flavor, env['CC'])
+
+            # override compilers
+            if self.mpi:
+                env['CC'] = 'mpicc'
+                env['CXX'] = 'mpicxx'
+                env['FC'] = 'mpifort'
+
             env['CFLAGS'] = cflags
             env['CXXFLAGS'] = cxxflags
             env['FFLAGS'] = fflags
@@ -285,6 +329,7 @@ class MacOSBuilder:
         cmd3 = [s.replace('%{host}', self.host) for s in cmd2]
         cmd4 = [s.replace('%{nprocs}', str(self.nprocs)) for s in cmd3]
         cmd5 = [s.replace('%{srcdir}', str(self.source_dir)) for s in cmd4]
+
         return cmd5
 
     def build(self, build_dir: Path, env: Dict[str, str]) -> None:
@@ -587,6 +632,7 @@ class MacOSBuilder:
         })
 
         # Add MPI compilers if MPI is enabled
+
         features = self.recipe.get('features', {})
         if features.get('mpi', False):
             context.update({
@@ -624,9 +670,7 @@ class MacOSBuilder:
             context['use_accelerate'] = True
             context['use_mkl'] = False
         elif math_config.get('linalg') == 'mkl':
-            context['mkl_link_line'] = self.get_mkl_link_line()
-            context['use_mkl'] = True
-            context['use_accelerate'] = False
+            throw_error("MKL is not supported on macOS anymore")
         else:
             context['use_mkl'] = False
             context['use_accelerate'] = False
@@ -649,32 +693,6 @@ class MacOSBuilder:
 
         # Add index size for packages that support it
         context['index_size'] = features.get('index_size', 32)
-
-        return context
-
-    def get_mkl_link_line(self) -> str:
-        """Generate Intel MKL link line for macOS (if MKL is used)"""
-        math_config = self.flavor.get('math', {})
-        threading = math_config.get('threading', 'openmp')
-
-        # MKL on macOS (if available)
-        interface_lib = 'mkl_intel_lp64'
-
-        if threading == 'openmp':
-            threading_lib = 'mkl_intel_thread'
-            extra_libs = '-liomp5'
-        else:
-            threading_lib = 'mkl_sequential'
-            extra_libs = ''
-
-        link_line = f"-l{interface_lib} -l{threading_lib} -lmkl_core {extra_libs} -lpthread -lm -ldl"
-
-        # Add MPI-specific MKL libraries if MPI is enabled
-        features = self.recipe.get('features', {})
-        if features.get('mpi', False) and features.get('math') == 'parallel':
-            link_line = f"-lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64 {link_line}"
-
-        return link_line
 
 def main():
     parser = argparse.ArgumentParser(description='Build SCLS packages for macOS')

@@ -1,34 +1,47 @@
 name: openmpi
 version: 5.0.8
 summary: A powerful implementation of MPI/SHMEM
-homepage: https://www.mpfr.org/
+homepage: https://www.open-mpi.org
 license: BSD
 
 source:
   url: https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-%{version}.tar.gz
 
 requires:
+  all:
     - gmp
     - mpfr
     - mpc
-
+  macos:
+    - gcc
 features:
-  fortran: false
+  fortran: yes
   mpi: false
   openmp: false
   math: false
 
 configure:
   type: autotools
-  args:
-    - --enable-thread-safe
-    - --with-gmp-include=%{prefix}/include
-    - --with-gmp-lib=%{prefix}/lib
+  defaults:
+    host_flags: false
+  env:
+    - CFLAGS: "+=-DHAVE_UNIX_BYTESWAP"
+    - CXXFLAGS: "+=-DHAVE_UNIX_BYTESWAP"
+    - FCFLAGS: "+=-DHAVE_UNIX_BYTESWAP"
 
-  # Flavor-specific configure arguments
-  flavor_env:
-    macos:
-      - SED: "%{prefix}/bin/gsed"
+  args:
+    - --enable-mpi-fortran
+    - --enable-mpi1-compatibility
+    - --with-pmix=%{prefix}
+    - --with-hwloc=%{prefix}
+    - --with-hwloc-libdir=%{prefix}/lib
+    - --with-libevent=%{prefix}
+    - --with-libevent-libdir=%{prefix}/lib
+  flavor_args:
+    gcc-mkl-cuda:
+      - --enable-mpi-ext=cuda
+      - --with-cuda=%{cuda}
+      - --with-cuda-libdir=%{cuda}/lib64
   optimization:
     O_level: 2
     strict_aliasing: true

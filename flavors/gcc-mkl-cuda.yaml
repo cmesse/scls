@@ -9,8 +9,8 @@ nvidia:
   gds_version: "2.17.5"    # Different versioning for math libs
 
 # Pre-build setup commands
-pre_build_setup:
-  - "source /opt/intel/oneapi/setvars.sh intel64"
+#pre_build_setup:
+#  - "source /opt/intel/oneapi/setvars.sh intel64"
   # NVIDIA paths should be set by nvhpc package installation
 
 # RPM package dependencies

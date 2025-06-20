@@ -1,0 +1,10 @@
+Open MPI is an open source implementation of the Message Passing
+Interface specification (https://www.mpi-forum.org/) developed and
+maintained by a consortium of research, academic, and industry
+partners.
+
+Open MPI also includes an implementation of the OpenSHMEM parallel
+programming API (https://www.openshmem.org/).  OpenSHMEM is a
+Partitioned Global Address Space (PGAS) abstraction layer, which
+provides fast inter-process communication using one-sided
+communication techniques.

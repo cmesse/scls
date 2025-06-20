@@ -1,3 +1,4 @@
+# nortte: using old pkg-conf instead because include flags do not work on mac
 name: pkgconf
 version: 2.4.3
 summary: Package compiler and linker metadata toolkit
