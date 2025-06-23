@@ -114,6 +114,14 @@ def get_optimization_flags(recipe: Dict, flavor: Dict, compiler: str) -> Tuple[s
             if 'fcflags' in plat_opt:
                 fflags += f" {plat_opt['fcflags']}"
 
+        # special handling for integers
+        math_config = flavor.get('math', {})
+        interface = math_config.get('interface', 'lp64')
+        if interface == 'ilp64':
+            fflags += " -fdefault-integer-8"
+            cflags += " -DInt=long"
+            cxxflags += " -DInt=long"
+
     return cflags.strip(), cxxflags.strip(), fflags.strip()
 
 
@@ -277,10 +285,9 @@ def get_configure_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, inst
     #            if 'defaults' exists but 'shared' is not in it, use True
     #            if 'defaults' exists and 'shared' is in it, use its value
     use_shared = defaults.get('shared', True)
+
     if use_shared:
         args.extend(["--enable-shared", "--disable-static"])
-    else:
-        args.extend(["--disable-shared", "--enable-static"])
 
     # Same logic for host_flags
     use_host_flags = defaults.get('host_flags', True)
@@ -803,5 +810,4 @@ def setup_environment(flavor: Dict, prefix: Path, srcdir: Path, recipe: Dict = N
                     value = str(value).replace('%{srcdir}', str(srcdir))
                     env[key] = value
                     print(f"Setting {key}={value}")
-
     return env

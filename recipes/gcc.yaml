@@ -53,6 +53,17 @@ build:
 install:
   post:
     - "pushd %{prefix} && mkdir -p bin && cd bin && ln -s ../gcc/bin/%{host}-gfortran-scls ./gfortran && popd"
+    - "pushd %{prefix} && mkdir -p lib && cd lib && ln -s ../gcc/lib/libgomp.1.dylib ./libgomp.1.dylib && ln -s ../gcc/lib/libgomp.1.dylib ./libgomp.dylib && popd"
+    - "pushd %{prefix}/gcc/lib && for f in libatomic.dylib libgfortran.dylib libgomp.dylib libitm.dylib libquadmath.dylib libssp.dylib libstdc++.dylib ; do rm -rv $f ; done
+ && popd"
+    - "pushd %{prefix}/gcc/lib && for f in libatomic.1.dylib libgfortran.5.dylib libgomp.1.dylib libitm.1.dylib libquadmath.0.dylib libssp.0.dylib libstdc++.6.dylib ; do install_name_tool -id %{install_prefix}/lib/$f $f ; for g in libatomic.1.dylib libgfortran.5.dylib libgomp.1.dylib libitm.1.dylib libquadmath.0.dylib libssp.0.dylib libstdc++.6.dylib libgcc_s.1.1.dylib ; do install_name_tool -change $g %{install_prefix}/lib/$g $f 2>/dev/null ; done ; install_name_tool -change @rpath/libgcc_s.1.1.dylib /opt/scls/gcc/lib/libgcc_s.1.1.dylib $f 2>/dev/null ; done && popd"
+    - "pushd %{prefix}/gcc/lib && ln -s ./libatomic.1.dylib ./libatomic.dylib && popd"
+    - "pushd %{prefix}/gcc/lib && ln -s ./libgfortran.5.dylib ./libgfortran.dylib && popd"
+    - "pushd %{prefix}/gcc/lib && ln -s ./libgomp.1.dylib ./libgomp.dylib && popd"
+    - "pushd %{prefix}/gcc/lib && ln -s ./libitm.1.dylib ./libitm.dylib && popd"
+    - "pushd %{prefix}/gcc/lib && ln -s ./libquadmath.0.dylib ./libquadmath.dylib && popd"
+    - "pushd %{prefix}/gcc/lib && ln -s ./libssp.0.dylib ./libssp.dylib && popd"
+    - "pushd %{prefix}/gcc/lib && ln -s ./libstdc++.6.dylib ./libstdc++.dylib && popd"
 
 test:
   commands:

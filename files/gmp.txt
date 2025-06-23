@@ -1,0 +1,8 @@
+%{prefix}/include/gmp.h
+%{prefix}/include/gmpxx.h
+%{prefix}/lib/libgmp.so
+%{prefix}/lib/libgmp.so.*
+%{prefix}/lib/libgmpxx.so
+%{prefix}/lib/libgmpxx.so.*
+%{prefix}/lib/pkgconfig/gmp.pc
+%{prefix}/lib/pkgconfig/gmpxx.pc

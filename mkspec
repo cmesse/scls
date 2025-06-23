@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+/Users/christian/Applications/python/bin/python3 python/rpm_builder.py --package $1 --flavor gcc-debug --spec-only

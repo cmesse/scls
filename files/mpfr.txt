@@ -1,0 +1,6 @@
+%{prefix}/include/mpf2mpfr.h
+%{prefix}/include/mpfr.h
+%{prefix}/lib/libmpfr.so
+%{prefix}/lib/libmpfr.so.*
+%{prefix}/lib/pkgconfig/mpfr.pc
+%{prefix}/share/doc/mpfr

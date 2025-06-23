@@ -1,0 +1,55 @@
+name: cmake
+version: 4.0.3
+summary: Cross-platform make system
+homepage: https://cmake.org/
+license: BSD-3-Clause
+source:
+  url: https://github.com/Kitware/CMake/releases/download/v%{version}/cmake-%{version}.tar.gz
+
+requires:
+  macos:
+    - automake
+    - autoconf
+    - openssl
+
+rpm_build_requires:
+    - ncurses-devel
+    - openssl-devel
+
+rpm_requires:
+    - sed
+    - git
+    - ncurses
+    - openssl
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+configure:
+  type: autotools
+  defaults:
+    shared: false
+    host_flags: false
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+  pre:
+     - "sed -i '/\"lib64\"/s/64//' Modules/GNUInstallDirs.cmake"
+  args:
+    - '--no-qt-gui'
+    - '--parallel=$(nproc)'
+    - '--system-zlib'
+  flavor_env:
+    all:
+      SED: "sed"
+    macos:
+      SED: "gsed"
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make check"

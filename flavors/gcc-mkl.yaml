@@ -27,6 +27,7 @@ flags:
   cxxflags: "-march=x86-64-v3 -fPIC -fno-fast-math"
   fflags: "-march=x86-64-v3 -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
   ldflags: "-Wl,-rpath,/opt/scls/lib -L/opt/scls/lib"
+
 math:
   linalg: mkl
   threading: openmp

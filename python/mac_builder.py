@@ -29,6 +29,8 @@ from patch_common import (
     apply_patches
 )
 
+from math_common import ( get_math_link_line, get_math_compile_flags )
+
 class MacOSBuilder:
     def __init__(self, package: str, flavor: str = "macos"):
         self.package = package
@@ -71,7 +73,20 @@ class MacOSBuilder:
         self.host = "x86_64-apple-darwin" + subprocess.check_output(
             ["uname", "-r"],text=True).strip()
 
+        # Feature flags
+        self.openmp = False
         self.mpi = False
+        self.cuda = False  # Not used on macOS but kept for consistency
+        self.math = None  # 'reference', 'accelerate', or None
+
+        # flags to be filled later
+        self.cflags = ""
+        self.cxxflags = ""
+        self.fcflags = ""
+        self.ldflags = ""
+
+        self.math_flags = ""
+        self.math_ldflags = ""
 
         # Create directories
         for d in [self.sources_dir, self.build_dir, self.rpms_dir, self.srpms_dir, self.specs_dir]:
@@ -94,17 +109,25 @@ class MacOSBuilder:
 
     def configure(self, source_dir: Path, env: Dict[str, str]) -> None:
         """Run configure step"""
-
+        self.math_flags
         configure_type = self.recipe.get('configure', {}).get('type', 'autotools')
 
         pkg_config_path = str(self.prefix / 'lib/pkgconfig') + ':' + "/opt/X11/lib/pkgconfig:/usr/lib/pkgconfig"
 
         # check for MPI
         features = self.recipe.get('features', {})
-        if 'mpi' in features:
-            if features['mpi'] == True:
-                self.mpi = True
+        self.openmp = features.get('openmp', False)
+        self.mpi = features.get('mpi', False)
+        self.math = features.get('math', None)
 
+        # Add math flags if math features are enabled
+        if self.math :
+            self.math_flags = get_math_compile_flags(self.flavor, self.recipe)
+            self.math_ldflags = get_math_link_line(self.flavor, self.recipe)
+
+            # Replace %{mklroot} with actual path (not applicable on macOS, but for consistency)
+            mklroot = getattr(self, 'mklroot', '/opt/intel/oneapi/mkl/latest')
+            self.math_ldflags = self.math_ldflags.replace('%{mklroot}', mklroot)
 
         if configure_type == 'autotools':
             # Update config scripts
@@ -118,11 +141,6 @@ class MacOSBuilder:
             # Get configure arguments
             args = get_configure_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix )
 
-            # Get optimization flags
-            cflags, cxxflags, fflags = get_optimization_flags(
-                self.recipe, self.flavor, env['CC']
-            )
-
             # override compilers
             if self.mpi:
                 env['CC'] = 'mpicc'
@@ -131,11 +149,25 @@ class MacOSBuilder:
                 env['FF'] = 'mpifort'
                 env['F77'] = 'mpifort'
 
-            env['CFLAGS'] = cflags
-            env['CXXFLAGS'] = cxxflags
-            env['FFLAGS'] = fflags
-            env['FCFLAGS'] = fflags
-            env['LDFLAGS'] = self.flavor['flags'].get('ldflags', '')
+            # Get optimization flags
+            self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
+                self.recipe, self.flavor, env['CC']
+            )
+
+            ldflags = self.flavor['flags'].get('ldflags', '')
+
+            # Add math flags to existing flags
+            if self.math:
+                self.cflags += f" {self.math_flags}"
+                self.cxxflags += f" {self.math_flags}"
+                self.fcflags += f" {self.math_flags}"
+                self.ldflags += f" {self.math_ldflags}"
+
+            env['CFLAGS'] = self.cflags
+            env['CXXFLAGS'] = self.cxxflags
+            env['FFLAGS'] = self.fcflags
+            env['FCFLAGS'] = self.fcflags
+            env['LDFLAGS'] = self.ldflags
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             # Apply enhanced configure environment (supports +=, -=, etc.)
@@ -167,13 +199,10 @@ class MacOSBuilder:
 
         elif configure_type == 'cmake':
 
-            # override compilers
-            if self.mpi:
-                env['CC'] = 'mpicc'
-                env['CXX'] = 'mpicxx'
-                env['FC'] = 'mpifort'
-                env['FF'] = 'mpifort'
-                env['F77'] = 'mpifort'
+            # Apply enhanced configure environment (supports +=, -=, etc.)
+            from build_common import apply_configure_environment
+
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
 
             # Create build directory
             build_dir = source_dir / 'build'
@@ -187,23 +216,57 @@ class MacOSBuilder:
             # Get CMake arguments
             args = get_cmake_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
 
+            # override compilers
+            if self.mpi:
+                env['CC'] = 'mpicc'
+                env['CXX'] = 'mpicxx'
+                env['FC'] = 'mpifort'
+                env['FF'] = 'mpifort'
+                env['F77'] = 'mpifort'
+
             # Get optimization flags
-            cflags, cxxflags, fflags = get_optimization_flags(
+            self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
                 self.recipe, self.flavor, env['CC']
             )
-            env['CFLAGS'] = cflags
-            env['CXXFLAGS'] = cxxflags
-            env['FFLAGS'] = fflags
-            env['LDFLAGS'] = self.flavor['flags'].get('ldflags', '')
+
+            self.ldflags = self.flavor['flags'].get('ldflags', '')
+
+            # Add math flags to existing flags
+            if self.math :
+                self.cflags += f" {self.math_flags}"
+                self.cxxflags += f" {self.math_flags}"
+                self.fcflags += f" {self.math_flags}"
+                self.ldflags += f" {self.math_ldflags}"
+
+            env['CFLAGS'] = self.cflags
+            env['CXXFLAGS'] = self.cxxflags
+            env['FFLAGS'] = self.fcflags
+            env['FCFLAGS'] = self.fcflags
+            env['LDFLAGS'] = self.ldflags
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             # Apply enhanced configure environment (supports +=, -=, etc.)
             from build_common import apply_configure_environment
             env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
 
+            # Run any pre-configure commands
+            if 'configure' in self.recipe and 'pre' in self.recipe['configure']:
+                for cmd in self.recipe['configure']['pre']:
+                    # Apply check_args to replace %{sdk} and %{host}
+                    checked_cmd = self.check_args([cmd])[0]
+                    run_command(['sh', '-c', checked_cmd], source_dir, env, "pre-configure")
+
             # Run CMake
             cmd = self.check_args(['cmake', '..'] + args)
             run_command(cmd, build_dir, env, "cmake configure")
+
+            # Run any post-configure commands
+            if 'configure' in self.recipe and 'post' in self.recipe['configure']:
+                for cmd in self.recipe['configure']['post']:
+                    # Apply check_args to replace %{sdk} and %{host}
+                    checked_cmd = self.check_args([cmd])[0]
+                    run_command(['sh', '-c', checked_cmd], source_dir, env, "post-configure")
+
 
             # Update source_dir to build_dir for subsequent steps
             return build_dir
@@ -214,12 +277,7 @@ class MacOSBuilder:
                 self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
             else:
                 self.install_prefix = self.prefix
-
-            # Get optimization flags
-            cflags, cxxflags, fflags = get_optimization_flags(
-                self.recipe, self.flavor, env['CC']
-            )
-
+                
             # override compilers
             if self.mpi:
                 env['CC'] = 'mpicc'
@@ -228,11 +286,25 @@ class MacOSBuilder:
                 env['FF'] = 'mpifort'
                 env['F77'] = 'mpifort'
 
-            env['CFLAGS'] = cflags
-            env['CXXFLAGS'] = cxxflags
-            env['FFLAGS'] = fflags
-            env['FCFLAGS'] = fflags
-            env['LDFLAGS'] = self.flavor['flags'].get('ldflags', '')
+            # Get optimization flags
+            self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
+                self.recipe, self.flavor, env['CC']
+            )
+
+            ldflags = self.flavor['flags'].get('ldflags', '')
+
+            # Add math flags to existing flags
+            if self.math:
+                self.cflags += f" {self.math_flags}"
+                self.cxxflags += f" {self.math_flags}"
+                self.fcflags += f" {self.math_flags}"
+                self.ldflags += f" {self.math_ldflags}"
+
+            env['CFLAGS'] = self.cflags
+            env['CXXFLAGS'] = self.cxxflags
+            env['FFLAGS'] = self.fcflags
+            env['FCFLAGS'] = self.fcflags
+            env['LDFLAGS'] = self.ldflags
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             # Run any pre-configure commands
@@ -273,16 +345,33 @@ class MacOSBuilder:
             else:
                 self.install_prefix = self.prefix
 
-            # Get optimization flags and set environment
-            cflags, cxxflags, fflags = get_optimization_flags(
+            # override compilers
+            if self.mpi:
+                env['CC'] = 'mpicc'
+                env['CXX'] = 'mpicxx'
+                env['FC'] = 'mpifort'
+                env['FF'] = 'mpifort'
+                env['F77'] = 'mpifort'
+
+            # Get optimization flags
+            self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
                 self.recipe, self.flavor, env['CC']
             )
-            env['CFLAGS'] = cflags
-            env['CXXFLAGS'] = cxxflags
-            env['FFLAGS'] = fflags
-            env['FCFLAGS'] = fflags
-            env['LDFLAGS'] = self.flavor['flags'].get('ldflags', '')
-            env['PREFIX'] = str(self.install_prefix)
+
+            self.ldflags = self.flavor['flags'].get('ldflags', '')
+
+            # Add math flags to existing flags
+            if self.math:
+                self.cflags += f" {self.math_flags}"
+                self.cxxflags += f" {self.math_flags}"
+                self.fcflags += f" {self.math_flags}"
+                self.ldflags += f" {self.math_ldflags}"
+
+            env['CFLAGS'] = self.cflags
+            env['CXXFLAGS'] = self.cxxflags
+            env['FFLAGS'] = self.fcflags
+            env['FCFLAGS'] = self.fcflags
+            env['LDFLAGS'] = self.ldflags
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             print("Skipping configure step (type: none)")
@@ -295,20 +384,35 @@ class MacOSBuilder:
                 self.install_prefix = self.prefix
 
             # Get optimization flags and set environment
-            cflags, cxxflags, fflags = get_optimization_flags(self.recipe, self.flavor, env['CC'])
+            cflags, cxxflags, fcflags = get_optimization_flags(self.recipe, self.flavor, env['CC'])
 
             # override compilers
             if self.mpi:
                 env['CC'] = 'mpicc'
                 env['CXX'] = 'mpicxx'
                 env['FC'] = 'mpifort'
+                env['FF'] = 'mpifort'
+                env['F77'] = 'mpifort'
 
-            env['CFLAGS'] = cflags
-            env['CXXFLAGS'] = cxxflags
-            env['FFLAGS'] = fflags
-            env['FCFLAGS'] = fflags
-            env['LDFLAGS'] = self.flavor['flags'].get('ldflags', '')
-            env['PREFIX'] = str(self.install_prefix)
+            # Get optimization flags
+            self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
+                self.recipe, self.flavor, env['CC']
+            )
+
+            self.ldflags = self.flavor['flags'].get('ldflags', '')
+
+            # Add math flags to existing flags
+            if self.math:
+                self.cflags += f" {self.math_flags}"
+                self.cxxflags += f" {self.math_flags}"
+                self.fcflags += f" {self.math_flags}"
+                self.ldflags += f" {self.math_ldflags}"
+
+            env['CFLAGS'] = self.cflags
+            env['CXXFLAGS'] = self.cxxflags
+            env['FFLAGS'] = self.fcflags
+            env['FCFLAGS'] = self.fcflags
+            env['LDFLAGS'] = self.ldflags
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             # Apply enhanced configure environment
@@ -323,14 +427,18 @@ class MacOSBuilder:
         return source_dir
 
     def check_args(self, cmd):
-        cmd0 = [s.replace('%{prefix}', str(self.prefix)) for s in cmd]
-        cmd1 = [s.replace('%{install_prefix}', str(self.install_prefix)) for s in cmd0]
-        cmd2 =  [ s.replace('%{sdk}', self.sdk) for s in cmd1 ]
-        cmd3 = [s.replace('%{host}', self.host) for s in cmd2]
-        cmd4 = [s.replace('%{nprocs}', str(self.nprocs)) for s in cmd3]
-        cmd5 = [s.replace('%{srcdir}', str(self.source_dir)) for s in cmd4]
-
-        return cmd5
+        cmd = [s.replace('sed -i', 'gsed -i') for s in cmd]
+        cmd = [s.replace('%{prefix}', str(self.prefix)) for s in cmd]
+        cmd = [s.replace('%{install_prefix}', str(self.install_prefix)) for s in cmd]
+        cmd =  [ s.replace('%{sdk}', self.sdk) for s in cmd ]
+        cmd = [s.replace('%{host}', self.host) for s in cmd]
+        cmd = [s.replace('%{nprocs}', str(self.nprocs)) for s in cmd]
+        cmd = [s.replace('%{srcdir}', str(self.source_dir)) for s in cmd]
+        cmd = [s.replace('%{cflags}', str(self.cflags)) for s in cmd]
+        cmd = [s.replace('%{cxxflags}', str(self.cxxflags)) for s in cmd]
+        cmd = [s.replace('%{fcflags}', str(self.fcflags)) for s in cmd]
+        cmd = [s.replace('%{ldflags}', str(self.fcflags)) for s in cmd]
+        return cmd
 
     def build(self, build_dir: Path, env: Dict[str, str]) -> None:
         """Run build step"""
@@ -620,7 +728,7 @@ class MacOSBuilder:
             'version': self.recipe['version'],
             'features': self.recipe.get('features', {}),
             'prefix': str(self.prefix),
-            'install_prefix': str(self.install_prefix),
+            'install_prefix': str(self.install_prefix)
         }
 
         # Add compiler information
@@ -632,22 +740,23 @@ class MacOSBuilder:
         })
 
         # Add MPI compilers if MPI is enabled
-
-        features = self.recipe.get('features', {})
-        if features.get('mpi', False):
+        if self.mpi:
             context.update({
                 'mpicc': 'mpicc',
                 'mpicxx': 'mpicxx',
                 'mpifort': 'mpifort',
             })
 
-        # Add optimization flags (get from environment since they're already calculated)
+        # Add optimization flags
+        cflags, cxxflags, fcflags = get_optimization_flags(
+            self.recipe, self.flavor, env['CC']
+        )
         context.update({
-            'cflags': env.get('CFLAGS', ''),
-            'cxxflags': env.get('CXXFLAGS', ''),
-            'fflags': env.get('FFLAGS', ''),
-            'fcflags': env.get('FCFLAGS', ''),
-            'ldflags': env.get('LDFLAGS', ''),
+            'cflags': cflags,
+            'cxxflags': cxxflags,
+            'fcflags': fcflags,
+            'fcflags': fcflags,
+            'ldflags': env['LDFLAGS'],
         })
 
         # Add macOS-specific variables
@@ -657,42 +766,44 @@ class MacOSBuilder:
             'nprocs': str(self.nprocs),
         })
 
-        # Add math library information
+        # Math library configuration - all or nothing approach
         math_config = self.flavor.get('math', {})
-        context['math_type'] = math_config.get('linalg', 'reference')
-
-        # Generate math library link lines
         if math_config.get('linalg') == 'accelerate':
-            if features.get('math') == 'parallel':
-                context['math_libs'] = '-lscalapack -framework Accelerate'
-            else:
-                context['math_libs'] = '-framework Accelerate'
+            # Use Accelerate for everything
             context['use_accelerate'] = True
-            context['use_mkl'] = False
-        elif math_config.get('linalg') == 'mkl':
-            throw_error("MKL is not supported on macOS anymore")
+            context['blas_libs'] = '-framework Accelerate'
+            context['lapack_libs'] = '-framework Accelerate'
+            if self.math == 'parallel':
+                # ScaLAPACK built against Accelerate
+                context['scalapack_libs'] = '-lscalapack -framework Accelerate'
+            context['math_libs'] = '-framework Accelerate'
         else:
-            context['use_mkl'] = False
+            # Use reference implementation for everything
             context['use_accelerate'] = False
-            if features.get('math') == 'parallel':
+            context['blas_libs'] = '-lblas'
+            context['lapack_libs'] = '-llapack'
+            if self.math == 'parallel':
+                context['scalapack_libs'] = '-lscalapack -llapack -lblas'
                 context['math_libs'] = '-lscalapack -llapack -lblas'
             else:
                 context['math_libs'] = '-llapack -lblas'
 
-        # Add threading information
-        threading = math_config.get('threading', 'openmp')
-        context['threading'] = threading
-        if threading == 'openmp':
+        # OpenMP configuration - simple since we use symlinks
+        if self.openmp:
             context['openmp_flag'] = '-fopenmp'
+            context['openmp_libs'] = '-lgomp'
         else:
             context['openmp_flag'] = ''
+            context['openmp_libs'] = ''
 
-        # Add library type (always shared on macOS)
+        # Library type
         context['shared_libs'] = True
         context['lib_ext'] = '.dylib'
 
-        # Add index size for packages that support it
-        context['index_size'] = features.get('index_size', 32)
+        # Index size for packages that support it
+        context['index_size'] = self.recipe.get('features', {}).get('index_size', 32)
+
+        return context
 
 def main():
     parser = argparse.ArgumentParser(description='Build SCLS packages for macOS')

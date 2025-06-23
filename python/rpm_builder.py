@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Enhanced RPM builder with release tags, proper parallel builds, and changelog logs
+FIXED: Direct configure call instead of %configure macro to avoid unwanted arguments
 """
 
 import os
@@ -22,6 +23,13 @@ from patch_common import (
     copy_patches_to_sources,
     get_all_patches
 )
+
+from math_common import (
+    get_math_link_line,
+    get_math_compile_flags,
+    get_cuda_path,
+    nv_hpc_compiler_path,
+    get_nv_gpu_targets )
 
 
 def load_changelog(package_name: str, logs_dir: Path = Path("logs")) -> str:
@@ -69,21 +77,31 @@ class RPMBuilder:
         # Setup paths
         self.prefix = Path(self.flavor['prefix'])
         self.project_root = Path(__file__).parent.parent
-        self.rpm_base = self.project_root / "work"  # Changed to match directory structure
-        self.sources_dir = self.rpm_base / "sources"
-        self.specs_dir = self.rpm_base / "specs"
+        self.rpm_base = self.project_root / "rpmbuild"  # DO NOT CHANGE!!!
+        self.sources_dir = self.rpm_base / "SOURCES" # DO NOT CHANGE!!!
+        self.specs_dir = self.rpm_base / "SPECS" # DO NOT CHANGE!!!
 
         self.host = "x86_64-redhat-linux"
         self.nprocs = os.cpu_count()
-        self.cuda = None
-        self.mpi = False
+
+        # flags to be filled later
+        self.cflags = ""
+        self.cxxflags = ""
+        self.fcflags = ""
+        self.ldflags = ""
+
+        self.math_flags = ""
+        self.math_ldflags = ""
 
         # Set install prefix
         if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
             configure_config = self.recipe['configure']
             self.install_prefix = self.prefix / configure_config['install_prefix']
+        else:
+            self.install_prefix = self.prefix
 
         # check for MPI
+        self.mpi = False
         features = self.recipe.get('features', {})
         if 'mpi' in features:
             if features['mpi'] == True:
@@ -97,10 +115,24 @@ class RPMBuilder:
                 comp['f77'] = 'mpifort'
                 comp['f90'] = 'mpifort'
                 self.flavor['compilers'] = comp
+                
+        if 'nvidia' in self.flavor :
+            self.cuda = True
+            self.cuda_path = get_cuda_path(self.flavor)
+            self.nv_gpu_target = get_nv_gpu_targets( self.flavor )
+            self.nv_hpc_compilers = nv_hpc_compiler_path( self.flavor )
         else:
-            self.install_prefix = self.prefix
+            self.cuda = False
+            self.cuda_path = ''
+            self.nv_gpu_target = ''
+            self.nv_hpc_compilers = ''
 
 
+        # MKL paths if needed
+        if 'mkl' in self.flavor_name:
+            self.mkl_root = '/opt/intel/oneapi/mkl/latest'
+        else:
+            self.mkl_root = None
 
         # Create directories
         self.specs_dir.mkdir(parents=True, exist_ok=True)
@@ -129,6 +161,153 @@ class RPMBuilder:
         else:
             return 'make'
 
+    def get_test_commands(self) -> List[str]:
+        """Get test commands with parallel make substitution if appropriate"""
+        if 'test' not in self.recipe:
+            return []
+
+        test_config = self.recipe['test']
+        commands = test_config.get('commands', [])
+
+        # Check if parallel testing is enabled (default: True)
+        parallel_tests = test_config.get('parallel', True)
+
+        # Process commands
+        processed_commands = []
+        for cmd in commands:
+            if parallel_tests and cmd.strip().startswith('make '):
+                # Replace "make " with "make %{?_smp_mflags} "
+                cmd = cmd.replace('make ', 'make %{?_smp_mflags} ', 1)
+            processed_commands.append(cmd)
+
+        return processed_commands
+
+    def get_configure_pre_post_commands(self) -> tuple[list, list]:
+        """Get pre and post configure commands from recipe"""
+        pre_commands = []
+        post_commands = []
+
+        if 'configure' in self.recipe:
+            if 'pre' in self.recipe['configure']:
+                for cmd in self.recipe['configure']['pre']:
+                    pre_commands.append(cmd)
+
+            if 'post' in self.recipe['configure']:
+                for cmd in self.recipe['configure']['post']:
+                    post_commands.append(cmd)
+
+        return pre_commands, post_commands
+
+    def check_args(self, cmd):
+        cmd = [s.replace('%{prefix}', str(self.prefix)) for s in cmd]
+        cmd = [s.replace('%{install_prefix}', str(self.install_prefix)) for s in cmd]
+        cmd = [s.replace('%{host}', self.host) for s in cmd]
+        cmd = [s.replace('%{nprocs}', str(self.nprocs)) for s in cmd]
+        cmd = [s.replace('%{cuda}', str(self.cuda_path)) for s in cmd]
+        cmd = [s.replace('%{mklroot}', str( self.mkl_root)) for s in cmd]
+        return cmd
+
+    def get_install_pre_post_commands(self) -> tuple[list, list]:
+        """Get pre and post install commands from recipe"""
+        pre_commands = []
+        post_commands = []
+
+        if 'install' in self.recipe:
+            if 'pre' in self.recipe['install']:
+                for cmd in self.recipe['install']['pre']:
+                    pre_commands.append(cmd)
+
+            if 'post' in self.recipe['install']:
+                for cmd in self.recipe['install']['post']:
+                    post_commands.append(cmd)
+
+        return pre_commands, post_commands
+
+    def get_intel_oneapi_setup(self) -> list:
+        """Get Intel OneAPI setup commands for MKL flavors"""
+        setup_commands = []
+
+        # Add Intel OneAPI setup for MKL flavors
+        if 'mkl' in self.flavor_name:
+            setup_commands.append("source /opt/intel/oneapi/setvars.sh intel64")
+
+        # Add any flavor-specific pre-build setup
+        if 'pre_build_setup' in self.flavor:
+            setup_commands.extend(self.flavor['pre_build_setup'])
+
+        return setup_commands
+
+    def get_configure_args_for_rpm(self) -> List[str]:
+        """Get configure arguments for RPM SPEC file, preserving RPM macros"""
+        args = ["--prefix=%{prefix}"]
+
+        # Get defaults configuration if it exists
+        defaults = self.recipe.get('configure', {}).get('defaults', {})
+
+        # Always check the value of 'shared' - default to True if not specified
+        use_shared = defaults.get('shared', True)
+        if use_shared:
+            args.extend(["--enable-shared", "--disable-static"])
+
+        # Same logic for host_flags
+        use_host_flags = defaults.get('host_flags', True)
+        if use_host_flags:
+            args.extend([
+                f"--host={self.host}",
+                f"--build={self.host}",
+                f"--target={self.host}"
+            ])
+
+        # Add recipe-specific configure args with RPM macro preservation
+        if 'configure' in self.recipe and 'args' in self.recipe['configure']:
+            for arg in self.recipe['configure']['args']:
+                args.append(arg)
+
+        # Add flavor-specific args from recipe
+        if 'configure' in self.recipe and 'flavor_args' in self.recipe['configure']:
+            flavor_name = self.flavor.get('name', '')
+            if flavor_name in self.recipe['configure']['flavor_args']:
+                for arg in self.recipe['configure']['flavor_args'][flavor_name]:
+                    args.append(arg)
+
+        return args
+
+    def get_direct_configure_command(self) -> str:
+        """
+        Get direct configure command instead of using %configure macro
+        This avoids the unwanted RPM default arguments
+        """
+        configure_type = self.recipe.get('configure', {}).get('type', 'autotools')
+
+        if configure_type != 'autotools':
+            return ""  # Only applies to autotools
+
+        # Get our custom configure arguments with RPM macros preserved
+        args = self.get_configure_args_for_rpm()
+
+        # Build the direct configure command
+        cmd_parts = ['./configure']
+        cmd_parts.extend(args)
+
+        # Format for SPEC file (with proper line continuation)
+        if len(cmd_parts) == 1:
+            return cmd_parts[0]
+
+        # Multi-line format with backslash continuation
+        lines = [cmd_parts[0] + ' \\']
+        for arg in cmd_parts[1:-1]:
+            lines.append(f'    {arg} \\')
+        lines.append(f'    {cmd_parts[-1]}')  # Last line without backslash
+
+        return '\n'.join(lines)
+
+    def get_path_setup(self) -> str:
+        """Get PATH setup to ensure SCLS binaries are found first"""
+        if self.cuda :
+            return f"export PATH=%{{prefix}}/bin:%{{nv_hpc_compiler}}/bin:$PATH"
+        else :
+            return f"export PATH=%{{prefix}}/bin:$PATH"
+
     def generate_spec(self) -> Path:
         """Generate RPM SPEC file from template"""
         # Load template
@@ -139,9 +318,26 @@ class RPMBuilder:
             template = self.jinja_env.get_template('default.spec.j2')
 
         # Get optimization flags
-        cflags, cxxflags, fflags = get_optimization_flags(
+        self.cflags, self.cxxflags, self.fflags = get_optimization_flags(
             self.recipe, self.flavor, self.flavor['compilers']['cc']
         )
+
+        # Get math flags if math features are enabled
+        features = self.recipe.get('features', {})
+        if features.get('math') :
+            self.math_flags = get_math_compile_flags(self.flavor, self.recipe)
+            self.math_ldflags = get_math_link_line(self.flavor, self.recipe)
+
+            # Replace %{mklroot} with actual path
+            if self.mkl_root:
+                self.math_flags = self.math_flags.replace('%{mklroot}', self.mkl_root)
+                self.math_ldflags = self.math_ldflags.replace('%{mklroot}', self.mkl_root)
+
+            # Add math flags to existing flags
+            if self.math_flags :
+                self.cflags += f" {self.math_flags}"
+                self.cxxflags += f" {self.math_flags}"
+                self.fflags += f" {self.math_flags}"
 
         # Get requirements
         build_requires, requires = self.get_rpm_requires()
@@ -172,14 +368,20 @@ class RPMBuilder:
         # Get configure type
         configure_type = self.recipe.get('configure', {}).get('type', 'autotools')
 
-        # Get configure/cmake args based on type
-        configure_args = []
-        cmake_args = []
+        # Get direct configure command (instead of %configure)
+        direct_configure_command = self.get_direct_configure_command()
 
-        if configure_type == 'autotools':
-            configure_args = get_configure_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
-        elif configure_type == 'cmake':
-            cmake_args = get_cmake_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
+        # Get pre/post commands
+        configure_pre_commands, configure_post_commands = self.get_configure_pre_post_commands()
+        install_pre_commands, install_post_commands = self.get_install_pre_post_commands()
+
+        # Get Intel OneAPI setup
+        intel_oneapi_setup = self.get_intel_oneapi_setup()
+
+        # Get cmake args if needed
+        cmake_args = []
+        if configure_type == 'cmake':
+            cmake_args = self.get_cmake_args_with_paths()
 
         # Prepare template variables
         context = {
@@ -197,25 +399,35 @@ class RPMBuilder:
             'build_requires': build_requires,
             'requires': requires,
             'prefix': str(self.prefix),
-            'install_prefix': str(self.install_prefix),
-            'cflags': cflags,
-            'cxxflags': cxxflags,
-            'fflags': fflags,
-            'fcflags': fflags,
+            'cflags': self.cflags,
+            'cxxflags': self.cxxflags,
+            'fflags': self.fclags,
+            'fcflags': self.fcfags,
             'ldflags': self.flavor['flags'].get('ldflags', ''),
             'files': files,
             'changelog_date': datetime.now().strftime('%a %b %d %Y'),
             'parallel_build': self.recipe.get('build', {}).get('parallel', True),
             'make_command': make_command,
             'configure_type': configure_type,
-            'configure_args': configure_args,
+            'direct_configure_command': direct_configure_command,  # NEW: Direct configure
+            'configure_pre_commands': configure_pre_commands,  # NEW: Pre-configure commands
+            'configure_post_commands': configure_post_commands,  # NEW: Post-configure commands
+            'install_pre_commands': install_pre_commands,  # NEW: Pre-install commands
+            'install_post_commands': install_post_commands,  # NEW: Post-install commands
             'cmake_args': cmake_args,
             'configure_env_vars': configure_env_vars,
             'patches': self.get_patches(),
-            'test_commands': self.recipe.get('test', {}).get('commands', []),
-            'pre_build_setup': self.flavor.get('pre_build_setup', []),
-            'cuda': self.cuda,
-            'nprocs': "$(nproc)"
+            'test_commands': self.get_test_commands(),
+            'pre_build_setup': intel_oneapi_setup,  # UPDATED: Intel OneAPI setup
+            'cuda': self.cuda_path,
+            'nv_hpc_compilers' : self.nv_hpc_compilers,
+            'nv_gpu_target' : self.nv_gpu_target,
+            'nprocs': "$(nproc)",
+            'mkl_root': self.mkl_root,
+            'self.math_flags': self.math_flags,
+            'math_ldflags': self.math_ldflags,
+            'features': self.recipe.get('features', {}),
+            'path_setup': self.get_path_setup()
         }
 
         # Render template
@@ -224,11 +436,44 @@ class RPMBuilder:
         # Write to generated directory first
         spec_filename = f"{self.scls_name}.spec"
         generated_spec = self.specs_dir / spec_filename
+
+        # Remove any existing file/directory with same name
+        if generated_spec.exists():
+            if generated_spec.is_dir():
+                import shutil
+                shutil.rmtree(generated_spec)
+            else:
+                generated_spec.unlink()
+
         with open(generated_spec, 'w') as f:
             f.write(spec_content)
 
         print(f"Generated SPEC file: {generated_spec}")
         return generated_spec
+
+    def get_cmake_args_with_paths(self) -> List[str]:
+        """Get CMake arguments with proper path substitutions"""
+        args = get_cmake_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
+
+        # Process arguments for MKL and CUDA paths
+        processed_args = []
+        for arg in args:
+            # Replace CUDA path variables
+            if '%{cuda}' in arg:
+                arg = arg.replace('%{cuda}', self.cuda_path)
+            # Replace MKL path variables
+            if '%{mklroot}' in arg:
+                arg = arg.replace('%{mklroot}', self.mklroot)
+
+            arg = arg.replace('%{cflags}', self.cflags)
+            arg = arg.replace('%{cxxflags}', self.cxxflags)
+            arg = arg.replace('%{fcflags}', self.fcflags)
+            arg = arg.replace('%{ldflags}', self.ldflags)
+            arg = arg.replace('%{math_flags}', self.math_flags)
+            arg = arg.replace('%{math_ldflags}', self.math_ldflags)
+            processed_args.append(arg)
+
+        return processed_args
 
     def get_rpm_requires(self) -> tuple[list, list]:
         """Get RPM BuildRequires and Requires from recipe and flavor-specific settings"""
@@ -340,33 +585,6 @@ class RPMBuilder:
 
         return build_requires, requires
 
-    def get_file_list(self) -> list:
-        """Generate file list for the package"""
-        files = []
-
-        # Headers
-        files.extend([
-            f"{self.prefix}/include/*.h",
-            f"{self.prefix}/include/*.hpp",
-        ])
-
-        # Libraries (shared only)
-        files.extend([
-            f"{self.prefix}/lib/*.so",
-            f"{self.prefix}/lib/*.so.*",
-        ])
-
-        # pkg-config files
-        files.append(f"{self.prefix}/lib/pkgconfig/*.pc")
-
-        # Binaries (if any)
-        files.append(f"{self.prefix}/bin/*")
-
-        # Exclude common directories
-        files.append(f"%exclude {self.prefix}/share")
-
-        return files
-
     def get_configure_env_vars(self) -> List[Dict[str, str]]:
         """Get configure environment variables for SPEC file"""
         env_vars = []
@@ -459,6 +677,34 @@ class RPMBuilder:
         except FileNotFoundError:
             raise BuildError("rpmbuild command not found. Please install rpm-build package.")
 
+    def get_file_list(self) -> list:
+        """Generate file list for the package using actual installed files"""
+        # Check if we have tracked files from a previous build
+        file_list_path = self.project_root / "files" / "{:s}.txt".format(self.package)
+
+        if file_list_path.exists():
+            print(f"Using tracked files from: {file_list_path}")
+            with open(file_list_path, 'r') as f:
+                files = [line.strip() for line in f if line.strip()]
+
+            # Convert absolute paths to RPM file list format
+            rpm_files = []
+            for file_path in files:
+                if file_path.startswith(str(self.prefix)):
+                    # Remove the prefix to get relative path, then add back as RPM macro
+                    rel_path = file_path[len(str(self.prefix)):]
+                    if rel_path.startswith('/'):
+                        rel_path = rel_path[1:]
+                    rpm_files.append(f"%{{prefix}}/{rel_path}")
+                else:
+                    # File outside our prefix - use as-is
+                    rpm_files.append(file_path)
+            return rpm_files
+        else:
+            print("No tracked files found")
+            # return empty list
+            return []
+
     def run(self) -> None:
         """Run the complete build process"""
         print(f"\n{'=' * 60}")
@@ -480,169 +726,6 @@ class RPMBuilder:
         print(f"\n{'=' * 60}")
         print("Build completed successfully!")
         print(f"{'=' * 60}\n")
-
-
-def create_default_template():
-    """Create a default SPEC template with enhanced features"""
-    template_dir = Path("templates")
-    template_dir.mkdir(exist_ok=True)
-
-    default_template = template_dir / "default.spec.j2"
-    if not default_template.exists():
-        template_content = '''#######################################################################
-# SCLS {{ flavor.name }} - {{ package_name }}                        #
-#######################################################################
-
-%define prefix {{ prefix }}
-%define install_prefix {{ install_prefix }}
-%define scls_name {{ scls_name }}
-
-Name:           %{scls_name}
-Version:        {{ version }}
-Release:        {{ release }}%{?dist}
-Summary:        {{ description | truncate(70) }}
-
-License:        {{ license }}
-URL:            {{ homepage }}
-Source0:        {{ source_url }}
-{% for patch in patches %}
-Patch{{ patch.number }}:         {{ patch.file }}
-{% endfor %}
-
-# Build requirements
-{% for req in build_requires %}
-BuildRequires:  {{ req }}
-{% endfor %}
-
-# Runtime requirements
-{% for req in requires %}
-Requires:       {{ req }}
-{% endfor %}
-
-%description
-{{ description }}
-
-%prep
-%setup -q -n {{ package_name }}-{{ version }}
-{% for patch in patches %}
-{% if patch.strip == 1 %}
-%patch{{ patch.number }} -p1
-{% else %}
-%patch{{ patch.number }} -p{{ patch.strip }}
-{% endif %}
-{% endfor %}
-
-%build
-# Pre-build setup (Intel OneAPI, NVIDIA HPC SDK, etc.)
-{% for setup_cmd in pre_build_setup %}
-{{ setup_cmd }}
-{% endfor %}
-
-# Setup environment
-export CC={{ flavor.compilers.cc }}
-export CXX={{ flavor.compilers.cxx }}
-export FC={{ flavor.compilers.fc }}
-export F77={{ flavor.compilers.fc }}
-export CFLAGS="{{ cflags }}"
-export CXXFLAGS="{{ cxxflags }}"
-export FFLAGS="{{ fflags }}"
-export FCFLAGS="{{ fcflags }}"
-export LDFLAGS="{{ ldflags }}"
-
-# Configure-specific environment variables
-{% for env_var in configure_env_vars %}
-{% if '+=' in env_var.value %}
-export {{ env_var.name }}="${{ env_var.name }}:-} {{ env_var.value.replace('+=', '').strip() }}"
-{% elif '-=' in env_var.value %}
-# Remove operation for {{ env_var.name }} (manual implementation needed)
-export {{ env_var.name }}="${{ env_var.name }}"
-{% else %}
-export {{ env_var.name }}="{{ env_var.value }}"
-{% endif %}
-{% endfor %}
-
-{% if configure_type == 'autotools' %}
-./configure \\
-{% for arg in configure_args %}
-    {{ arg }}{% if not loop.last %} \\{% endif %}
-{% endfor %}
-
-{{ make_command }}
-
-{% elif configure_type == 'cmake' %}
-%cmake \\
-{% for arg in cmake_args %}
-    {{ arg }}{% if not loop.last %} \\{% endif %}
-{% endfor %}
-
-%cmake_build
-
-{% elif configure_type == 'custom' %}
-# Custom configuration system
-{% if recipe.configure.command is defined %}
-{{ recipe.configure.command }} \\
-{% else %}
-./config \\
-{% endif %}
-{% if 'configure' in recipe and 'args' in recipe['configure'] %}
-{% for arg in recipe['configure']['args'] %}
-    {{ arg }}{% if not loop.last %} \\{% endif %}
-{% endfor %}
-{% endif %}
-
-{{ make_command }}
-
-{% elif configure_type == 'none' %}
-# No configure step - direct build
-{% if parallel_build %}
-make %{?_smp_mflags} PREFIX=%{install_prefix}
-{% else %}
-make PREFIX=%{install_prefix}
-{% endif %}
-
-{% endif %}
-
-%check
-{% if test_commands %}
-{% for cmd in test_commands %}
-{{ cmd }}
-{% endfor %}
-{% endif %}
-
-%install
-{% if configure_type == 'autotools' %}
-%make_install
-{% elif configure_type == 'cmake' %}
-%cmake_install
-{% else %}
-make install DESTDIR=%{buildroot}
-{% endif %}
-
-# Remove libtool archives
-find %{buildroot} -name '*.la' -delete
-
-%files
-{% for file in files %}
-{{ file }}
-{% endfor %}
-
-%changelog
-{% if changelog %}
-{{ changelog }}
-{% else %}
-* {{ changelog_date }} SCLS Build System <scls@lbl.gov> - {{ version }}-{{ release }}
-- Initial package for {{ flavor.name }} flavor
-{% if patches %}
-- Applied {{ patches|length }} patch(es):
-{% for patch in patches %}
-  - {{ patch.file }}{% if patch.strip != 1 %} (-p{{ patch.strip }}){% endif %}
-{% endfor %}
-{% endif %}
-{% endif %}
-'''
-        with open(default_template, 'w') as f:
-            f.write(template_content)
-        print(f"Created default template: {default_template}")
 
 
 def create_example_changelog():
@@ -680,11 +763,10 @@ def main():
     parser.add_argument('--flavor', '-f', required=True, help='Flavor name')
     parser.add_argument('--spec-only', action='store_true',
                         help='Only generate SPEC file, do not build RPM')
+    parser.add_argument('--verbose', '-v', action='store_true',
+                        help='Verbose output')
 
     args = parser.parse_args()
-
-    # Ensure default template exists
-    create_default_template()
 
     try:
         builder = RPMBuilder(args.package, args.flavor)
@@ -703,6 +785,8 @@ def main():
     except KeyboardInterrupt:
         print("\nBuild interrupted by user", file=sys.stderr)
         sys.exit(130)
+
+
 
 
 if __name__ == '__main__':

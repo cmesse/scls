@@ -8,9 +8,11 @@ source:
   url: https://www.mpfr.org/mpfr-current/mpfr-%{version}.tar.xz
 
 requires:
-  - make
-  - sed
-  - gmp
+  all:
+    - gmp
+  macos:
+    - make
+    - sed
 
 features:
   fortran: false
@@ -38,6 +40,4 @@ build:
 
 test:
   commands:
-    - "make check 2>&1 | tee check.log"
-  post:
-    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"
+    - "make check"

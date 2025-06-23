@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+/Users/christian/Applications/python/bin/python3 ./python/build_order.py ./recipes --flavor gcc-debug

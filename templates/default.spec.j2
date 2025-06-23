@@ -5,6 +5,11 @@
 %define prefix {{ prefix }}
 %define scls_name {{ scls_name }}
 
+{% if flavor.nvidia %}
+%define cuda {{ cuda_path }}
+%define gpu {{ gpu_target }}
+{% endif %}
+
 Name:           %{scls_name}
 Version:        {{ version }}
 Release:        {{ release }}%{?dist}
@@ -46,11 +51,21 @@ Requires:       {{ req }}
 {{ setup_cmd }}
 {% endfor %}
 
+{{ path_setup }}
+
 # Setup environment
+{% if features.mpi %}
+export CC=mpicc
+export CXX=mpicxx
+export FC=mpifort
+export F77=mpifort
+{% else %}
 export CC={{ flavor.compilers.cc }}
 export CXX={{ flavor.compilers.cxx }}
 export FC={{ flavor.compilers.fc }}
 export F77={{ flavor.compilers.fc }}
+{% endif %}
+
 export CFLAGS="{{ cflags }}"
 export CXXFLAGS="{{ cxxflags }}"
 export FFLAGS="{{ fflags }}"
@@ -59,10 +74,10 @@ export LDFLAGS="{{ ldflags }}"
 
 # Configure-specific environment variables
 {% for env_var in configure_env_vars %}
-{% if '+=' in env_var.value %}
-export {{ env_var.name }}="${{ env_var.name }}:-} {{ env_var.value.replace('+=', '').strip() }}"
-{% elif '-=' in env_var.value %}
-# Remove operation for {{ env_var.name }} (manual implementation needed)
+{% if env_var.operation == 'append' %}
+export {{ env_var.name }}="${{ env_var.name }}:{{ env_var.value }}"
+{% elif env_var.operation == 'remove' %}
+# Remove operation for {{ env_var.name }} - needs manual implementation
 export {{ env_var.name }}="${{ env_var.name }}"
 {% else %}
 export {{ env_var.name }}="{{ env_var.value }}"
@@ -70,10 +85,21 @@ export {{ env_var.name }}="{{ env_var.value }}"
 {% endfor %}
 
 {% if configure_type == 'autotools' %}
-%configure \
-{% for arg in configure_args %}
-    {{ arg }}{% if not loop.last %} \{% endif %}
+{% if configure_pre_commands %}
+# Pre-configure commands
+{% for cmd in configure_pre_commands %}
+{{ cmd }}
 {% endfor %}
+{% endif %}
+
+{{ direct_configure_command }}
+
+{% if configure_post_commands %}
+# Post-configure commands
+{% for cmd in configure_post_commands %}
+{{ cmd }}
+{% endfor %}
+{% endif %}
 
 {{ make_command }}
 
@@ -81,6 +107,7 @@ export {{ env_var.name }}="{{ env_var.value }}"
 %cmake \
 {% for arg in cmake_args %}
     {{ arg }}{% if not loop.last %} \{% endif %}
+
 {% endfor %}
 
 %cmake_build
@@ -94,6 +121,7 @@ export {{ env_var.name }}="{{ env_var.value }}"
 {% endif %}
 {% for arg in configure_args %}
     {{ arg }}{% if not loop.last %} \{% endif %}
+
 {% endfor %}
 
 {{ make_command }}
@@ -109,6 +137,9 @@ make PREFIX=%{prefix}
 {% endif %}
 
 %check
+# Ensure our binaries are still in PATH for tests
+{{ path_setup }}
+
 {% if test_commands %}
 {% for cmd in test_commands %}
 {{ cmd }}
@@ -116,6 +147,13 @@ make PREFIX=%{prefix}
 {% endif %}
 
 %install
+{% if install_pre_commands %}
+# Pre-install commands
+{% for cmd in install_pre_commands %}
+{{ cmd }}
+{% endfor %}
+{% endif %}
+
 {% if configure_type == 'autotools' %}
 %make_install
 {% elif configure_type == 'cmake' %}
@@ -124,8 +162,18 @@ make PREFIX=%{prefix}
 make install DESTDIR=%{buildroot}
 {% endif %}
 
+{% if install_post_commands %}
+# Post-install commands
+{% for cmd in install_post_commands %}
+{{ cmd }}
+{% endfor %}
+{% endif %}
+
 # Remove libtool archives
 find %{buildroot} -name '*.la' -delete
+
+# Remove info directory file - managed by system
+rm -rf %{buildroot}%{prefix}/share/info
 
 %files
 {% for file in files %}
@@ -136,7 +184,7 @@ find %{buildroot} -name '*.la' -delete
 {% if changelog %}
 {{ changelog }}
 {% else %}
-* {{ changelog_date }} SCLS Build System <scls@lbl.gov> - {{ version }}-{{ release }}
+* {{ changelog_date }} Christian Messe <cmesse@lbl.gov> - {{ version }}-{{ release }}
 - Initial package for {{ flavor.name }} flavor
 {% if patches %}
 - Applied {{ patches|length }} patch(es):

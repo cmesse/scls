@@ -8,10 +8,11 @@ source:
   url: https://gmplib.org/download/gmp/gmp-%{version}.tar.xz
 
 requires:
-  - autoconf
-  - automake
-  - libtool
-  - bison
+  macos:
+    - autoconf
+    - automake
+    - libtool
+    - bison
 
 features:
   fortran: false
@@ -45,6 +46,4 @@ build:
 
 test:
   commands:
-    - "make check 2>&1 | tee check.log"
-  post:
-    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"
+    - "make check"

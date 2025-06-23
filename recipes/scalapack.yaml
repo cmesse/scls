@@ -1,0 +1,48 @@
+name: scalapack
+version: 2.2.2
+summary: A subset of LAPACK routines redesigned for heterogeneous computing
+homepage: http://www.netlib.org/scalapack/
+
+license: BSD
+
+source:
+  url: https://github.com/Reference-ScaLAPACK/scalapack/archive/refs/tags/v%{version}.tar.gz
+
+requires:
+  all:
+    - openmpi
+    - cmake
+  gcc-debug:
+    - blas
+    - lapack
+  clang-debug:
+    - blas
+    - lapack
+
+features:
+  fortran: true
+  mpi: false
+  openmp: false
+  math: sequential
+
+configure:
+  type: cmake
+  pre:
+    - "sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 4.0)/g' %{srcdir}/BLACS/INSTALL/CMakeLists.txt"
+    - "sed -i 's/cmake_minimum_required(VERSION 3.9)/cmake_minimum_required(VERSION 4.0)/g' %{srcdir}/CMakeLists.txt"
+  args:
+    - -DCMAKE_C_FLAGS='%{cflags} -Wno-implicit-function-declaration'
+    - -DCMAKE_CXX_FLAGS='%{cxxflags} -Wno-implicit-function-declaration'
+    - -DCMAKE_Fortran_FLAGS='%{fcflags} -fallow-argument-mismatch'
+    - -DMPI_BASE_DIR=%{prefix}
+    - -DCMAKE_POLICY_VERSION_MINIMUM=4.0
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make check"

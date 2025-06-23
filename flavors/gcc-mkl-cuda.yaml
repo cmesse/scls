@@ -5,13 +5,10 @@ prefix: /opt/scls/gcc-mkl-cuda
 
 # Version configuration for NVIDIA HPC SDK
 nvidia:
-  hpc_version: "25.5"      # nvhpc-25-5 package version
-  gds_version: "2.17.5"    # Different versioning for math libs
+  hpc: "25.5"
+  gds: "12.9"
+  target: "sm_80"
 
-# Pre-build setup commands
-#pre_build_setup:
-#  - "source /opt/intel/oneapi/setvars.sh intel64"
-  # NVIDIA paths should be set by nvhpc package installation
 
 # RPM package dependencies
 rpm_build_requires:
@@ -46,8 +43,3 @@ math:
 
 # MPI implementation
 mpi: openmpi
-
-# CUDA-specific configuration
-cuda:
-  gpu_target: "sm_80"  # Default GPU architecture target
-  version: "12.0"  # Managed by nvhpc package
