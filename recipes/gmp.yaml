@@ -24,6 +24,11 @@ features:
 
 configure:
   type: autotools
+  # GCC 15+ is stricter about C23 compliance - GMP's configure tests use K&R style
+  # function declarations that fail with modern GCC. Use gnu17 to allow older syntax.
+  env:
+    - CFLAGS: "+=-std=gnu17"
+    - CXXFLAGS: "+=-std=gnu++17"
   args:
     - --enable-cxx
     - --with-pic

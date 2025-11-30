@@ -882,3 +882,136 @@ def get_all_registry_entries(prefix: Path) -> Dict[str, Dict]:
             pass
 
     return packages
+
+
+# =============================================================================
+# Subpackage Functions
+# =============================================================================
+
+def get_subpackages_for_flavor(recipe: Dict, flavor_name: str) -> List[Dict]:
+    """
+    Get the list of subpackages that should be built for a given flavor.
+
+    Args:
+        recipe: The package recipe
+        flavor_name: The flavor being built
+
+    Returns:
+        List of subpackage definitions that apply to this flavor
+    """
+    if 'subpackages' not in recipe:
+        return []
+
+    subpackages = []
+    for subpkg_name, subpkg_config in recipe['subpackages'].items():
+        # Check if this subpackage should be built for this flavor
+        allowed_flavors = subpkg_config.get('flavors', None)
+
+        if allowed_flavors is None:
+            # No restriction - build for all flavors
+            subpackages.append({
+                'name': subpkg_name,
+                **subpkg_config
+            })
+        elif flavor_name in allowed_flavors:
+            # Flavor is in the allowed list
+            subpackages.append({
+                'name': subpkg_name,
+                **subpkg_config
+            })
+
+    return subpackages
+
+
+def get_subpackage_dependencies(subpkg_config: Dict, flavor_name: str) -> List[str]:
+    """
+    Get the dependencies for a subpackage.
+
+    Args:
+        subpkg_config: The subpackage configuration
+        flavor_name: The flavor being built
+
+    Returns:
+        List of dependency package names
+    """
+    deps = []
+    requires = subpkg_config.get('requires', [])
+
+    if isinstance(requires, list):
+        deps.extend(requires)
+    elif isinstance(requires, dict):
+        # Add 'all' dependencies
+        if 'all' in requires:
+            deps.extend(requires['all'])
+        # Add flavor-specific dependencies
+        if flavor_name in requires:
+            deps.extend(requires[flavor_name])
+
+    return deps
+
+
+def match_files_to_subpackage(all_files: List[str], file_patterns: List[str], prefix: str) -> List[str]:
+    """
+    Match installed files to a subpackage based on glob patterns.
+
+    Args:
+        all_files: List of all installed files (with %{prefix} or absolute paths)
+        file_patterns: List of glob patterns for this subpackage (e.g., ['lib/libblas.*', 'include/cblas*.h'])
+        prefix: The installation prefix
+
+    Returns:
+        List of files that match the patterns
+    """
+    import fnmatch
+
+    matched = []
+    for file_path in all_files:
+        # Normalize path: remove prefix to get relative path
+        if file_path.startswith('%{prefix}'):
+            rel_path = file_path[len('%{prefix}/'):]
+        elif file_path.startswith(prefix):
+            rel_path = file_path[len(prefix):].lstrip('/')
+        else:
+            rel_path = file_path
+
+        # Check against each pattern
+        for pattern in file_patterns:
+            if fnmatch.fnmatch(rel_path, pattern):
+                matched.append(file_path)
+                break
+
+    return matched
+
+
+def split_files_by_subpackage(all_files: List[str], subpackages: List[Dict], prefix: str) -> Dict[str, List[str]]:
+    """
+    Split a list of installed files among subpackages.
+
+    Args:
+        all_files: List of all installed files
+        subpackages: List of subpackage definitions with 'files' patterns
+        prefix: The installation prefix
+
+    Returns:
+        Dict mapping subpackage names to their file lists.
+        Files not matching any subpackage go to 'main'.
+    """
+    result = {'main': []}
+    assigned_files = set()
+
+    for subpkg in subpackages:
+        subpkg_name = subpkg['name']
+        file_patterns = subpkg.get('files', [])
+
+        if not file_patterns:
+            result[subpkg_name] = []
+            continue
+
+        matched = match_files_to_subpackage(all_files, file_patterns, prefix)
+        result[subpkg_name] = matched
+        assigned_files.update(matched)
+
+    # Remaining files go to main package
+    result['main'] = [f for f in all_files if f not in assigned_files]
+
+    return result

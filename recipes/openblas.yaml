@@ -1,0 +1,63 @@
+name: openblas
+version: 0.3.30
+summary: An optimized BLAS library based on GotoBLAS2
+homepage: https://github.com/OpenMathLib/OpenBLAS
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/OpenMathLib/OpenBLAS/archive/v%{version}/OpenBLAS-%{version}.tar.gz
+
+patches:
+  # Drop extra 'p' from threaded library name
+  - file: openblas-0.2.5-libname.patch
+  # Supply the proper flags to the test makefile
+  - file: openblas-0.3.11-tests.patch
+
+requires:
+  macos:
+    - gcc
+
+features:
+  fortran: true
+  mpi: false
+  openmp: true
+  math: false
+
+configure:
+  # OpenBLAS uses plain Makefile, not autotools or cmake
+  type: none
+
+build:
+  parallel: true
+  # INTERFACE64 is automatically set based on flavor's math.interface (lp64/ilp64)
+  args:
+    - "USE_OPENMP=1"
+    - "NO_LAPACK=1"
+    - "NO_LAPACKE=1"
+    - "NO_CBLAS=0"
+    - "DYNAMIC_ARCH=1"
+    - "NO_STATIC=1"
+  flavor_args:
+    macos:
+      - "BINARY=64"
+      - "NO_AVX512=1"
+    debug:
+      - "TARGET=GENERIC"
+
+install:
+  args:
+    - "PREFIX=%{prefix}"
+  post:
+    # Create compatibility symlink: libblas -> libopenblas
+    - "cd %{prefix}/lib && ln -sf libopenblas.so libblas.so || true"
+  flavor_post:
+    macos:
+      - "cd %{prefix}/lib && ln -sf libopenblas.dylib libblas.dylib || true"
+
+test:
+  commands:
+    - "make tests"
+
+registry:
+  cflags: "-I%{prefix}/include/openblas"
+  ldflags: "-L%{prefix}/lib -lopenblas"

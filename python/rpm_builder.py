@@ -21,7 +21,9 @@ from build_common import (
     check_package_installed,
     get_package_dependencies,
     add_rpath_for_libdirs,
-    get_all_registry_entries
+    get_all_registry_entries,
+    get_subpackages_for_flavor,
+    get_subpackage_dependencies
 )
 from patch_common import (
     copy_patches_to_sources,
@@ -515,7 +517,8 @@ class RPMBuilder:
             'path_setup': self.get_path_setup(),
             'library_symlink_fixes': self.get_library_symlink_fixes(),
             'extra_source_info': self.extra_source_info,  # For recipe-referenced sources
-            'package_dependencies': get_package_dependencies(self.recipe, self.flavor_name)
+            'package_dependencies': get_package_dependencies(self.recipe, self.flavor_name),
+            'subpackages': self.get_subpackages_for_spec()
         }
 
         # Add extra source info as individual variables (e.g., gmp_version, gmp_tarball)
@@ -894,6 +897,51 @@ class RPMBuilder:
             "  /sbin/ldconfig %{prefix}/lib 2>/dev/null || true",
             "fi"
         ]
+
+    def get_subpackages_for_spec(self) -> List[Dict]:
+        """
+        Get subpackage definitions formatted for the SPEC template.
+
+        Returns:
+            List of subpackage dicts with name, summary, requires, and files
+        """
+        subpackages = get_subpackages_for_flavor(self.recipe, self.flavor_name)
+
+        if not subpackages:
+            return []
+
+        spec_subpackages = []
+        for subpkg in subpackages:
+            subpkg_name = subpkg['name']
+
+            # Get dependencies for this subpackage
+            deps = get_subpackage_dependencies(subpkg, self.flavor_name)
+
+            # Convert dependency names to SCLS RPM package names
+            rpm_requires = []
+            for dep in deps:
+                # Check if it's one of our subpackages
+                is_subpkg = any(s['name'] == dep for s in subpackages)
+                if is_subpkg:
+                    rpm_requires.append(f"scls-{self.flavor_name}-{dep}")
+                else:
+                    # External dependency
+                    rpm_requires.append(f"scls-{self.flavor_name}-{dep}")
+
+            # Get file patterns for this subpackage
+            file_patterns = subpkg.get('files', [])
+
+            spec_subpackages.append({
+                'name': subpkg_name,
+                'rpm_name': f"scls-{self.flavor_name}-{subpkg_name}",
+                'summary': subpkg.get('summary', f'{subpkg_name} subpackage'),
+                'description': subpkg.get('description', subpkg.get('summary', '')),
+                'requires': rpm_requires,
+                'files': file_patterns
+            })
+
+        return spec_subpackages
+
 
 def create_example_changelog():
     """Create an example changelog file"""

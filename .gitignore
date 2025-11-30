@@ -4,6 +4,7 @@ __pycache__/
 work/
 rpmbuild/
 target/
+tmp/
 
 =======
 # Prerequisites

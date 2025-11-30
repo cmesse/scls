@@ -1,0 +1,20 @@
+OpenBLAS is an optimized BLAS (Basic Linear Algebra Subprograms) library based
+on GotoBLAS2 1.13 BSD version.
+
+For more information about OpenBLAS, please see:
+
+* The documentation at openmathlib.org/OpenBLAS/docs/,
+* The home page at openmathlib.org/OpenBLAS/.
+
+For a general introduction to the BLAS routines, please refer to the extensive
+documentation of their reference implementation hosted at netlib:
+
+https://www.netlib.org/blas.
+
+On that site you will likewise find documentation for the reference
+implementation of the higher-level library LAPACK - the Linear Algebra Package
+that comes included with OpenBLAS.
+
+If you are looking for a general primer or refresher on Linear Algebra, the set
+of six 20-minute lecture videos by Prof. Gilbert Strang on either MIT
+OpenCourseWare here or YouTube here may be helpful.

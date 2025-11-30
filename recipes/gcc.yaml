@@ -71,8 +71,16 @@ build:
 
 install:
   post:
-    # Create convenience symlinks for gcc/g++/gfortran without version suffix
-    - "cd %{prefix}/bin && for f in gcc g++ gfortran; do ln -sf %{host}-$f-15 $f 2>/dev/null || true; done"
+    # Create convenience symlinks for compilers (gcc, g++, c++, gfortran)
+    - "cd %{prefix}/bin && ln -sf %{host}-gcc gcc"
+    - "cd %{prefix}/bin && ln -sf %{host}-g++ g++"
+    - "cd %{prefix}/bin && ln -sf %{host}-c++ c++"
+    - "cd %{prefix}/bin && ln -sf %{host}-gfortran gfortran"
+    # Create symlinks for LTO-enabled tools (without host prefix, but keep gcc- prefix)
+    # Do NOT create plain ar/nm/ranlib - let those use system tools for Mach-O support
+    - "cd %{prefix}/bin && ln -sf %{host}-gcc-ar gcc-ar"
+    - "cd %{prefix}/bin && ln -sf %{host}-gcc-nm gcc-nm"
+    - "cd %{prefix}/bin && ln -sf %{host}-gcc-ranlib gcc-ranlib"
   flavor_post:
     macos:
       # Fix library symlinks (GCC creates versioned .dylib, we need unversioned too)

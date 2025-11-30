@@ -1,4 +1,5 @@
 %{prefix}/bin/gsed
+%{prefix}/share/info/dir
 %{prefix}/share/info/sed.info
 %{prefix}/share/man/man1
 %{prefix}/share/man/man1/gsed.1

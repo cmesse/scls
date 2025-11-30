@@ -3,6 +3,7 @@ version: 7.2
 summary: Tools needed to create Texinfo format documentation files
 homepage: https://www.gnu.org/software/texinfo/
 license: GPL-3.0-or-later
+bootstrap: true  # Build with system compiler before scls gcc is available
 
 source:
   url: https://ftp.gnu.org/gnu/texinfo/texinfo-%{version}.tar.xz

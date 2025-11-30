@@ -6,3 +6,7 @@
 %{prefix}/lib/libgmpxx.so.*
 %{prefix}/lib/pkgconfig/gmp.pc
 %{prefix}/lib/pkgconfig/gmpxx.pc
+%{prefix}/share/info/dir
+%{prefix}/share/info/gmp.info
+%{prefix}/share/info/gmp.info-1
+%{prefix}/share/info/gmp.info-2

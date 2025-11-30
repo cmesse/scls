@@ -23,7 +23,11 @@ from build_common import (
     should_build_package,
     check_package_installed,
     write_registry_entry,
-    add_rpath_for_libdirs
+    add_rpath_for_libdirs,
+    get_package_dependencies,
+    get_subpackages_for_flavor,
+    get_subpackage_dependencies,
+    split_files_by_subpackage
 )
 
 from patch_common import (
@@ -473,6 +477,21 @@ class MacOSBuilder:
         if 'build' in self.recipe and 'args' in self.recipe['build']:
             make_cmd.extend(self.recipe['build']['args'])
 
+        # Add flavor-specific build args
+        if 'build' in self.recipe and 'flavor_args' in self.recipe['build']:
+            flavor_name = self.flavor.get('name', 'macos')
+            if flavor_name in self.recipe['build']['flavor_args']:
+                make_cmd.extend(self.recipe['build']['flavor_args'][flavor_name])
+
+        # Special handling for OpenBLAS: set INTERFACE64 based on flavor's math.interface
+        if self.package == 'openblas':
+            math_config = self.flavor.get('math', {})
+            interface = math_config.get('interface', 'lp64')
+            if interface == 'ilp64':
+                make_cmd.append('INTERFACE64=1')
+            else:
+                make_cmd.append('INTERFACE64=0')
+
         run_command(make_cmd, build_dir, env, "build")
 
         # Run any post-build commands
@@ -520,7 +539,8 @@ class MacOSBuilder:
         # Install command with DESTDIR
         install_cmd = ['make', 'install', f'DESTDIR={destdir}']
         if 'install' in self.recipe and 'args' in self.recipe['install']:
-            install_cmd.extend(self.recipe['install']['args'])
+            args = self.check_args(self.recipe['install']['args'])
+            install_cmd.extend(args)
 
         # special case for Apple zlib - only if the zlib subdirectory exists
         if self.package == 'zlib' and (build_dir / 'zlib').exists():
@@ -689,57 +709,148 @@ class MacOSBuilder:
         print(f"RPM file list written: {output_file} ({len(rpm_file_list)} entries)")
 
     def create_pkg(self) -> None:
-        """Create a macOS PKG file with proper file tracking"""
-        pkg_name = f"scls-{self.package}-{self.recipe['version']}.pkg"
-        pkg_path = self.rpms_dir / pkg_name  # PKGs go in rpms dir for consistency
-
-        print(f"\n=== Creating PKG: {pkg_name} ===")
-
+        """Create macOS PKG file(s) with proper file tracking and subpackage support"""
         # Check if we have the installed files list
         file_list_path = self.work_dir / "installed_files.txt"
         if not file_list_path.exists():
             raise BuildError("No installed files list found. Run 'install' first.")
 
+        # Read installed files
+        with open(file_list_path, 'r') as f:
+            installed_files = [line.strip() for line in f if line.strip()]
+
+        # Check for subpackages
+        subpackages = get_subpackages_for_flavor(self.recipe, self.flavor_name)
+
+        if subpackages:
+            # Split files among subpackages
+            files_by_subpkg = split_files_by_subpackage(
+                installed_files, subpackages, str(self.prefix)
+            )
+
+            # Create a PKG for each subpackage
+            for subpkg in subpackages:
+                subpkg_name = subpkg['name']
+                subpkg_files = files_by_subpkg.get(subpkg_name, [])
+
+                if not subpkg_files:
+                    print(f"Warning: No files matched for subpackage '{subpkg_name}'")
+                    continue
+
+                self._create_single_pkg(
+                    pkg_name=subpkg_name,
+                    version=self.recipe['version'],
+                    files=subpkg_files,
+                    identifier=f'gov.lbl.scls.{subpkg_name}'
+                )
+
+            # Create main package with remaining files (if any)
+            main_files = files_by_subpkg.get('main', [])
+            if main_files:
+                self._create_single_pkg(
+                    pkg_name=self.package,
+                    version=self.recipe['version'],
+                    files=main_files,
+                    identifier=f'gov.lbl.scls.{self.package}'
+                )
+        else:
+            # No subpackages - create single package
+            self._create_single_pkg(
+                pkg_name=self.package,
+                version=self.recipe['version'],
+                files=installed_files,
+                identifier=f'gov.lbl.scls.{self.package}'
+            )
+
+    def _create_single_pkg(self, pkg_name: str, version: str, files: List[str], identifier: str) -> None:
+        """Create a single macOS PKG file"""
+        pkg_filename = f"scls-{pkg_name}-{version}.pkg"
+        pkg_path = self.rpms_dir / pkg_filename
+
+        print(f"\n=== Creating PKG: {pkg_filename} ===")
+
         # Create a temporary package root
-        pkg_root = self.work_dir / "pkg-root"
+        pkg_root = self.work_dir / f"pkg-root-{pkg_name}"
         if pkg_root.exists():
             shutil.rmtree(pkg_root)
         pkg_root.mkdir(parents=True)
 
-        # Read installed files and copy to package root
-        with open(file_list_path, 'r') as f:
-            installed_files = [Path(line.strip()) for line in f]
+        print(f"Packaging {len(files)} files...")
 
-        print(f"Packaging {len(installed_files)} files...")
+        for file_path in files:
+            # Convert %{prefix} format to actual path
+            if file_path.startswith('%{prefix}'):
+                src_file = Path(str(self.prefix) + file_path[len('%{prefix}'):])
+            else:
+                src_file = Path(file_path)
 
-        for src_file in installed_files:
             if src_file.exists():
                 # Calculate relative path from root
-                if str(src_file).startswith('/'):
-                    rel_path = str(src_file).lstrip('/')
-                else:
-                    rel_path = src_file
-
+                rel_path = str(src_file).lstrip('/')
                 dest_file = pkg_root / rel_path
                 dest_file.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src_file, dest_file)
+                if src_file.is_symlink():
+                    # Preserve symlinks
+                    link_target = os.readlink(src_file)
+                    if dest_file.exists() or dest_file.is_symlink():
+                        dest_file.unlink()
+                    dest_file.symlink_to(link_target)
+                else:
+                    shutil.copy2(src_file, dest_file)
 
         # Create the package
         cmd = [
             'pkgbuild',
             '--root', str(pkg_root),
-            '--identifier', f'gov.lbl.scls.{self.package}',
-            '--version', self.recipe['version'],
+            '--identifier', identifier,
+            '--version', version,
             '--install-location', '/',
             str(pkg_path)
         ]
 
         try:
-            run_command(cmd, self.work_dir, os.environ, "create PKG")
+            run_command(cmd, self.work_dir, os.environ, f"create PKG {pkg_name}")
             print(f"Created package: {pkg_path}")
+
+            # Also save the file list for this subpackage
+            file_list_dir = self.project_root / "files"
+            file_list_dir.mkdir(parents=True, exist_ok=True)
+            file_list_path = file_list_dir / f"{pkg_name}.txt"
+            with open(file_list_path, 'w') as f:
+                for file_path in files:
+                    # Convert to %{prefix} format for portability
+                    if file_path.startswith(str(self.prefix)):
+                        f.write(f"%{{prefix}}{file_path[len(str(self.prefix)):]}\n")
+                    elif file_path.startswith('%{prefix}'):
+                        f.write(f"{file_path}\n")
+                    else:
+                        f.write(f"{file_path}\n")
+            print(f"Saved file list: {file_list_path}")
+
         except BuildError as e:
-            print(f"Warning: Failed to create PKG: {e}")
+            print(f"Warning: Failed to create PKG {pkg_name}: {e}")
             print("Package is installed but PKG creation failed")
+
+    def check_dependencies(self) -> None:
+        """Check that all required dependencies are installed before building."""
+        deps = get_package_dependencies(self.recipe, self.flavor_name)
+
+        if not deps:
+            return
+
+        missing = []
+        for dep in deps:
+            if not check_package_installed(self.prefix, dep):
+                missing.append(dep)
+
+        if missing:
+            missing_list = ', '.join(missing)
+            raise BuildError(
+                f"Package '{self.package}' has missing dependencies: {missing_list}\n"
+                f"Install them first with: python python/mac_builder.py -p <package> build install"
+            )
+
+        print(f"All dependencies satisfied: {', '.join(deps)}")
 
     def run(self, commands: List[str]) -> None:
         """Run the build process"""
@@ -747,15 +858,8 @@ class MacOSBuilder:
         print(f"Building {self.package} {self.recipe['version']} for {self.flavor_name}")
         print(f"{'=' * 60}\n")
 
-        # Check dependencies: non-bootstrap packages require GCC to be installed
-        is_bootstrap = self.recipe.get('bootstrap', False)
-        if not is_bootstrap and self.package != 'gcc':
-            if not check_package_installed(self.prefix, 'gcc'):
-                raise BuildError(
-                    f"Package '{self.package}' requires GCC but it is not installed.\n"
-                    f"Build GCC first: python python/mac_builder.py -p gcc build install"
-                )
-            print(f"GCC dependency satisfied (via pkg-config)")
+        # Check all dependencies before starting
+        self.check_dependencies()
 
         # Clean work directory if it exists
         if self.work_dir.exists() and 'build' in commands:

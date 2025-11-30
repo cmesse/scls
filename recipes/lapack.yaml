@@ -1,0 +1,123 @@
+name: lapack
+version: 3.12.1
+summary: LAPACK - Linear Algebra PACKage
+homepage: https://www.netlib.org/lapack/
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/Reference-LAPACK/lapack/archive/v%{version}/lapack-%{version}.tar.gz
+
+requires:
+  macos:
+    - gcc
+    - openblas
+  debug:
+    - gcc
+
+features:
+  fortran: true
+  mpi: false
+  openmp: false
+  math: false
+
+# Subpackages: blas and cblas only built for debug flavor
+# lapack and lapacke built for all flavors
+subpackages:
+  blas:
+    summary: The Basic Linear Algebra Subprograms library (reference)
+    description: |
+      BLAS (Basic Linear Algebra Subprograms) is a standard library which
+      provides a number of basic algorithms for numerical algebra.
+      This is the reference implementation from netlib.
+    flavors:
+      - debug
+    files:
+      - "lib/libblas.so*"
+      - "lib/pkgconfig/blas.pc"
+
+  cblas:
+    summary: C interface to BLAS
+    description: |
+      CBLAS provides a C interface to the Basic Linear Algebra Subprograms.
+    flavors:
+      - debug
+    requires:
+      - blas
+    files:
+      - "include/cblas*.h"
+      - "lib/libcblas.so*"
+      - "lib/pkgconfig/cblas.pc"
+      - "lib/cmake/cblas-*/*"
+
+  lapack:
+    summary: LAPACK numerical linear algebra library
+    description: |
+      LAPACK (Linear Algebra PACKage) is a standard library for numerical
+      linear algebra. LAPACK provides routines for solving systems of
+      simultaneous linear equations, least-squares solutions of linear
+      systems of equations, eigenvalue problems, and singular value problems.
+    requires:
+      debug:
+        - blas
+      macos:
+        - openblas
+    files:
+      - "lib/liblapack.so*"
+      - "lib/libtmglib.so*"
+      - "lib/pkgconfig/lapack.pc"
+      - "lib/cmake/lapack-*/*"
+
+  lapacke:
+    summary: C interface to LAPACK
+    description: |
+      LAPACKE provides a C interface to LAPACK, making it easier to call
+      LAPACK routines from C and C++ programs.
+    requires:
+      - lapack
+    files:
+      - "include/lapack*.h"
+      - "lib/liblapacke.so*"
+      - "lib/pkgconfig/lapacke.pc"
+      - "lib/cmake/lapacke-*/*"
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_STATIC_LIBS=OFF"
+    - "-DLAPACKE=ON"
+    - "-DBUILD_TESTING=ON"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    # XBLAS for extended precision
+    - "-DXBLAS=OFF"
+    # Fortran compiler flags for recursive routines
+    - "-DCMAKE_Fortran_FLAGS=-frecursive"
+  flavor_args:
+    debug:
+      # Build BLAS and CBLAS for debug flavor
+      - "-DCBLAS=ON"
+      - "-DBLAS++=OFF"
+      - "-DLAPACK++=OFF"
+      - "-DUSE_OPTIMIZED_BLAS=OFF"
+    macos:
+      # Use OpenBLAS, don't build reference BLAS/CBLAS
+      - "-DCBLAS=OFF"
+      - "-DUSE_OPTIMIZED_BLAS=ON"
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
+    mkl:
+      # MKL flavor - typically wouldn't use this recipe
+      - "-DCBLAS=OFF"
+      - "-DUSE_OPTIMIZED_BLAS=ON"
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.so"
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "ctest --output-on-failure"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -llapack -llapacke"

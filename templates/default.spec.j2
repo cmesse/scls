@@ -35,6 +35,20 @@ Requires:       {{ req }}
 %description
 {{ description }}
 
+{% for subpkg in subpackages %}
+#######################################################################
+# Subpackage: {{ subpkg.name }}
+#######################################################################
+%package -n {{ subpkg.rpm_name }}
+Summary:        {{ subpkg.summary }}
+{% for req in subpkg.requires %}
+Requires:       {{ req }}
+{% endfor %}
+
+%description -n {{ subpkg.rpm_name }}
+{{ subpkg.description }}
+
+{% endfor %}
 %prep
 %setup -q -n {{ package_name }}-{{ version }}
 {% for patch in patches %}
@@ -217,6 +231,13 @@ rm -f %{prefix}/share/scls/registry/{{ package_name }}.yaml 2>/dev/null || true
 {{ file }}
 {% endfor %}
 
+{% for subpkg in subpackages %}
+%files -n {{ subpkg.rpm_name }}
+{% for file_pattern in subpkg.files %}
+%{prefix}/{{ file_pattern }}
+{% endfor %}
+
+{% endfor %}
 %changelog
 {% if changelog %}
 {{ changelog }}
