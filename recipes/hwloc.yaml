@@ -45,8 +45,8 @@ configure:
       - --disable-cuda
       - --disable-nvml
     gcc-mkl-cuda:
-      - -with-cuda=%{cuda}
-      - -enable-nvml
+      - --with-cuda=%{cuda}
+      - --enable-nvml
     intel-mkl:
       - --disable-cuda
       - --disable-nvml

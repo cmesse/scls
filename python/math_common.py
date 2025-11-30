@@ -148,42 +148,6 @@ def get_math_compile_flags(flavor: Dict, recipe: Dict) -> str:
 
     return ' '.join(args)
 
-# Example usage in build scripts:
-"""
-# In mac_builder.py or rpm_builder.py:
-
-# Get link line for a package
-link_line = get_math_link_line(self.flavor, self.recipe)
-compile_flags = get_math_compile_flags(self.flavor, self.recipe)
-
-# Apply to environment
-env['LDFLAGS'] = f"{env.get('LDFLAGS', '')} {link_line}"
-env['CFLAGS'] = f"{env.get('CFLAGS', '')} {compile_flags}"
-env['CXXFLAGS'] = f"{env.get('CXXFLAGS', '')} {compile_flags}"
-
-# For Fortran
-env['FFLAGS'] = f"{env.get('FFLAGS', '')} {compile_flags}"
-
-# Get additional environment variables
-math_env = get_math_environment(self.flavor, self.recipe)
-env.update(math_env)
-
-# Check for warnings
-warnings = validate_math_config(self.flavor, self.recipe)
-for warning in warnings:
-    print(warning)
-"""
-
-# For use in Makefile templates:
-"""
-# In a Jinja2 makefile template:
-MATH_LIBS = {{ math_libs }}
-MATH_FLAGS = {{ math_flags }}
-
-# Where context includes:
-context['math_libs'] = get_math_link_line(flavor, recipe)
-context['math_flags'] = get_math_compile_flags(flavor, recipe)
-"""
 
 def nv_hpc_compiler_path(flavor: Dict) -> str:
     sdk = str(flavor.get('nvidia').get('hpc'))
@@ -194,5 +158,6 @@ def get_cuda_path(flavor: Dict) -> str:
     gds = str(flavor.get('nvidia').get('gds'))
     return "/opt/nvidia/hpc_sdk/Linux_x86_64/{:s}/math_libs/{:s}/targets/x86_64-linux".format(sdk, gds)
 
-def get_nv_gpu_targets( flavor: Dict ) -> str:
-    flavor.get('nvidia', {}).get('target', 'sm_80')
+def get_nv_gpu_targets(flavor: Dict) -> str:
+    """Get NVIDIA GPU target architecture from flavor configuration"""
+    return flavor.get('nvidia', {}).get('target', 'sm_80')

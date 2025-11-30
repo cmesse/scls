@@ -1,19 +1,33 @@
-# Linux GCC + Intel MKL flavor configuration
+# Linux GCC + reference BLAS/LAPACK flavor configuration
 name: gcc-debug
 platform: linux
 description: "Developer build with GCC compilers and reference BLAS/LAPACK"
 prefix: /opt/scls/gcc-debug
 
+# RPM package dependencies (for bootstrap packages only - we build our own GCC)
+rpm_build_requires:
+  - gcc
+  - gcc-c++
+  - gcc-gfortran
+
+# Default compilers (our custom GCC in prefix/bin - used for most packages)
 compilers:
   cc: gcc
   cxx: g++
   fc: gfortran
 
+# Bootstrap compilers (system GCC - used for core packages before our GCC is available)
+# Packages with "bootstrap: true" in their recipe will use these compilers
+bootstrap_compilers:
+  cc: /usr/bin/gcc
+  cxx: /usr/bin/g++
+  fc: /usr/bin/gfortran
+
 flags:
   cflags: "-g -march=x86-64-v3 -fPIC -fno-fast-math"
   cxxflags: "-g -march=x86-64-v3 -fPIC -fno-fast-math"
-  fflags: "-g march=x86-64-v3 -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
-  ldflags: "-Wl,-rpath,/opt/scls/lib -L/opt/scls/lib"
+  fflags: "-g -march=x86-64-v3 -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
+  ldflags: "-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib"
 
 math:
   linalg: lapack

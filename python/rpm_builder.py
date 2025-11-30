@@ -17,11 +17,19 @@ from typing import Dict, List
 from build_common import (
     BuildError, load_recipe, load_flavor, load_description,
     get_optimization_flags, download_source, should_build_package,
-    get_configure_args, get_cmake_args
+    get_configure_args, get_cmake_args,
+    check_package_installed,
+    get_package_dependencies,
+    add_rpath_for_libdirs,
+    get_all_registry_entries
 )
 from patch_common import (
     copy_patches_to_sources,
-    get_all_patches
+    get_all_patches,
+    apply_patches,
+    validate_patches,
+    process_env_operations,
+    apply_configure_environment
 )
 
 from math_common import (
@@ -32,23 +40,41 @@ from math_common import (
     get_nv_gpu_targets )
 
 
-def load_changelog(package_name: str, logs_dir: Path = Path("logs")) -> str:
-    """Load package changelog from logs directory"""
-    changelog_path = logs_dir / f"{package_name}.md"
+def load_changelog(package_name: str, changelogs_dir: Path = Path("changelogs")) -> str:
+    """Load package changelog from changelogs directory and convert to RPM format"""
+    changelog_path = changelogs_dir / f"{package_name}.md"
     if changelog_path.exists():
         with open(changelog_path, 'r') as f:
             content = f.read().strip()
 
-        # Convert Markdown to basic RPM changelog format
-        # This is a simple conversion - could be enhanced
+        # Convert Markdown to RPM changelog format
         changelog_lines = []
+        current_author = "Christian Messe <cmesse@lbl.gov>"  # Default author
+        
         for line in content.split('\n'):
             line = line.strip()
-            if line.startswith('##'):  # Version headers
-                # Convert "## Version 1.2.3 - 2024-01-15" to RPM format
-                changelog_lines.append(line.replace('##', '*').strip())
+            
+            # Skip empty lines and main title
+            if not line or line.startswith('# '):
+                continue
+                
+            if line.startswith('## Version'):  # Version headers
+                # Extract version and date from "## Version X.Y.Z-R - Day Mon DD YYYY"
+                parts = line.replace('## Version', '').strip()
+                if ' - ' in parts:
+                    version_part, date_part = parts.split(' - ', 1)
+                    # Format as RPM changelog entry
+                    changelog_lines.append(f"* {date_part} {current_author} - {version_part}")
+                else:
+                    changelog_lines.append(f"* {parts} {current_author}")
+                    
             elif line.startswith('-'):  # Bullet points
+                # Keep existing bullet points
                 changelog_lines.append(line)
+                
+            elif line.startswith('Author:'):  # Handle author lines if present
+                current_author = line.replace('Author:', '').strip()
+                
             elif line and not line.startswith('#'):  # Regular text
                 changelog_lines.append(f"- {line}")
 
@@ -74,6 +100,13 @@ class RPMBuilder:
         if not should_build_package(self.recipe, self.flavor):
             raise BuildError(f"Package {package} not built for {flavor}")
 
+        # Check if this is a bootstrap package (needs system compilers before our GCC is built)
+        self.is_bootstrap = self.recipe.get('bootstrap', False)
+        if self.is_bootstrap and 'bootstrap_compilers' in self.flavor:
+            print(f"Using bootstrap compilers (bootstrap package)")
+            # Override compilers with bootstrap compilers for this build
+            self.flavor['compilers'] = self.flavor['bootstrap_compilers'].copy()
+
         # Setup paths
         self.prefix = Path(self.flavor['prefix'])
         self.project_root = Path(__file__).parent.parent
@@ -92,6 +125,9 @@ class RPMBuilder:
 
         self.math_flags = ""
         self.math_ldflags = ""
+
+        # Extra source info for recipe references (populated during download_sources)
+        self.extra_source_info = {}
 
         # Set install prefix
         if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
@@ -183,17 +219,30 @@ class RPMBuilder:
         return processed_commands
 
     def get_configure_pre_post_commands(self) -> tuple[list, list]:
-        """Get pre and post configure commands from recipe"""
+        """Get pre and post configure commands from recipe, including flavor-specific ones"""
         pre_commands = []
         post_commands = []
+        flavor_name = self.flavor.get('name', '')
 
         if 'configure' in self.recipe:
+            # General pre commands
             if 'pre' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['pre']:
                     pre_commands.append(cmd)
+            
+            # Flavor-specific pre commands
+            if 'flavor_pre' in self.recipe['configure'] and flavor_name in self.recipe['configure']['flavor_pre']:
+                for cmd in self.recipe['configure']['flavor_pre'][flavor_name]:
+                    pre_commands.append(cmd)
 
+            # General post commands
             if 'post' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['post']:
+                    post_commands.append(cmd)
+            
+            # Flavor-specific post commands
+            if 'flavor_post' in self.recipe['configure'] and flavor_name in self.recipe['configure']['flavor_post']:
+                for cmd in self.recipe['configure']['flavor_post'][flavor_name]:
                     post_commands.append(cmd)
 
         return pre_commands, post_commands
@@ -208,17 +257,30 @@ class RPMBuilder:
         return cmd
 
     def get_install_pre_post_commands(self) -> tuple[list, list]:
-        """Get pre and post install commands from recipe"""
+        """Get pre and post install commands from recipe, including flavor-specific ones"""
         pre_commands = []
         post_commands = []
+        flavor_name = self.flavor.get('name', '')
 
         if 'install' in self.recipe:
+            # General pre commands
             if 'pre' in self.recipe['install']:
                 for cmd in self.recipe['install']['pre']:
                     pre_commands.append(cmd)
+            
+            # Flavor-specific pre commands
+            if 'flavor_pre' in self.recipe['install'] and flavor_name in self.recipe['install']['flavor_pre']:
+                for cmd in self.recipe['install']['flavor_pre'][flavor_name]:
+                    pre_commands.append(cmd)
 
+            # General post commands
             if 'post' in self.recipe['install']:
                 for cmd in self.recipe['install']['post']:
+                    post_commands.append(cmd)
+            
+            # Flavor-specific post commands
+            if 'flavor_post' in self.recipe['install'] and flavor_name in self.recipe['install']['flavor_post']:
+                for cmd in self.recipe['install']['flavor_post'][flavor_name]:
                     post_commands.append(cmd)
 
         return pre_commands, post_commands
@@ -308,8 +370,30 @@ class RPMBuilder:
         else :
             return f"export PATH=%{{prefix}}/bin:$PATH"
 
+    def resolve_extra_sources(self) -> None:
+        """Resolve extra source info from recipe references without downloading.
+        This populates self.extra_source_info for use in spec generation."""
+        if 'extra_sources' in self.recipe:
+            for extra in self.recipe['extra_sources']:
+                if 'recipe' in extra:
+                    ref_recipe = load_recipe(extra['recipe'])
+                    ref_version = ref_recipe['version']
+                    ref_url = ref_recipe['source'].get('source0', ref_recipe['source']['url'])
+                    ref_url = ref_url.replace('%{version}', ref_version)
+                    extra_name = extra['recipe']
+                    tarball_name = ref_url.split('/')[-1]
+                    self.extra_source_info[extra_name] = {
+                        'version': ref_version,
+                        'tarball': tarball_name,
+                        'url': ref_url
+                    }
+
     def generate_spec(self) -> Path:
         """Generate RPM SPEC file from template"""
+        # Resolve extra sources if not already done (for spec-only mode)
+        if not self.extra_source_info:
+            self.resolve_extra_sources()
+
         # Load template
         template_name = self.recipe.get('template', 'default.spec.j2')
         try:
@@ -399,11 +483,12 @@ class RPMBuilder:
             'build_requires': build_requires,
             'requires': requires,
             'prefix': str(self.prefix),
+            'sources': str(self.sources_dir),  # For extra sources (e.g., gmp/mpfr/mpc for GCC)
             'cflags': self.cflags,
             'cxxflags': self.cxxflags,
-            'fflags': self.fclags,
-            'fcflags': self.fcfags,
-            'ldflags': self.flavor['flags'].get('ldflags', ''),
+            'fflags': self.fflags,
+            'fcflags': self.fflags,
+            'ldflags': add_rpath_for_libdirs(self.flavor['flags'].get('ldflags', ''), 'linux'),
             'files': files,
             'changelog_date': datetime.now().strftime('%a %b %d %Y'),
             'parallel_build': self.recipe.get('build', {}).get('parallel', True),
@@ -427,8 +512,16 @@ class RPMBuilder:
             'self.math_flags': self.math_flags,
             'math_ldflags': self.math_ldflags,
             'features': self.recipe.get('features', {}),
-            'path_setup': self.get_path_setup()
+            'path_setup': self.get_path_setup(),
+            'library_symlink_fixes': self.get_library_symlink_fixes(),
+            'extra_source_info': self.extra_source_info,  # For recipe-referenced sources
+            'package_dependencies': get_package_dependencies(self.recipe, self.flavor_name)
         }
+
+        # Add extra source info as individual variables (e.g., gmp_version, gmp_tarball)
+        for name, info in self.extra_source_info.items():
+            context[f'{name}_version'] = info['version']
+            context[f'{name}_tarball'] = info['tarball']
 
         # Render template
         spec_content = template.render(**context)
@@ -483,6 +576,13 @@ class RPMBuilder:
         # Get flavor-specific RPM requirements from recipe
         flavor_name = self.flavor_name
 
+        # Non-bootstrap packages depend on our custom GCC
+        is_bootstrap = self.recipe.get('bootstrap', False)
+        if not is_bootstrap and self.package != 'gcc':
+            scls_gcc = f"scls-{self.flavor_name}-gcc"
+            build_requires.append(scls_gcc)
+            requires.append(scls_gcc)
+
         # Add flavor-specific build requirements
         if 'rpm_build_requires' in self.recipe:
             if isinstance(self.recipe['rpm_build_requires'], dict):
@@ -512,16 +612,15 @@ class RPMBuilder:
         # Compiler requirements based on features
         features = self.recipe.get('features', {})
 
-        # Add compiler requirements based on flavor
-        compiler_cc = self.flavor['compilers']['cc']
-        if compiler_cc == 'gcc':
-            build_requires.append('gcc')
-            build_requires.append('gcc-c++')
-            if features.get('fortran', False):
-                build_requires.append('gfortran')
-        elif compiler_cc == 'icx':
-            # Intel compilers - could be added later
-            pass
+        # Bootstrap packages need system compilers
+        # Non-bootstrap packages use our SCLS GCC (already added above)
+        if is_bootstrap:
+            compiler_cc = self.flavor.get('bootstrap_compilers', {}).get('cc', '/usr/bin/gcc')
+            if 'gcc' in compiler_cc:
+                build_requires.append('gcc')
+                build_requires.append('gcc-c++')
+                if features.get('fortran', False):
+                    build_requires.append('gcc-gfortran')
 
         # Standard build tools
         build_requires.extend(['make', 'git'])
@@ -634,11 +733,42 @@ class RPMBuilder:
 
     def download_sources(self) -> None:
         """Download source tarball and copy patches to rpmbuild/SOURCES"""
-        source_url = self.recipe['source']['url'].replace('%{version}', self.recipe['version'])
+        # Prefer source0 (direct tarball URL) over url (homepage/base URL)
+        source_url = self.recipe['source'].get('source0', self.recipe['source']['url'])
+        source_url = source_url.replace('%{version}', self.recipe['version'])
         download_source(
             source_url, self.sources_dir,
             self.package, self.recipe['version']
         )
+
+        # Download extra sources (e.g., gmp, mpfr, mpc for GCC)
+        # Supports both direct URLs and recipe references (single source of truth)
+        if 'extra_sources' in self.recipe:
+            for extra in self.recipe['extra_sources']:
+                if 'recipe' in extra:
+                    # Load version and URL from referenced recipe
+                    ref_recipe = load_recipe(extra['recipe'])
+                    ref_version = ref_recipe['version']
+                    ref_url = ref_recipe['source'].get('source0', ref_recipe['source']['url'])
+                    ref_url = ref_url.replace('%{version}', ref_version)
+                    extra_name = extra['recipe']
+                    # Store for later substitution in SPEC template
+                    tarball_name = ref_url.split('/')[-1]
+                    self.extra_source_info[extra_name] = {
+                        'version': ref_version,
+                        'tarball': tarball_name,
+                        'url': ref_url
+                    }
+                    print(f"Downloading extra source from recipe {extra_name}: {ref_url}")
+                    download_source(ref_url, self.sources_dir, extra_name, ref_version)
+                else:
+                    # Direct URL (legacy support)
+                    extra_url = extra['url']
+                    print(f"Downloading extra source: {extra_url}")
+                    download_source(
+                        extra_url, self.sources_dir,
+                        extra.get('extract_to', 'extra'), '0'
+                    )
 
         # Copy patches using improved patching system
         copy_patches_to_sources(self.recipe, Path("patches"), self.sources_dir, self.package)
@@ -678,32 +808,46 @@ class RPMBuilder:
             raise BuildError("rpmbuild command not found. Please install rpm-build package.")
 
     def get_file_list(self) -> list:
-        """Generate file list for the package using actual installed files"""
-        # Check if we have tracked files from a previous build
-        file_list_path = self.project_root / "files" / "{:s}.txt".format(self.package)
+        """
+        Generate file list for the package using tracked files.
+
+        Reads from files/{package}.txt which can contain:
+        - RPM-style paths with %{prefix} (generated by mac_builder)
+        - Absolute paths (legacy format)
+
+        Returns a list ready for the SPEC %files section.
+        """
+        file_list_path = self.project_root / "files" / f"{self.package}.txt"
 
         if file_list_path.exists():
             print(f"Using tracked files from: {file_list_path}")
             with open(file_list_path, 'r') as f:
-                files = [line.strip() for line in f if line.strip()]
+                files = [line.strip() for line in f if line.strip() and not line.startswith('#')]
 
-            # Convert absolute paths to RPM file list format
             rpm_files = []
             for file_path in files:
-                if file_path.startswith(str(self.prefix)):
-                    # Remove the prefix to get relative path, then add back as RPM macro
+                # Already in RPM format with %{prefix}
+                if file_path.startswith('%{prefix}'):
+                    rpm_files.append(file_path)
+                # Absolute path - convert to RPM format
+                elif file_path.startswith(str(self.prefix)):
                     rel_path = file_path[len(str(self.prefix)):]
                     if rel_path.startswith('/'):
                         rel_path = rel_path[1:]
                     rpm_files.append(f"%{{prefix}}/{rel_path}")
+                # Assume it's already relative or a special RPM directive
                 else:
-                    # File outside our prefix - use as-is
                     rpm_files.append(file_path)
+
+            # Add the registry file to the package
+            rpm_files.append("%{prefix}/share/scls/registry/%{name}.yaml")
+
             return rpm_files
         else:
-            print("No tracked files found")
-            # return empty list
-            return []
+            print(f"Warning: No tracked files found at {file_list_path}")
+            print("SPEC file will have empty %files section - build may fail")
+            # Return minimal list with just registry entry
+            return ["%{prefix}/share/scls/registry/%{name}.yaml"]
 
     def run(self) -> None:
         """Run the complete build process"""
@@ -727,13 +871,36 @@ class RPMBuilder:
         print("Build completed successfully!")
         print(f"{'=' * 60}\n")
 
+    def get_library_symlink_fixes(self) -> List[str]:
+        """Get shell commands to fix library symlinks in RPM %post section"""
+        return [
+            "# Fix library symlinks created as hard copies",
+            "if [ -d %{prefix}/lib ]; then",
+            "  cd %{prefix}/lib",
+            "  for lib in *.so.*; do",
+            "    if [ -f \"$lib\" ]; then",
+            "      base=\"${lib%%.*}.so\"",
+            "      if [ -f \"$base\" ] && [ ! -L \"$base\" ]; then",
+            "        # Check if they're hard links (same inode)",
+            "        if [ \"$(stat -c %i \"$lib\")\" = \"$(stat -c %i \"$base\")\" ]; then",
+            "          echo \"Converting hard copy to symlink: $base -> $lib\"",
+            "          rm -f \"$base\"",
+            "          ln -s \"$lib\" \"$base\"",
+            "        fi",
+            "      fi",
+            "    fi",
+            "  done",
+            "  # Update library cache",
+            "  /sbin/ldconfig %{prefix}/lib 2>/dev/null || true",
+            "fi"
+        ]
 
 def create_example_changelog():
     """Create an example changelog file"""
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
+    changelogs_dir = Path("changelogs")
+    changelogs_dir.mkdir(exist_ok=True)
 
-    example_changelog = logs_dir / "example.md"
+    example_changelog = changelogs_dir / "example.md"
     if not example_changelog.exists():
         changelog_content = '''# Package Changelog
 
@@ -757,16 +924,60 @@ def create_example_changelog():
         print(f"Created example changelog: {example_changelog}")
 
 
+def list_installed_packages(flavor_name: str) -> None:
+    """List all installed packages from the registry."""
+    try:
+        flavor = load_flavor(flavor_name)
+        prefix = Path(flavor['prefix'])
+    except Exception as e:
+        print(f"Error loading flavor '{flavor_name}': {e}", file=sys.stderr)
+        sys.exit(1)
+
+    entries = get_all_registry_entries(prefix)
+
+    if not entries:
+        print(f"No packages installed in {prefix}")
+        return
+
+    print(f"\nInstalled packages in {prefix}:")
+    print(f"{'Package':<20} {'Version':<12} {'Has .pc':<8} {'Dependencies'}")
+    print("-" * 80)
+
+    for name in sorted(entries.keys()):
+        entry = entries[name]
+        version = entry.get('version', '?')
+        has_pc = 'yes' if entry.get('has_pc_file', False) else 'no'
+        deps = ', '.join(entry.get('dependencies', [])) or '-'
+        print(f"{name:<20} {version:<12} {has_pc:<8} {deps}")
+
+    print(f"\nTotal: {len(entries)} package(s)")
+
+
 def main():
     parser = argparse.ArgumentParser(description='Generate RPM SPEC files for SCLS packages')
-    parser.add_argument('--package', '-p', required=True, help='Package name')
-    parser.add_argument('--flavor', '-f', required=True, help='Flavor name')
+    parser.add_argument('--package', '-p', help='Package name')
+    parser.add_argument('--flavor', '-f', help='Flavor name')
     parser.add_argument('--spec-only', action='store_true',
                         help='Only generate SPEC file, do not build RPM')
+    parser.add_argument('--list', '-l', action='store_true',
+                        help='List installed packages')
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Verbose output')
 
     args = parser.parse_args()
+
+    # Handle --list flag
+    if args.list:
+        if not args.flavor:
+            parser.error("--flavor/-f is required when using --list")
+        list_installed_packages(args.flavor)
+        return
+
+    # Require package and flavor for build commands
+    if not args.package:
+        parser.error("--package/-p is required when not using --list")
+    if not args.flavor:
+        parser.error("--flavor/-f is required when not using --list")
 
     try:
         builder = RPMBuilder(args.package, args.flavor)

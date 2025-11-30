@@ -321,11 +321,22 @@ def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict,
     if 'flavor_env' in configure_config and flavor_name in configure_config['flavor_env']:
         flavor_env = configure_config['flavor_env'][flavor_name]
 
-        # Process variable substitution
-        processed_env = {}
-        for var, val in flavor_env.items():
-            val = str(val).replace('%{prefix}', str(prefix))
-            processed_env[var] = val
-        env = process_env_operations(env, processed_env)
+        # Handle both dict and list formats for flavor_env
+        if isinstance(flavor_env, dict):
+            # Dictionary format: {"VAR": "value"}
+            processed_env = {}
+            for var, val in flavor_env.items():
+                val = str(val).replace('%{prefix}', str(prefix))
+                processed_env[var] = val
+            env = process_env_operations(env, processed_env)
+        elif isinstance(flavor_env, list):
+            # List format: [{"VAR": "value"}, {"VAR2": "value2"}]
+            for env_item in flavor_env:
+                if isinstance(env_item, dict):
+                    processed_env = {}
+                    for var, val in env_item.items():
+                        val = str(val).replace('%{prefix}', str(prefix))
+                        processed_env[var] = val
+                    env = process_env_operations(env, processed_env)
 
     return env

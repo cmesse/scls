@@ -17,6 +17,9 @@ patches:
 requires:
   macos:
     - openssl
+    - automake
+    - libtool
+    - sed
 
 rpm_build_requires:
   all:
@@ -40,9 +43,11 @@ configure:
   env:
     - CFLAGS: "+=-I%{prefix}/include"
     - CXXFLAGS: "+=-I%{prefix}/include"
-    - LDFLAGS: "+=-lssl -lcrypto"
+    - LDFLAGS: "+=-L%{prefix}/lib -Wl,-rpath,%{prefix}/lib -lssl -lcrypto"
   pre:
     - "autoreconf -f -i"
+    - "for f in $(find . -name configure); do sed -i 's/--version -v -V -qversion/--version -v/g' configure ; done"
+
   args:
     - -disable-dependency-tracking
 

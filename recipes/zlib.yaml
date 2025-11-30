@@ -3,9 +3,10 @@ version: 1.2.12
 summary: Compression and decompression library
 homepage: https://www.zlip.net
 license: zlib and boost
+bootstrap: true  # Build with system compiler before scls gcc is available
 
 source:
-  url: https://github.com/apple-oss-distributions/zlib/archive/zlib-98.tar.gz
+  url: https://github.com/apple-oss-distributions/zlib/archive/zlib-100.tar.gz
 
 flavors:
   - macos
@@ -28,10 +29,38 @@ configure:
     - "ln -s %{srcdir}/libz.exp %{srcdir}/zlib/libz.exp"
   env:
      - SRCROOT: "%{srcdir}/zlib"
+     - LDFLAGS: "-headerpad_max_install_names"
 
 install:
   post:
     - "rm -v %{prefix}/lib/libz.a"
+    # Write a clean zlib.pc file (use %{final_prefix} for content, %{prefix} for file path)
+    - |
+      mkdir -p %{prefix}/lib/pkgconfig
+      cat > %{prefix}/lib/pkgconfig/zlib.pc << EOF
+      prefix=%{final_prefix}
+      exec_prefix=\${prefix}
+      libdir=\${exec_prefix}/lib
+      includedir=\${prefix}/include
+
+      Name: zlib
+      Description: zlib compression library
+      Version: %{version}
+
+      Requires:
+      Libs: -L\${libdir} -lz
+      Cflags: -I\${includedir}
+      EOF
+  flavor_post:
+    macos:
+      - "if [ -f %{prefix}/lib/libz.so.1.2.12 ]; then cd %{prefix}/lib && mv libz.so.1.2.12 libz.1.2.12.dylib; fi"
+      - "if [ -f %{prefix}/lib/libz.so.1 ]; then cd %{prefix}/lib && rm libz.so.1; fi"
+      - "if [ -f %{prefix}/lib/libz.so ]; then cd %{prefix}/lib && rm libz.so; fi"
+      - "cd %{prefix}/lib && ln -sf libz.1.2.12.dylib libz.1.dylib"
+      - "cd %{prefix}/lib && ln -sf libz.1.2.12.dylib libz.dylib"
+  flavor_final_post:
+    macos:
+      - "install_name_tool -id %{prefix}/lib/libz.1.2.12.dylib %{prefix}/lib/libz.1.2.12.dylib"
 
 build:
   parallel: true

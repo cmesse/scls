@@ -21,6 +21,71 @@ class BuildError(Exception):
     pass
 
 
+def add_rpath_for_libdirs(ldflags: str, platform: str = 'linux') -> str:
+    """
+    Add rpath entries for every -L directory in ldflags.
+
+    This ensures that libraries can be found at runtime without
+    needing to set LD_LIBRARY_PATH or DYLD_LIBRARY_PATH.
+
+    The rpath is inserted immediately after each -L flag, before any -l flags.
+    Example: "-L/opt/scls/lib -lz" becomes "-L/opt/scls/lib -Wl,-rpath,/opt/scls/lib -lz"
+
+    Args:
+        ldflags: The linker flags string
+        platform: 'linux' or 'macos' (affects rpath syntax)
+
+    Returns:
+        ldflags with rpath entries added for each -L path
+    """
+    if not ldflags:
+        return ldflags
+
+    # Collect existing rpaths to avoid duplicates
+    existing_rpaths = set()
+    for token in ldflags.split():
+        if '-rpath' in token:
+            # Extract path from -Wl,-rpath,/path or -Wl,-rpath=/path
+            if ',' in token:
+                parts = token.split(',')
+                for part in parts:
+                    if part.startswith('/') or part.startswith('='):
+                        existing_rpaths.add(part.lstrip('='))
+            elif '=' in token:
+                existing_rpaths.add(token.split('=')[-1])
+
+    # Process tokens and insert rpath after each -L
+    tokens = ldflags.split()
+    result_tokens = []
+
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        if token.startswith('-L'):
+            if token == '-L' and i + 1 < len(tokens):
+                # -L /path/to/lib (space separated)
+                lib_path = tokens[i + 1]
+                result_tokens.append(token)
+                result_tokens.append(lib_path)
+                if lib_path not in existing_rpaths:
+                    result_tokens.append(f'-Wl,-rpath,{lib_path}')
+                    existing_rpaths.add(lib_path)
+                i += 2
+            else:
+                # -L/path/to/lib (no space)
+                lib_path = token[2:]
+                result_tokens.append(token)
+                if lib_path not in existing_rpaths:
+                    result_tokens.append(f'-Wl,-rpath,{lib_path}')
+                    existing_rpaths.add(lib_path)
+                i += 1
+        else:
+            result_tokens.append(token)
+            i += 1
+
+    return ' '.join(result_tokens)
+
+
 def load_yaml(filepath: Path) -> Dict:
     """Load a YAML file"""
     with open(filepath, 'r') as f:
@@ -170,58 +235,8 @@ def extract_source(tarball: Path, work_dir: Path, package_name: str, version: st
     raise BuildError(f"Could not find extracted source directory in {work_dir}")
 
 
-def copy_patches_to_sources(recipe: Dict, patches_dir: Path, sources_dir: Path) -> None:
-    """Copy patches from version-controlled patches/ to sources directory"""
-    if 'source' not in recipe:
-        return
-
-    package_name = recipe['name']
-    package_patches_dir = patches_dir / package_name
-
-    if not package_patches_dir.exists():
-        return
-
-    # Copy all patches for this package
-    for patch_file in package_patches_dir.glob("*.patch"):
-        dest = sources_dir / patch_file.name
-        shutil.copy2(patch_file, dest)
-        print(f"Copied patch to sources: {patch_file.name}")
 
 
-def apply_patches(source_dir: Path, recipe: Dict, patches_dir: Path = Path("patches")) -> None:
-    """Apply patches if specified in recipe"""
-    if 'patch' not in recipe:
-        return
-
-    package_name = recipe['name']
-    package_patches_dir = patches_dir / package_name
-
-    for patch_cmd in recipe['patch']:
-        # Parse patch command (e.g., "-p1 < fix-apple-m1.patch")
-        parts = patch_cmd.strip().split()
-        patch_level = "-p1"  # default
-        patch_file = None
-
-        for i, part in enumerate(parts):
-            if part.startswith("-p"):
-                patch_level = part
-            elif part == "<" and i + 1 < len(parts):
-                patch_file = parts[i + 1]
-
-        if not patch_file:
-            print(f"Warning: Could not parse patch command: {patch_cmd}")
-            continue
-
-        patch_path = package_patches_dir / patch_file
-        if not patch_path.exists():
-            print(f"Warning: Patch file not found: {patch_path}")
-            continue
-
-        print(f"Applying patch: {patch_file}")
-        cmd = ["patch", patch_level, "-i", str(patch_path)]
-        result = subprocess.run(cmd, cwd=source_dir, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f"Warning: Patch failed: {result.stderr}")
 
 
 def run_command(cmd: List[str], cwd: Path, env: Dict[str, str], phase: str) -> None:
@@ -395,366 +410,7 @@ def clean_libtool_files(prefix: Path) -> None:
         la_file.unlink()
 
 
-def get_patches_from_recipe(recipe: Dict) -> List[Dict]:
-    """
-    Extract patch information from recipe - simplified approach:
-    1. patches: [list] format (recommended - auto-discover files)
-    2. Legacy patch commands (still supported)
-    """
-    patches = []
-
-    # Method 1: Simple patches list (recommended)
-    if 'patches' in recipe:
-        for patch_entry in recipe['patches']:
-            if isinstance(patch_entry, str):
-                # Simple filename - default to -p1
-                patches.append({
-                    'file': patch_entry,
-                    'strip': 1,
-                    'source': 'recipe_patches'
-                })
-            elif isinstance(patch_entry, dict):
-                # Detailed patch specification with optional strip level
-                patches.append({
-                    'file': patch_entry['file'],
-                    'strip': patch_entry.get('strip', 1),  # Default to -p1
-                    'source': 'recipe_patches'
-                })
-
-    # Method 2: Legacy patch commands (for backward compatibility)
-    elif 'patch' in recipe:
-        for patch_cmd in recipe['patch']:
-            # Parse patch command (e.g., "-p1 < fix-apple-m1.patch")
-            parts = patch_cmd.strip().split()
-            patch_level = 1  # default
-            patch_file = None
-
-            for i, part in enumerate(parts):
-                if part.startswith("-p"):
-                    try:
-                        patch_level = int(part[2:])
-                    except ValueError:
-                        patch_level = 1
-                elif part == "<" and i + 1 < len(parts):
-                    patch_file = parts[i + 1]
-                elif part.endswith('.patch') and not patch_file:
-                    patch_file = part
-
-            if patch_file:
-                patches.append({
-                    'file': patch_file,
-                    'strip': patch_level,
-                    'source': 'recipe_patch_legacy'
-                })
-
-    return patches
-
-
-def discover_patches_in_directory(package_name: str, patches_dir: Path = Path("patches")) -> List[Dict]:
-    """
-    Automatically discover all patches for a package in the patches directory
-    """
-    package_patches_dir = patches_dir / package_name
-    patches = []
-
-    if not package_patches_dir.exists():
-        return patches
-
-    # Find all .patch files, sorted by name
-    patch_files = sorted(package_patches_dir.glob("*.patch"))
-
-    for patch_file in patch_files:
-        # Try to infer patch level from filename or content
-        patch_level = infer_patch_level(patch_file)
-
-        patches.append({
-            'file': patch_file.name,
-            'strip': patch_level,
-            'source': 'auto_discovered',
-            'full_path': patch_file
-        })
-
-    return patches
-
-
-def infer_patch_level(patch_file: Path) -> int:
-    """
-    Try to infer the appropriate -p level for a patch by examining its content
-    """
-    try:
-        with open(patch_file, 'r', encoding='utf-8', errors='ignore') as f:
-            lines = f.readlines()
-
-        # Look for diff headers to determine directory structure
-        for line in lines:
-            if line.startswith('---') or line.startswith('+++'):
-                # Count path components
-                parts = line.split()
-                if len(parts) >= 2:
-                    path = parts[1]
-                    # Remove common prefixes like a/ b/ or timestamps
-                    if path.startswith(('a/', 'b/')):
-                        return 1
-                    elif '/' in path:
-                        # Count directory levels
-                        return min(path.count('/'), 3)  # Cap at -p3
-
-        # Default to -p1 if we can't determine
-        return 1
-
-    except Exception:
-        return 1
-
-
-def get_all_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("patches")) -> List[Dict]:
-    """
-    Get all patches for a package, with smart auto-discovery
-    Priority: recipe-specified patches first, then auto-discovered
-    """
-    patches = []
-
-    # First, get patches specified in recipe (if any)
-    recipe_patches = get_patches_from_recipe(recipe)
-    patches.extend(recipe_patches)
-
-    # If no patches specified in recipe, auto-discover all patches
-    if not recipe_patches:
-        print(f"No patches specified in recipe, auto-discovering patches for {package_name}...")
-        discovered_patches = discover_patches_in_directory(package_name, patches_dir)
-        patches.extend(discovered_patches)
-    else:
-        # If recipe has patches, only auto-discover additional ones not already specified
-        discovered_patches = discover_patches_in_directory(package_name, patches_dir)
-        recipe_patch_files = {p['file'] for p in recipe_patches}
-
-        additional_patches = [p for p in discovered_patches if p['file'] not in recipe_patch_files]
-        if additional_patches:
-            print(f"Found {len(additional_patches)} additional patches not specified in recipe:")
-            for patch in additional_patches:
-                print(f"  - {patch['file']} (-p{patch['strip']})")
-            patches.extend(additional_patches)
-
-    return patches
-
-
-def copy_patches_to_sources(recipe: Dict, patches_dir: Path, sources_dir: Path, package_name: str) -> None:
-    """
-    Enhanced version that copies all relevant patches to sources directory
-    """
-    if 'source' not in recipe:
-        return
-
-    patches = get_all_patches(recipe, package_name, patches_dir)
-
-    if not patches:
-        print(f"No patches found for {package_name}")
-        return
-
-    package_patches_dir = patches_dir / package_name
-
-    for patch in patches:
-        if 'full_path' in patch:
-            # Auto-discovered patch
-            src_path = patch['full_path']
-        else:
-            # Recipe-specified patch
-            src_path = package_patches_dir / patch['file']
-
-        if src_path.exists():
-            dest = sources_dir / patch['file']
-            shutil.copy2(src_path, dest)
-            print(f"Copied patch to sources: {patch['file']} (strip level: {patch['strip']})")
-        else:
-            print(f"Warning: Patch file not found: {src_path}")
-
-
-def apply_patches(source_dir: Path, recipe: Dict, package_name: str, patches_dir: Path = Path("patches")) -> None:
-    """
-    Enhanced patch application with better error handling and logging
-    """
-    patches = get_all_patches(recipe, package_name, patches_dir)
-
-    if not patches:
-        print(f"No patches to apply for {package_name}")
-        return
-
-    print(f"\n=== Applying {len(patches)} patches ===")
-
-    for i, patch in enumerate(patches, 1):
-        patch_file = patch['file']
-        strip_level = patch['strip']
-        patch_source = patch['source']
-
-        print(f"[{i}/{len(patches)}] Applying {patch_file} (-p{strip_level}) [{patch_source}]")
-
-        # Look for patch file in current directory (copied by copy_patches_to_sources)
-        patch_path = source_dir.parent / "sources" / patch_file
-        if not patch_path.exists():
-            # Try in patches directory
-            patch_path = patches_dir / package_name / patch_file
-
-        if not patch_path.exists():
-            print(f"  ERROR: Patch file not found: {patch_file}")
-            continue
-
-        # Apply patch
-        cmd = ["patch", f"-p{strip_level}", "-i", str(patch_path)]
-
-        try:
-            result = subprocess.run(
-                cmd,
-                cwd=source_dir,
-                capture_output=True,
-                text=True,
-                timeout=60  # Timeout after 60 seconds
-            )
-
-            if result.returncode == 0:
-                print(f"  SUCCESS: {patch_file} applied successfully")
-                if result.stdout.strip():
-                    # Show patched files
-                    patched_files = [line.split()[1] for line in result.stdout.split('\n')
-                                     if line.startswith('patching file')]
-                    if patched_files:
-                        print(f"    Patched files: {', '.join(patched_files[:3])}" +
-                              (f" and {len(patched_files) - 3} more" if len(patched_files) > 3 else ""))
-            else:
-                print(f"  WARNING: Patch {patch_file} failed to apply")
-                print(f"    Return code: {result.returncode}")
-                if result.stderr:
-                    print(f"    Error: {result.stderr.strip()}")
-                # Don't fail the build for patch failures - just warn
-
-        except subprocess.TimeoutExpired:
-            print(f"  ERROR: Patch {patch_file} timed out")
-        except Exception as e:
-            print(f"  ERROR: Failed to apply patch {patch_file}: {e}")
-
-
-def validate_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("patches")) -> bool:
-    """
-    Validate that all specified patches exist and are readable
-    """
-    patches = get_all_patches(recipe, package_name, patches_dir)
-    all_valid = True
-
-    print(f"\n=== Validating patches for {package_name} ===")
-
-    for patch in patches:
-        if 'full_path' in patch:
-            patch_path = patch['full_path']
-        else:
-            patch_path = patches_dir / package_name / patch['file']
-
-        if not patch_path.exists():
-            print(f"  ERROR: Patch not found: {patch['file']}")
-            all_valid = False
-        elif not patch_path.is_file():
-            print(f"  ERROR: Not a file: {patch['file']}")
-            all_valid = False
-        else:
-            print(f"  OK: {patch['file']} (-p{patch['strip']})")
-
-    return all_valid
-
-
-# Updated function signatures for compatibility
-def copy_patches_to_sources_compat(recipe: Dict, patches_dir: Path, sources_dir: Path) -> None:
-    """Compatibility wrapper for existing code"""
-    package_name = recipe.get('name', '')
-    if package_name:
-        copy_patches_to_sources(recipe, patches_dir, sources_dir, package_name)
-
-
-def apply_patches_compat(source_dir: Path, recipe: Dict, patches_dir: Path = Path("patches")) -> None:
-    """Compatibility wrapper for existing code"""
-    package_name = recipe.get('name', '')
-    if package_name:
-        apply_patches(source_dir, recipe, package_name, patches_dir)
-
-
-def process_env_operations(env: Dict[str, str], env_ops: Dict[str, str]) -> Dict[str, str]:
-    """
-    Process environment variable operations like +=, -=, =
-
-    Args:
-        env: Current environment dictionary
-        env_ops: Dictionary of environment operations from recipe
-
-    Returns:
-        Updated environment dictionary
-    """
-    for key, value in env_ops.items():
-        value_str = str(value).strip()
-
-        if '+=' in value_str:
-            # Append operation: VAR += "value"
-            append_value = value_str.replace('+=', '').strip()
-            if key in env:
-                # Add space between existing and new value
-                env[key] = f"{env[key]} {append_value}"
-            else:
-                env[key] = append_value
-        elif '-=' in value_str:
-            # Remove operation: VAR -= "value"
-            remove_value = value_str.replace('-=', '').strip()
-            if key in env:
-                env[key] = env[key].replace(remove_value, '').strip()
-                # Clean up multiple spaces
-                env[key] = ' '.join(env[key].split())
-        else:
-            # Direct assignment (= or no operator)
-            env[key] = value_str
-
-    return env
-
-
-def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict, prefix: Path) -> Dict[str, str]:
-    """
-    Apply configure-specific environment variables from recipe
-    Supports operations like +=, -=, and =
-    """
-    if 'configure' not in recipe:
-        return env
-
-    configure_config = recipe['configure']
-    flavor_name = flavor.get('name', '')
-
-    # Apply general configure environment
-    if 'env' in configure_config:
-        env_config = configure_config['env']
-
-        # Handle list format: [{"VAR": "value"}, {"VAR2": "value2"}]
-        if isinstance(env_config, list):
-            for env_item in env_config:
-                if isinstance(env_item, dict):
-                    # Process variable substitution
-                    processed_env = {}
-                    for var, val in env_item.items():
-                        val = str(val).replace('%{prefix}', str(prefix))
-                        processed_env[var] = val
-                    env = process_env_operations(env, processed_env)
-        # Handle dict format: {"VAR": "value", "VAR2": "value2"}
-        elif isinstance(env_config, dict):
-            # Process variable substitution
-            processed_env = {}
-            for var, val in env_config.items():
-                val = str(val).replace('%{prefix}', str(prefix))
-                processed_env[var] = val
-            env = process_env_operations(env, processed_env)
-
-    # Apply flavor-specific configure environment
-    if 'flavor_env' in configure_config and flavor_name in configure_config['flavor_env']:
-        flavor_env = configure_config['flavor_env'][flavor_name]
-
-        # Process variable substitution
-        processed_env = {}
-        for var, val in flavor_env.items():
-            val = str(val).replace('%{prefix}', str(prefix))
-            processed_env[var] = val
-        env = process_env_operations(env, processed_env)
-
-    return env
+# Patch functions moved to patch_common.py to avoid duplication
 
 def setup_environment(flavor: Dict, prefix: Path, srcdir: Path, recipe: Dict = None) -> Dict[str, str]:
     """Setup build environment variables"""
@@ -762,11 +418,21 @@ def setup_environment(flavor: Dict, prefix: Path, srcdir: Path, recipe: Dict = N
 
     flavor_name = flavor.get('name', '')
 
-    # Compiler setup
-    compilers = flavor.get('compilers', {})
+    # Check if this is a bootstrap package (needs system compilers before GCC is built)
+    is_bootstrap = recipe.get('bootstrap', False) if recipe else False
+
+    # Compiler setup - use bootstrap compilers if available and package is bootstrap
+    if is_bootstrap and 'bootstrap_compilers' in flavor:
+        compilers = flavor['bootstrap_compilers']
+        print(f"Using bootstrap compilers (bootstrap package)")
+    else:
+        compilers = flavor.get('compilers', {})
+
     env['CC'] = compilers.get('cc', 'gcc')
     env['CXX'] = compilers.get('cxx', 'g++')
-    env['FC'] = compilers.get('fc', 'gfortran')
+    # Fortran compiler - bootstrap packages typically don't need Fortran,
+    # but fall back to gfortran from default compilers if needed
+    env['FC'] = compilers.get('fc', flavor.get('compilers', {}).get('fc', 'gfortran'))
     env['F77'] = env['FC']
     env['FF'] = env['FC']
 
@@ -811,3 +477,408 @@ def setup_environment(flavor: Dict, prefix: Path, srcdir: Path, recipe: Dict = N
                     env[key] = value
                     print(f"Setting {key}={value}")
     return env
+
+
+def check_package_installed(prefix: Path, package_name: str) -> bool:
+    """
+    Check if a package is installed by looking for its registry entry.
+
+    Falls back to pkg-config if registry entry doesn't exist.
+
+    Args:
+        prefix: The installation prefix (e.g., /opt/scls)
+        package_name: Name of the package to check
+
+    Returns:
+        True if package is found in registry or via pkg-config
+    """
+    # First check the registry
+    registry_file = prefix / "share" / "scls" / "registry" / f"{package_name}.yaml"
+    if registry_file.exists():
+        return True
+
+    # Fall back to pkg-config for packages not yet using registry
+    pkgconfig_dir = prefix / "lib" / "pkgconfig"
+    env = os.environ.copy()
+    env['PKG_CONFIG_PATH'] = str(pkgconfig_dir)
+
+    try:
+        result = subprocess.run(
+            ['pkg-config', '--exists', package_name],
+            env=env,
+            capture_output=True
+        )
+        return result.returncode == 0
+    except FileNotFoundError:
+        # pkg-config not installed, fall back to checking .pc file directly
+        pc_file = pkgconfig_dir / f"{package_name}.pc"
+        return pc_file.exists()
+
+
+def get_package_version(prefix: Path, package_name: str) -> Optional[str]:
+    """
+    Get the version of an installed package using pkg-config.
+
+    Args:
+        prefix: The installation prefix
+        package_name: Name of the package
+
+    Returns:
+        Version string or None if not found
+    """
+    pkgconfig_dir = prefix / "lib" / "pkgconfig"
+    env = os.environ.copy()
+    env['PKG_CONFIG_PATH'] = str(pkgconfig_dir)
+
+    try:
+        result = subprocess.run(
+            ['pkg-config', '--modversion', package_name],
+            env=env,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except FileNotFoundError:
+        pass
+    return None
+
+
+def get_package_libs(prefix: Path, package_name: str) -> Optional[str]:
+    """
+    Get the link flags for a package using pkg-config.
+
+    Args:
+        prefix: The installation prefix
+        package_name: Name of the package
+
+    Returns:
+        Link flags string or None if not found
+    """
+    pkgconfig_dir = prefix / "lib" / "pkgconfig"
+    env = os.environ.copy()
+    env['PKG_CONFIG_PATH'] = str(pkgconfig_dir)
+
+    try:
+        result = subprocess.run(
+            ['pkg-config', '--libs', package_name],
+            env=env,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except FileNotFoundError:
+        pass
+    return None
+
+
+def get_package_cflags(prefix: Path, package_name: str) -> Optional[str]:
+    """
+    Get the compiler flags for a package using pkg-config.
+
+    Args:
+        prefix: The installation prefix
+        package_name: Name of the package
+
+    Returns:
+        Compiler flags string or None if not found
+    """
+    pkgconfig_dir = prefix / "lib" / "pkgconfig"
+    env = os.environ.copy()
+    env['PKG_CONFIG_PATH'] = str(pkgconfig_dir)
+
+    try:
+        result = subprocess.run(
+            ['pkg-config', '--cflags', package_name],
+            env=env,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except FileNotFoundError:
+        pass
+    return None
+
+
+# =============================================================================
+# SCLS Registry Functions
+# =============================================================================
+
+def get_package_dependencies(recipe: Dict, flavor_name: str = None) -> List[str]:
+    """
+    Get the list of dependencies for a package, including implicit gcc dependency.
+
+    Args:
+        recipe: The package recipe
+        flavor_name: Optional flavor name for flavor-specific dependencies
+
+    Returns:
+        List of dependency package names
+    """
+    deps = []
+
+    # Non-bootstrap packages implicitly depend on gcc
+    is_bootstrap = recipe.get('bootstrap', False)
+    if not is_bootstrap and recipe.get('name') != 'gcc':
+        deps.append('gcc')
+
+    # Get explicit requires from recipe
+    requires = recipe.get('requires', [])
+
+    if isinstance(requires, list):
+        deps.extend(requires)
+    elif isinstance(requires, dict):
+        # Add 'all' dependencies
+        if 'all' in requires:
+            deps.extend(requires['all'])
+        # Add flavor-specific dependencies
+        if flavor_name and flavor_name in requires:
+            deps.extend(requires[flavor_name])
+
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_deps = []
+    for dep in deps:
+        if dep not in seen:
+            seen.add(dep)
+            unique_deps.append(dep)
+
+    return unique_deps
+
+
+def parse_pc_file(pc_file: Path, prefix: Path) -> tuple[Optional[str], Optional[str]]:
+    """
+    Parse a .pc file directly to extract Cflags and Libs.
+
+    This is used as a fallback when pkg-config is not available.
+
+    Args:
+        pc_file: Path to the .pc file
+        prefix: Installation prefix for variable substitution
+
+    Returns:
+        Tuple of (cflags, ldflags) or (None, None) if parsing fails
+    """
+    if not pc_file.exists():
+        return None, None
+
+    try:
+        # Read and parse the .pc file
+        variables = {
+            'prefix': str(prefix),
+            'exec_prefix': str(prefix),
+            'libdir': str(prefix / 'lib'),
+            'includedir': str(prefix / 'include'),
+            'sharedlibdir': str(prefix / 'lib'),
+        }
+
+        cflags = None
+        ldflags = None
+
+        with open(pc_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+
+                # Parse variable definitions
+                if '=' in line and not line.startswith(('Libs', 'Cflags', 'Requires', 'Name', 'Description', 'Version')):
+                    key, value = line.split('=', 1)
+                    # Substitute variables in value
+                    for var, val in variables.items():
+                        value = value.replace(f'${{{var}}}', val)
+                    variables[key.strip()] = value.strip()
+
+                # Parse Cflags
+                elif line.startswith('Cflags:'):
+                    cflags = line[7:].strip()
+                    # Substitute variables
+                    for var, val in variables.items():
+                        cflags = cflags.replace(f'${{{var}}}', val)
+
+                # Parse Libs (not Libs.private)
+                elif line.startswith('Libs:') and not line.startswith('Libs.private:'):
+                    ldflags = line[5:].strip()
+                    # Substitute variables
+                    for var, val in variables.items():
+                        ldflags = ldflags.replace(f'${{{var}}}', val)
+
+        return cflags, ldflags
+
+    except Exception as e:
+        print(f"Warning: Could not parse {pc_file}: {e}")
+        return None, None
+
+
+def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None) -> None:
+    """
+    Write a registry entry for an installed package.
+
+    Registry files are stored in {prefix}/share/scls/registry/{package}.yaml
+    and contain package metadata, dependencies, and build flags.
+
+    If a .pc file exists, the flags are extracted from it (via pkg-config or direct parsing).
+
+    Args:
+        prefix: The installation prefix
+        recipe: The package recipe
+        flavor_name: Optional flavor name for flavor-specific settings
+    """
+    registry_dir = prefix / "share" / "scls" / "registry"
+    registry_dir.mkdir(parents=True, exist_ok=True)
+
+    package_name = recipe['name']
+    version = str(recipe['version'])
+
+    # Get dependencies
+    dependencies = get_package_dependencies(recipe, flavor_name)
+
+    # Try to get flags from pkg-config (if .pc file exists and pkg-config is available)
+    pc_cflags = get_package_cflags(prefix, package_name)
+    pc_ldflags = get_package_libs(prefix, package_name)
+
+    # If pkg-config failed, try parsing .pc file directly
+    has_pc_file = False
+    pkgconfig_dir = prefix / "lib" / "pkgconfig"
+    pc_file = pkgconfig_dir / f"{package_name}.pc"
+
+    if pc_cflags is None and pc_ldflags is None and pc_file.exists():
+        pc_cflags, pc_ldflags = parse_pc_file(pc_file, prefix)
+        if pc_cflags is not None or pc_ldflags is not None:
+            has_pc_file = True
+            print(f"Registry: Parsed .pc file directly for {package_name}")
+    elif pc_cflags is not None or pc_ldflags is not None:
+        has_pc_file = True
+
+    # Default flags based on prefix
+    default_cflags = f"-I{prefix}/include"
+    default_ldflags = f"-L{prefix}/lib -Wl,-rpath,{prefix}/lib"
+
+    # Check if this is a library by looking for lib files (including versioned ones)
+    lib_dir = prefix / "lib"
+    is_library = False
+    if lib_dir.exists():
+        # Check for any library file matching the package name
+        for pattern in [f"lib{package_name}.so*", f"lib{package_name}.dylib", f"lib{package_name}.*.dylib", f"lib{package_name}.a"]:
+            if list(lib_dir.glob(pattern)):
+                is_library = True
+                break
+
+    # Also consider it a library if .pc file has Libs
+    if pc_ldflags:
+        is_library = True
+
+    # Determine final flags
+    features = recipe.get('features', {})
+
+    if pc_cflags is not None:
+        cflags = pc_cflags
+    elif is_library:
+        cflags = default_cflags
+    else:
+        cflags = ""
+
+    if pc_ldflags is not None:
+        ldflags = pc_ldflags
+    elif is_library:
+        ldflags = default_ldflags
+    else:
+        ldflags = ""
+
+    # Add rpath for every -L directory
+    if ldflags:
+        ldflags = add_rpath_for_libdirs(ldflags)
+
+    # Build registry entry
+    registry_entry = {
+        'name': package_name,
+        'version': version,
+        'dependencies': dependencies,
+        'cflags': cflags,
+        'ldflags': ldflags,
+        'features': {
+            'fortran': features.get('fortran', False),
+            'openmp': features.get('openmp', False),
+            'mpi': features.get('mpi', False),
+            'math': features.get('math', False)
+        },
+        'has_pc_file': has_pc_file
+    }
+
+    # Log what we did
+    if has_pc_file:
+        print(f"Registry: Using flags from .pc file for {package_name}")
+    elif is_library:
+        print(f"Registry: No .pc file for {package_name}, using default flags")
+    else:
+        print(f"Registry: {package_name} is a tool (no library flags needed)")
+
+    registry_file = registry_dir / f"{package_name}.yaml"
+    with open(registry_file, 'w') as f:
+        yaml.dump(registry_entry, f, default_flow_style=False, sort_keys=False)
+
+    print(f"Registry entry written: {registry_file}")
+
+
+def check_package_in_registry(prefix: Path, package_name: str) -> bool:
+    """
+    Check if a package is installed by looking for its registry entry.
+
+    Args:
+        prefix: The installation prefix
+        package_name: Name of the package to check
+
+    Returns:
+        True if package has a registry entry
+    """
+    registry_file = prefix / "share" / "scls" / "registry" / f"{package_name}.yaml"
+    return registry_file.exists()
+
+
+def get_registry_entry(prefix: Path, package_name: str) -> Optional[Dict]:
+    """
+    Get the registry entry for a package.
+
+    Args:
+        prefix: The installation prefix
+        package_name: Name of the package
+
+    Returns:
+        Registry entry dict or None if not found
+    """
+    registry_file = prefix / "share" / "scls" / "registry" / f"{package_name}.yaml"
+
+    if not registry_file.exists():
+        return None
+
+    try:
+        with open(registry_file, 'r') as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        print(f"Warning: Could not read registry entry for {package_name}: {e}")
+        return None
+
+
+def get_all_registry_entries(prefix: Path) -> Dict[str, Dict]:
+    """
+    Get all installed packages from the registry.
+
+    Returns:
+        Dict mapping package names to their registry entries
+    """
+    registry_dir = prefix / "share" / "scls" / "registry"
+    packages = {}
+
+    if not registry_dir.exists():
+        return packages
+
+    for registry_file in registry_dir.glob("*.yaml"):
+        try:
+            with open(registry_file, 'r') as f:
+                entry = yaml.safe_load(f)
+            if entry and 'name' in entry:
+                packages[entry['name']] = entry
+        except Exception:
+            pass
+
+    return packages

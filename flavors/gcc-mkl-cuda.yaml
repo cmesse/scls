@@ -9,12 +9,11 @@ nvidia:
   gds: "12.9"
   target: "sm_80"
 
-
-# RPM package dependencies
+# RPM package dependencies (for bootstrap packages only - we build our own GCC)
 rpm_build_requires:
   - gcc
   - gcc-c++
-  - gfortran
+  - gcc-gfortran
   - intel-oneapi-mkl-devel
   - nvhpc-25-5
 
@@ -22,17 +21,25 @@ rpm_requires:
   - intel-oneapi-mkl
   - nvhpc-25-5
 
+# Default compilers (our custom GCC in prefix/bin - used for most packages)
 compilers:
   cc: gcc
   cxx: g++
   fc: gfortran
   nvcc: nvcc  # Should be in PATH after nvhpc install
 
+# Bootstrap compilers (system GCC - used for core packages before our GCC is available)
+# Packages with "bootstrap: true" in their recipe will use these compilers
+bootstrap_compilers:
+  cc: /usr/bin/gcc
+  cxx: /usr/bin/g++
+  fc: /usr/bin/gfortran
+
 flags:
   cflags: "-march=x86-64-v3 -fPIC -fno-fast-math"
   cxxflags: "-march=x86-64-v3 -fPIC -fno-fast-math"
   fflags: "-march=x86-64-v3 -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
-  ldflags: "-Wl,-rpath,/opt/scls/lib -L/opt/scls/lib"
+  ldflags: "-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib"
 
 # Math libraries configuration
 math:

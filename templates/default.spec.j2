@@ -169,11 +169,48 @@ make install DESTDIR=%{buildroot}
 {% endfor %}
 {% endif %}
 
+%post
+{% for cmd in library_symlink_fixes %}
+{{ cmd }}
+{% endfor %}
+
 # Remove libtool archives
-find %{buildroot} -name '*.la' -delete
+find %{buildroot} -name '*.la' -delete 2>/dev/null || true
 
 # Remove info directory file - managed by system
 rm -rf %{buildroot}%{prefix}/share/info
+
+# Create SCLS registry entry
+mkdir -p %{prefix}/share/scls/registry
+cat > %{prefix}/share/scls/registry/{{ package_name }}.yaml << 'EOF'
+name: {{ package_name }}
+version: {{ version }}
+dependencies:
+{% for dep in package_dependencies %}
+  - {{ dep }}
+{% endfor %}
+cflags: -I%{prefix}/include
+ldflags: -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib
+features:
+  fortran: {{ 'true' if features.fortran else 'false' }}
+  openmp: {{ 'true' if features.openmp else 'false' }}
+  mpi: {{ 'true' if features.mpi else 'false' }}
+  math: {{ 'true' if features.math else 'false' }}
+has_pc_file: false
+EOF
+
+# Update registry with pkg-config flags if .pc file exists
+if pkg-config --exists {{ package_name }} 2>/dev/null; then
+    PC_CFLAGS=$(pkg-config --cflags {{ package_name }} 2>/dev/null || echo "")
+    PC_LDFLAGS=$(pkg-config --libs {{ package_name }} 2>/dev/null || echo "")
+    sed -i "s|^cflags:.*|cflags: $PC_CFLAGS|" %{prefix}/share/scls/registry/{{ package_name }}.yaml
+    sed -i "s|^ldflags:.*|ldflags: $PC_LDFLAGS|" %{prefix}/share/scls/registry/{{ package_name }}.yaml
+    sed -i "s|^has_pc_file:.*|has_pc_file: true|" %{prefix}/share/scls/registry/{{ package_name }}.yaml
+fi
+
+%postun
+# Remove SCLS registry entry on uninstall
+rm -f %{prefix}/share/scls/registry/{{ package_name }}.yaml 2>/dev/null || true
 
 %files
 {% for file in files %}

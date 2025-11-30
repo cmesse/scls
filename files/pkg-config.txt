@@ -1,0 +1,6 @@
+%{prefix}/bin/pkg-config
+%{prefix}/share/aclocal/pkg.m4
+%{prefix}/share/doc/pkg-config
+%{prefix}/share/doc/pkg-config/pkg-config-guide.html
+%{prefix}/share/man/man1
+%{prefix}/share/man/man1/pkg-config.1

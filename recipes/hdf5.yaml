@@ -42,3 +42,6 @@ test:
     - "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:%{scls}/lib make check 2>&1 | tee check.log"
   post:
     - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"
+
+registry:
+  ldflags: "-lhdf5_hl -lhdf5"

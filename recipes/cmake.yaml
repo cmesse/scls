@@ -1,5 +1,5 @@
 name: cmake
-version: 4.0.3
+version: 4.2.0
 summary: Cross-platform make system
 homepage: https://cmake.org/
 license: BSD-3-Clause
@@ -11,6 +11,7 @@ requires:
     - automake
     - autoconf
     - openssl
+    - sed
 
 rpm_build_requires:
     - ncurses-devel

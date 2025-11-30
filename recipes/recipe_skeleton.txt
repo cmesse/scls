@@ -2,7 +2,7 @@
 
 name: <package_name>
 version: <package_version>
-description: <package_description>
+summary: <package_description>
 homepage: <package_homepage>
 license: <package_license>
 
@@ -63,5 +63,12 @@ test:
   commands:
   pre:
   post:
+
+# Registry entry configuration (for downstream consumers)
+# The registry allows CMake/pkg-config to find and link against this package
+registry:
+  ldflags: -l<library_name>  # e.g., -lopenblas, -lhdf5, -lz
+  # cflags, cxxflags, fcflags default to -I{prefix}/include
+  # ldflags defaults to -L{prefix}/lib, the value here is appended
 
 # each package will also have an RPM skeleton containing platform specific build and runtime requirements, the package description and the logfile. To have one single source of truth, information provided here must be parsed into the specfile, and not be provided by the specfile skeleton.

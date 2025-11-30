@@ -3,6 +3,7 @@ version: 4.9
 summary: A GNU stream text editor
 homepage: http://sed.sourceforge.net/
 license: GPL-3.0-or-later
+bootstrap: true  # Build with system Clang before GCC is available
 
 source:
   url: https://ftp.gnu.org/pub/gnu/sed/sed-%{version}.tar.xz

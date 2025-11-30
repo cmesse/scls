@@ -3,12 +3,10 @@ version: 1.4.20
 summary: GNU M4 macro processor
 homepage: https://www.gnu.org/software/m4/
 license: GPLv3+
+bootstrap: true  # Build with system compiler before scls gcc is available
 
 source:
   url: https://ftp.gnu.org/gnu/m4/m4-%{version}.tar.xz
-
-flavors:
-  - macos
 
 features:
   fortran: false

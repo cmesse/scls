@@ -4,10 +4,17 @@ platform: macos
 description: "GNU toolkit and SCLS libraries for macOS"
 prefix: /opt/scls
 
+# Default compilers (GCC - used for most packages)
 compilers:
+  cc: gcc
+  cxx: g++
+  fc: gfortran
+
+# Bootstrap compilers (Apple Clang - used for core packages before GCC is available)
+# Packages with "bootstrap: true" in their recipe will use these compilers
+bootstrap_compilers:
   cc: clang
   cxx: clang++
-  fc: gfortran
 
 flags:
   cflags: "-g -fPIC -fno-fast-math -march=native"
@@ -17,6 +24,6 @@ flags:
 
 # Math libraries configuration
 math:
-  linalg: accelerate
-  threading: openmp  # Link against gomp from gfortran
+  linalg: openblas
+  threading: openmp
   interface: lp64

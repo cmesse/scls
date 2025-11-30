@@ -1,19 +1,36 @@
 name: gcc
-version: 15.1.0
+version: 15.2.0
 summary: The GNU Compiler Collection
 homepage: https://gcc.gnu.org/
 license: GPL-2.0
+bootstrap: true  # Build with system compilers (this IS the GCC we're building)
 
 source:
   url: https://ftp.gnu.org/gnu/gcc/gcc-15.1/gcc-%{version}.tar.xz
 
-flavors:
-  - macos
+# Additional sources for in-tree build (Linux From Scratch approach)
+# These are extracted into the GCC source tree before configure
+# Versions are pulled from the respective recipe files (single source of truth)
+extra_sources:
+  - recipe: gmp
+    extract_to: gmp
+  - recipe: mpfr
+    extract_to: mpfr
+  - recipe: mpc
+    extract_to: mpc
+
+# Build for all flavors (no restriction)
 
 requires:
-  - gmp
-  - mpfr
-  - mpc
+  all:
+    - autoconf
+    - automake
+    - bison
+    - m4
+    - make
+    - sed
+  macos:
+    - zlib
 
 features:
   fortran: false
@@ -23,25 +40,27 @@ features:
 
 configure:
   pre:
-    - "for f in $(find . -name configure); do gsed -i 's/--version -v -V -qversion/--version -v/g' configure ; done"
+    # Extract GMP, MPFR, MPC into GCC source tree (Linux From Scratch approach)
+    # This allows GCC to build them internally with correct flags
+    # %{gmp_tarball}, %{mpfr_tarball}, %{mpc_tarball} are resolved from respective recipes
+    - "tar -xf %{sources}/%{gmp_tarball} && mv -v gmp-%{gmp_version} gmp"
+    - "tar -xf %{sources}/%{mpfr_tarball} && mv -v mpfr-%{mpfr_version} mpfr"
+    - "tar -xf %{sources}/%{mpc_tarball} && mv -v mpc-%{mpc_version} mpc"
+    # Fix version detection for clang (uses GNU sed from our prefix)
+    - "find . -name configure -exec sed -i 's/--version -v -V -qversion/--version -v/g' {} \\;"
 
   type: autotools
-  install_prefix: "gcc"
   args:
-    - --with-gmp-include=%{prefix}/include
-    - --with-gmp-lib=%{prefix}/lib
-    - --with-mpfr-include=%{prefix}/include
-    - --with-mpfr-lib=%{prefix}/lib
-    - --with-mpc-include=%{prefix}/include
-    - --with-mpc-lib=%{prefix}/lib
     - --enable-checking=release
     - --enable-languages=c,c++,fortran,lto
-    - --with-native-system-header-dir=/usr/include
-    - --with-sysroot=%{sdk}
     - --with-system-zlib
     - --disable-nls
     - --disable-multilib
-    - --program-suffix=-scls
+
+  flavor_args:
+    macos:
+      - --with-native-system-header-dir=/usr/include
+      - --with-sysroot=%{sdk}
 
   optimization:
     O_level: 2
@@ -52,18 +71,16 @@ build:
 
 install:
   post:
-    - "pushd %{prefix} && mkdir -p bin && cd bin && ln -s ../gcc/bin/%{host}-gfortran-scls ./gfortran && popd"
-    - "pushd %{prefix} && mkdir -p lib && cd lib && ln -s ../gcc/lib/libgomp.1.dylib ./libgomp.1.dylib && ln -s ../gcc/lib/libgomp.1.dylib ./libgomp.dylib && popd"
-    - "pushd %{prefix}/gcc/lib && for f in libatomic.dylib libgfortran.dylib libgomp.dylib libitm.dylib libquadmath.dylib libssp.dylib libstdc++.dylib ; do rm -rv $f ; done
- && popd"
-    - "pushd %{prefix}/gcc/lib && for f in libatomic.1.dylib libgfortran.5.dylib libgomp.1.dylib libitm.1.dylib libquadmath.0.dylib libssp.0.dylib libstdc++.6.dylib ; do install_name_tool -id %{install_prefix}/lib/$f $f ; for g in libatomic.1.dylib libgfortran.5.dylib libgomp.1.dylib libitm.1.dylib libquadmath.0.dylib libssp.0.dylib libstdc++.6.dylib libgcc_s.1.1.dylib ; do install_name_tool -change $g %{install_prefix}/lib/$g $f 2>/dev/null ; done ; install_name_tool -change @rpath/libgcc_s.1.1.dylib /opt/scls/gcc/lib/libgcc_s.1.1.dylib $f 2>/dev/null ; done && popd"
-    - "pushd %{prefix}/gcc/lib && ln -s ./libatomic.1.dylib ./libatomic.dylib && popd"
-    - "pushd %{prefix}/gcc/lib && ln -s ./libgfortran.5.dylib ./libgfortran.dylib && popd"
-    - "pushd %{prefix}/gcc/lib && ln -s ./libgomp.1.dylib ./libgomp.dylib && popd"
-    - "pushd %{prefix}/gcc/lib && ln -s ./libitm.1.dylib ./libitm.dylib && popd"
-    - "pushd %{prefix}/gcc/lib && ln -s ./libquadmath.0.dylib ./libquadmath.dylib && popd"
-    - "pushd %{prefix}/gcc/lib && ln -s ./libssp.0.dylib ./libssp.dylib && popd"
-    - "pushd %{prefix}/gcc/lib && ln -s ./libstdc++.6.dylib ./libstdc++.dylib && popd"
+    # Create convenience symlinks for gcc/g++/gfortran without version suffix
+    - "cd %{prefix}/bin && for f in gcc g++ gfortran; do ln -sf %{host}-$f-15 $f 2>/dev/null || true; done"
+  flavor_post:
+    macos:
+      # Fix library symlinks (GCC creates versioned .dylib, we need unversioned too)
+      - "cd %{prefix}/lib && for f in libatomic libgfortran libgomp libitm libquadmath libssp libstdc++; do if [ -f ${f}.1.dylib ]; then ln -sf ${f}.1.dylib ${f}.dylib; elif [ -f ${f}.5.dylib ]; then ln -sf ${f}.5.dylib ${f}.dylib; elif [ -f ${f}.0.dylib ]; then ln -sf ${f}.0.dylib ${f}.dylib; elif [ -f ${f}.6.dylib ]; then ln -sf ${f}.6.dylib ${f}.dylib; fi; done"
+  flavor_final_post:
+    macos:
+      # Fix install names for dylibs
+      - "cd %{prefix}/lib && for f in libatomic.1.dylib libgfortran.5.dylib libgomp.1.dylib libitm.1.dylib libquadmath.0.dylib libssp.0.dylib libstdc++.6.dylib libgcc_s.1.1.dylib; do if [ -f $f ]; then install_name_tool -id %{prefix}/lib/$f $f; fi; done"
 
 test:
   commands:

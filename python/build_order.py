@@ -26,11 +26,30 @@ def load_yaml_files(directory, flavor=None):
                         continue
                     # If no 'flavors' key, package is built for all flavors (default behavior)
 
+                # Get explicit requires from recipe
+                requires = data.get('requires', [])
+
+                # Non-bootstrap packages implicitly depend on gcc (except gcc itself)
+                is_bootstrap = data.get('bootstrap', False)
+                pkg_name = data['name']
+                if not is_bootstrap and pkg_name != 'gcc':
+                    # Add gcc as implicit dependency
+                    if isinstance(requires, list):
+                        if 'gcc' not in requires:
+                            requires = ['gcc'] + requires
+                    elif isinstance(requires, dict):
+                        # For flavor-specific requires, add gcc to 'all'
+                        if 'all' not in requires:
+                            requires['all'] = []
+                        if 'gcc' not in requires['all']:
+                            requires['all'] = ['gcc'] + requires['all']
+
                 package = {
-                    'name': data['name'],
-                    'requires': data.get('requires', []),
+                    'name': pkg_name,
+                    'requires': requires,
                     'filepath': filepath,
-                    'flavors': data.get('flavors', [])  # Empty list means all flavors
+                    'flavors': data.get('flavors', []),  # Empty list means all flavors
+                    'bootstrap': is_bootstrap
                 }
                 packages.append(package)
         except Exception as e:

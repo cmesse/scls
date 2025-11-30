@@ -1,17 +1,20 @@
 name: openmpi
-version: 5.0.8
+version: 5.0.9
 summary: A powerful implementation of MPI/SHMEM
 homepage: https://www.open-mpi.org
 license: BSD
 
 source:
-  url: https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-%{version}.tar.gz
+  url: https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-%{version}.tar.bz2
 
 requires:
   all:
     - gmp
     - mpfr
     - mpc
+    - pmix
+    - libevent
+    - hwloc
   macos:
     - gcc
 features:

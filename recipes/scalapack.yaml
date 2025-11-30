@@ -15,9 +15,6 @@ requires:
   gcc-debug:
     - blas
     - lapack
-  clang-debug:
-    - blas
-    - lapack
 
 features:
   fortran: true
