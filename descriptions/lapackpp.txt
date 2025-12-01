@@ -1,0 +1,4 @@
+The Linear Algebra PACKage (LAPACK) is a standard software library for numerical linear algebra. It provides routines for solving systems of linear equations and linear least squares problems, eigenvalue problems, and singular value decomposition. It also includes routines to implement the associated matrix factorizations such as LU, QR, Cholesky, etc. LAPACK was originally written in FORTRAN 77, and moved to Fortran 90 in version 3.2 (2008). LAPACK provides routines for handling both real and complex matrices in both single and double precision.
+
+The objective of LAPACK++ is to provide a convenient, performance oriented API for development in the C++ language, that, for the most part, preserves established conventions, while, at the same time, takes advantages of modern C++ features, such as: namespaces, templates, exceptions, etc.
+

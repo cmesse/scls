@@ -1,0 +1,11 @@
+--- a/test/test.hh
++++ b/test/test.hh
+@@ -6,7 +6,7 @@
+ #ifndef TEST_HH
+ #define TEST_HH
+
+-#include "testsweeper.hh"
++#include <testsweeper.hh>
+ #include "blas.hh"
+
+ // -----------------------------------------------------------------------------

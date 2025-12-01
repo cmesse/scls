@@ -1,0 +1,58 @@
+name: slate
+version: 2024.05.31
+summary: Software for Linear Algebra Targeting Exascale
+homepage: https://icl.bitbucket.io/slate/
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/icl-utk-edu/slate/releases/download/v%{version}/slate-%{version}.tar.gz
+
+patches:
+  all:
+    - slate_cmake.patch
+
+requires:
+  all:
+    - cmake
+    - blaspp
+    - lapackpp
+    - testsweeper
+    - scalapack
+
+features:
+  fortran: true
+  mpi: true
+  openmp: true
+  math: parallel  # Uses ScaLAPACK
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-Dgpu_backend=none"
+    - "-Dblaspp_DIR=%{prefix}"
+    - "-Dlapackpp_DIR=%{prefix}"
+  flavor_args:
+    macos:
+      - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.dylib;%{prefix}/lib/liblapack.dylib;%{prefix}/lib/libopenblas.dylib"
+    debug:
+      - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so;%{prefix}/lib/liblapack.so;%{prefix}/lib/libblas.so"
+    mkl:
+      # MKL provides ScaLAPACK via linker flags
+  optimization:
+    O_level: 3
+
+build:
+  parallel: true
+  in_source: false
+
+# Tests cause timeout issues
+# test:
+#   commands:
+#     - "make check"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lslate -lslate_lapack_api"

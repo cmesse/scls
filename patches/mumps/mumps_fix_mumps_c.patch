@@ -1,0 +1,11 @@
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -452,7 +452,7 @@
+ 
+ $(ARITH)mumps_c.o:	mumps_c.c
+ 	$(CC) $(OPTC) $(FPIC) -I../include $(INCS) $(CDEFS) -DMUMPS_ARITH=MUMPS_ARITH_$(ARITH) \
+-	      $(IORDERINGSC) $(ORDERINGSC) -c mumps_c.c $(OUTC)$@
++	      $(IORDERINGSC) $(ORDERINGSC) -c mumps_c.c -o $(OUTC)$@
+ 
+ clean:
+ 	$(RM) *.o *.mod $(incdir)/mumps_int_def.h

@@ -1,0 +1,32 @@
+name: googletest
+version: 1.14.0
+summary: GoogleTest - Google Testing and Mocking Framework
+homepage: https://github.com/google/googletest
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/google/googletest/archive/refs/tags/v%{version}.tar.gz
+
+requires:
+  all:
+    - cmake
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+
+build:
+  parallel: true
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lgtest -lgmock"

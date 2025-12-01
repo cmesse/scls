@@ -1,0 +1,16 @@
+%{prefix}/include/lapack.hh
+%{prefix}/lib/liblapackpp.2.0.0.dylib
+%{prefix}/lib/liblapackpp.dylib
+%{prefix}/lib/liblapackpp.2.dylib
+%{prefix}/lib/cmake/lapackpp/lapackppTargets.cmake
+%{prefix}/lib/cmake/lapackpp/lapackppTargets-release.cmake
+%{prefix}/lib/cmake/lapackpp/lapackppConfig.cmake
+%{prefix}/lib/cmake/lapackpp/lapackppConfigVersion.cmake
+%{prefix}/include/lapack/flops.hh
+%{prefix}/include/lapack/wrappers.hh
+%{prefix}/include/lapack/config.h
+%{prefix}/include/lapack/fortran.h
+%{prefix}/include/lapack/defines.h
+%{prefix}/include/lapack/mangling.h
+%{prefix}/include/lapack/device.hh
+%{prefix}/include/lapack/util.hh

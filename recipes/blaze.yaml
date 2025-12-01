@@ -1,0 +1,49 @@
+name: blaze
+version: 3.8.2
+summary: A high-performance C++ math library for dense and sparse arithmetic
+homepage: https://bitbucket.org/blaze-lib/blaze
+license: BSD
+
+source:
+  url: https://bitbucket.org/blaze-lib/blaze/downloads/blaze-%{version}.tar.gz
+
+requires:
+  all:
+    - cmake
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: serial
+
+configure:
+  type: cmake
+  optimization:
+    O_level: 3
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBLAZE_BLAS_MODE=ON"
+  # Integer interface: LP64 (32-bit) vs ILP64 (64-bit) for BLAS calls
+  lp64_args:
+    - "-DBLAZE_BLAS_IS_64BIT=OFF"
+  ilp64_args:
+    - "-DBLAZE_BLAS_IS_64BIT=ON"
+  flavor_args:
+    macos:
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/liblapack.dylib"
+    debug:
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libblas.so"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/liblapack.so"
+    mkl:
+      # MKL provides BLAS/LAPACK via environment
+
+build:
+  parallel: true
+
+# Blaze is header-only, no library to link
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: ""

@@ -1,0 +1,6 @@
+%{prefix}/bin/pometis
+%{prefix}/bin/mtest
+%{prefix}/bin/parmetis
+%{prefix}/bin/ptest
+%{prefix}/include/parmetis.h
+%{prefix}/lib/libparmetis.dylib

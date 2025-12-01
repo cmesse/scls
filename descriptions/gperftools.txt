@@ -1,0 +1,8 @@
+Perf Tools is a collection of performance analysis tools, including a
+high-performance multi-threaded malloc() implementation that works
+particularly well with threads and STL, a thread-friendly heap-checker,
+a heap profiler, and a cpu-profiler.
+
+This is a metapackage which pulls in all of the gperftools (and pprof)
+binaries, libraries, and development headers, so that you can use them.
+

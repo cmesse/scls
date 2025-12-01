@@ -1,0 +1,57 @@
+name: armadillo
+version: 12.8.0
+summary: Fast C++ matrix library with syntax similar to MATLAB and Octave
+homepage: http://arma.sourceforge.net/
+license: Apache-2.0
+
+source:
+  url: http://sourceforge.net/projects/arma/files/armadillo-%{version}.tar.xz
+
+requires:
+  all:
+    - cmake
+    - arpack-ng
+    - superlu
+    - metis
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: serial
+
+configure:
+  type: cmake
+  optimization:
+    O_level: 3
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DALLOW_FLEXIBLAS_LINUX=OFF"
+    - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
+    - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
+  # Integer interface: LP64 (32-bit) vs ILP64 (64-bit)
+  # Armadillo uses ALLOW_BLAS_LONG_LONG for ILP64 BLAS
+  lp64_args:
+    - "-DALLOW_BLAS_LONG_LONG=OFF"
+  ilp64_args:
+    - "-DALLOW_BLAS_LONG_LONG=ON"
+  flavor_args:
+    macos:
+      - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.dylib"
+      - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.dylib"
+      - "-DBLAS_LIBRARY=%{prefix}/lib/libopenblas.dylib"
+      - "-DLAPACK_LIBRARY=%{prefix}/lib/liblapack.dylib"
+    debug:
+      - "-DBLAS_LIBRARY=%{prefix}/lib/libblas.so"
+      - "-DLAPACK_LIBRARY=%{prefix}/lib/liblapack.so"
+    mkl:
+      # MKL provides BLAS/LAPACK via environment
+
+build:
+  parallel: true
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -larmadillo"

@@ -1,0 +1,39 @@
+name: gperftools
+version: 2.15
+summary: Very fast malloc and performance analysis tools
+homepage: https://github.com/gperftools/gperftools
+license: BSD
+
+source:
+  url: https://github.com/gperftools/gperftools/releases/download/gperftools-%{version}/gperftools-%{version}.tar.gz
+
+requires:
+  all:
+    - autoconf
+    - automake
+    - libtool
+    - make
+
+rpm_build_requires:
+  - libunwind-devel
+  - perl-generators
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: autotools
+  args:
+    - "--disable-static"
+    - "--enable-shared"
+    - "--enable-libunwind"
+
+build:
+  parallel: true
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -ltcmalloc"

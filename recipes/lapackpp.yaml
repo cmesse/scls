@@ -1,0 +1,77 @@
+name: lapackpp
+version: 2025.05.28
+summary: C++ API for the Linear Algebra Package (LAPACK)
+homepage: https://icl.utk.edu/slate/
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/icl-utk-edu/lapackpp/releases/download/v%{version}/lapackpp-%{version}.tar.gz
+
+patches:
+  all:
+    - lapackpp_fix_testsweep_and_blaspp.patch
+    - lapackpp_lapacke_libpath.patch
+
+requires:
+  all:
+    - cmake
+    - blaspp
+    - testsweeper
+  macos:
+    - openblas
+    - lapack
+  debug:
+    - lapack
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: serial
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-Dbuild_tests=ON"
+  flavor_args:
+    macos:
+      # lapackpp finds blaspp automatically; no BLA_VENDOR needed for OpenBLAS
+      - "-Dlapack=auto"
+      - "-Dgpu_backend=none"
+      - '-DBLAS_LIBRARIES=-lopenblas'
+      - '-DLAPACK_LIBRARIES=-llapack'
+    debug:
+      # Reference BLAS/LAPACK from our lapack build
+      - "-Dlapack=generic"
+      - "-Dgpu_backend=none"
+      - '-DBLAS_LIBRARIES=-lblas'
+      - '-DLAPACK_LIBRARIES=-llapack'
+    mkl:
+      # For MKL, use CMake's FindLAPACK with appropriate vendor
+      - "-Duse_cmake_find_lapack=ON"
+      - "-Dgpu_backend=none"
+    cuda:
+      - "-Duse_cmake_find_lapack=ON"
+      - "-Dgpu_backend=cuda"
+  # LP64/ILP64: Only relevant for MKL (OpenBLAS/generic use lapackpp's auto-detection)
+  lp64_args:
+    - "-DBLA_VENDOR=Intel10_64lp"
+  ilp64_args:
+    - "-DBLA_VENDOR=Intel10_64ilp"
+  optimization:
+    O_level: 3
+
+build:
+  parallel: true
+  in_source: false  # Build in separate directory
+
+test:
+  commands:
+    - "make check"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -llapackpp -lblaspp"

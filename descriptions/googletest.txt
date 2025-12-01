@@ -1,0 +1,2 @@
+Googletest is a comprehensive testing framework for C++ designed to support test-driven development and Google's extensive internal test suites. It provides a rich set of assertions, user-defined assertions, death tests, and easy-to-use fixtures for writing both small and large test cases. Googletest is portable and can be used across diverse platforms. It encourages organized, expressive, and efficient testing practices, and integrates well with various build systems. This makes it suitable for both new and existing C++ projects looking to implement robust testing.
+

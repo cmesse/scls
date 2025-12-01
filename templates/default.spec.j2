@@ -143,9 +143,11 @@ export {{ env_var.name }}="{{ env_var.value }}"
 {% elif configure_type == 'none' %}
 # No configure step - direct build
 {% if parallel_build %}
-make %{?_smp_mflags} PREFIX=%{prefix}
+make %{?_smp_mflags} PREFIX=%{prefix}{% for arg in build_args %} {{ arg }}{% endfor %}
+
 {% else %}
-make PREFIX=%{prefix}
+make PREFIX=%{prefix}{% for arg in build_args %} {{ arg }}{% endfor %}
+
 {% endif %}
 
 {% endif %}

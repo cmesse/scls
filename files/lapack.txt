@@ -1,0 +1,9 @@
+%{prefix}/lib/libtmglib.3.dylib
+%{prefix}/lib/liblapacke.3.dylib
+%{prefix}/lib/libtmglib.dylib
+%{prefix}/lib/liblapack.dylib
+%{prefix}/lib/libtmglib.3.12.0.dylib
+%{prefix}/lib/liblapacke.3.12.0.dylib
+%{prefix}/lib/liblapack.3.12.0.dylib
+%{prefix}/lib/liblapack.3.dylib
+%{prefix}/lib/liblapacke.dylib

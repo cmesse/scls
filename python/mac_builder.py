@@ -27,7 +27,8 @@ from build_common import (
     get_package_dependencies,
     get_subpackages_for_flavor,
     get_subpackage_dependencies,
-    split_files_by_subpackage
+    split_files_by_subpackage,
+    get_interface_args
 )
 
 from patch_common import (
@@ -152,6 +153,9 @@ class MacOSBuilder:
             # Get configure arguments
             args = get_configure_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix )
 
+            # Add interface-specific arguments (LP64/ILP64)
+            args.extend(get_interface_args(self.recipe, self.flavor))
+
             # override compilers
             if self.mpi:
                 env['CC'] = 'mpicc'
@@ -165,7 +169,8 @@ class MacOSBuilder:
                 self.recipe, self.flavor, env['CC']
             )
 
-            ldflags = self.flavor['flags'].get('ldflags', '')
+            # Get ldflags from flavor
+            self.ldflags = self.flavor['flags'].get('ldflags', '')
 
             # Add math flags to existing flags
             if self.math:
@@ -226,6 +231,9 @@ class MacOSBuilder:
 
             # Get CMake arguments
             args = get_cmake_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
+
+            # Add interface-specific arguments (LP64/ILP64)
+            args.extend(get_interface_args(self.recipe, self.flavor))
 
             # override compilers
             if self.mpi:
@@ -302,7 +310,8 @@ class MacOSBuilder:
                 self.recipe, self.flavor, env['CC']
             )
 
-            ldflags = self.flavor['flags'].get('ldflags', '')
+            # Get ldflags from flavor
+            self.ldflags = self.flavor['flags'].get('ldflags', '')
 
             # Add math flags to existing flags
             if self.math:
@@ -483,14 +492,8 @@ class MacOSBuilder:
             if flavor_name in self.recipe['build']['flavor_args']:
                 make_cmd.extend(self.recipe['build']['flavor_args'][flavor_name])
 
-        # Special handling for OpenBLAS: set INTERFACE64 based on flavor's math.interface
-        if self.package == 'openblas':
-            math_config = self.flavor.get('math', {})
-            interface = math_config.get('interface', 'lp64')
-            if interface == 'ilp64':
-                make_cmd.append('INTERFACE64=1')
-            else:
-                make_cmd.append('INTERFACE64=0')
+        # Add LP64/ILP64 interface-specific build args
+        make_cmd.extend(get_interface_args(self.recipe, self.flavor, 'build'))
 
         run_command(make_cmd, build_dir, env, "build")
 
@@ -907,7 +910,7 @@ class MacOSBuilder:
                         )
 
             # Copy patches to sources directory
-            copy_patches_to_sources(self.recipe, Path("patches"), self.sources_dir, self.package)
+            copy_patches_to_sources(self.recipe, Path("patches"), self.sources_dir, self.package, self.flavor)
 
             # Extract source
             source_dir = extract_source(
@@ -923,7 +926,7 @@ class MacOSBuilder:
                 source_dir = source_dir / 'zlib'
 
             # Apply patches
-            apply_patches(source_dir, self.recipe, self.package, self.patch_dir)
+            apply_patches(source_dir, self.recipe, self.package, self.patch_dir, self.flavor)
 
             # Setup environment
             env = setup_environment(self.flavor, self.prefix, self.source_dir )
@@ -1087,6 +1090,56 @@ class MacOSBuilder:
 
         # Index size for packages that support it
         context['index_size'] = self.recipe.get('features', {}).get('index_size', 32)
+
+        # Platform
+        context['platform'] = 'macos'
+
+        # Compiler family (gnu, intel, etc.)
+        cc = compilers.get('cc', 'gcc')
+        if 'gcc' in cc or 'g++' in cc:
+            context['compiler_family'] = 'gnu'
+        elif 'icx' in cc or 'icc' in cc:
+            context['compiler_family'] = 'intel'
+        else:
+            context['compiler_family'] = 'gnu'  # default
+
+        # Version components
+        version = str(self.recipe.get('version', '0.0.0'))
+        version_parts = version.split('.')
+        context['version_major'] = version_parts[0] if len(version_parts) > 0 else '0'
+        context['version_minor'] = version_parts[1] if len(version_parts) > 1 else '0'
+        context['version_patch'] = version_parts[2] if len(version_parts) > 2 else '0'
+
+        # Archiver
+        context['ar'] = 'ar'
+
+        # Optimization level from recipe
+        oflags = '-O2'
+        if 'configure' in self.recipe and 'optimization' in self.recipe['configure']:
+            o_level = self.recipe['configure']['optimization'].get('O_level', 2)
+            oflags = f'-O{o_level}'
+        context['oflags'] = oflags
+
+        # LP64/ILP64 interface
+        math_config = self.flavor.get('math', {})
+        context['interface'] = math_config.get('interface', 'lp64')
+
+        # Math provider (mkl, lapack, accelerate)
+        math_linalg = math_config.get('linalg', 'reference')
+        if math_linalg == 'mkl':
+            context['math_provider'] = 'mkl'
+            # Use correct LP64/ILP64 MKL library names
+            interface = context['interface']
+            if interface == 'ilp64':
+                mkl_interface = 'ilp64'
+            else:
+                mkl_interface = 'lp64'
+            context['mkl_linker_flags'] = f'-lmkl_intel_{mkl_interface} -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+            context['mkl_mpi_linker_flags'] = f'-lmkl_scalapack_{mkl_interface} -lmkl_intel_{mkl_interface} -lmkl_gnu_thread -lmkl_core -lmkl_blacs_openmpi_{mkl_interface} -lgomp -lpthread -lm -ldl'
+        else:
+            context['math_provider'] = 'lapack'
+            context['mkl_linker_flags'] = ''
+            context['mkl_mpi_linker_flags'] = ''
 
         return context
 

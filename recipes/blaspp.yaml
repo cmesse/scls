@@ -1,0 +1,77 @@
+name: blaspp
+version: 2025.05.28
+summary: C++ API for the Basic Linear Algebra Subprograms (BLAS)
+homepage: https://icl.utk.edu/slate/
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/icl-utk-edu/blaspp/releases/download/v%{version}/blaspp-%{version}.tar.gz
+
+patches:
+  all:
+    - blaspp_fix_testsweep.patch
+    - blaspp_cblas_include.patch
+
+requires:
+  all:
+    - cmake
+    - testsweeper
+  macos:
+    - openblas
+    - lapack
+  debug:
+    - lapack
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: serial
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-Dbuild_tests=ON"
+  flavor_args:
+    macos:
+      - '-Dblas="OpenBLAS"'
+      - '-Dlapack="generic"'
+      - "-Dgpu_backend=none"
+      - '-DLAPACK_LIBRARIES=-llapack'
+    debug:
+      - '-Dblas="generic"'
+      - '-Dlapack="generic"'
+      - "-Dgpu_backend=none"
+      - '-DLAPACK_LIBRARIES=-llapack'
+    mkl:
+      - '-Dblas="Intel MKL"'
+      - '-Dlapack="Intel MKL"'
+      - "-Dgpu_backend=none"
+      - '-DLAPACK_LIBRARIES="%{math_ldflags}"'
+    cuda:
+      - '-Dblas="Intel MKL"'
+      - '-Dlapack="Intel MKL"'
+      - "-Dgpu_backend=cuda"
+      - '-DLAPACK_LIBRARIES="%{math_ldflags}"'
+  # LP64/ILP64 integer interface
+  lp64_args:
+    - '-Dblas_int="int (LP64)"'
+  ilp64_args:
+    - '-Dblas_int="int64_t (ILP64)"'
+  optimization:
+    O_level: 3
+
+build:
+  parallel: true
+  in_source: false  # Build in separate directory
+
+test:
+  commands:
+    - "make check"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lblaspp"

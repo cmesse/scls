@@ -1,0 +1,34 @@
+--- a/TOOLS/reshape.c
++++ b/TOOLS/reshape.c
+@@ -10,11 +10,11 @@ void Creshape( Int context_in, Int major_in, Int* context_out, Int major_out,
+ {
+
+    /** called subprograms **/
+-   void proc_inc();
+-   void Cblacs_gridinfo();
+-   Int Cblacs_pnum();
+-   void Cblacs_get();
+-   void Cblacs_gridmap();
++   void proc_inc(Int*, Int*, Int, Int, Int);
++   void Cblacs_gridinfo(Int, Int*, Int*, Int*, Int*);
++   Int Cblacs_pnum(Int, Int, Int);
++   void Cblacs_get(Int, Int, Int*);
++   void Cblacs_gridmap(Int*, Int*, Int, Int, Int);
+
+    /** variables **/
+    Int i, j;
+--- a/TOOLS/SL_gridreshape.c
++++ b/TOOLS/SL_gridreshape.c
+@@ -7,7 +7,11 @@
+
+ Int SL_Cgridreshape(Int ctxt, Int pstart, Int row_major_in, Int row_major_out, Int P, Int Q)
+ {
+-   Int Cblacs_pnum();
++   Int Cblacs_pnum(Int, Int, Int);
++   void Cblacs_gridinfo(Int, Int*, Int*, Int*, Int*);
++   void Cblacs_abort(Int, Int);
++   void Cblacs_get(Int, Int, Int*);
++   void Cblacs_gridmap(Int*, Int*, Int, Int, Int);
+    Int nctxt, P0, Q0, Np, i, *g;
+
+    Cblacs_gridinfo(ctxt, &P0, &Q0, &i, &Np);

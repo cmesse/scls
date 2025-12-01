@@ -1,0 +1,82 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -52,10 +52,6 @@
+ option( c_api "Build C API" false )
+ # todo: option( fortran_api "Build Fortran API. Requires C API." false )
+ 
+-set( gpu_backend "auto" CACHE STRING "GPU backend to use" )
+-set_property( CACHE gpu_backend PROPERTY STRINGS
+-              auto cuda hip sycl none )
+-
+ # After setting $color.
+ include( "cmake/util.cmake" )
+ 
+@@ -421,54 +417,14 @@
+ # Needed before ROCm, for include paths.
+ message( "" )
+ message( "---------------------------------------- BLAS++" )
+-if (NOT TARGET blaspp)
+-    find_package( blaspp QUIET )
+-    if (blaspp_FOUND)
+-        message( STATUS "   Found BLAS++: ${blaspp_DIR}" )
+-    elseif (EXISTS "${CMAKE_SOURCE_DIR}/blaspp/CMakeLists.txt")
+-        set( build_tests_save "${build_tests}" )
+-        set( build_tests "false" )
+-
+-        add_subdirectory( "blaspp" )
+-
+-        set( build_tests "${build_tests_save}" )
+-        set( blaspp_DIR "${CMAKE_BINARY_DIR}/blaspp" )
+-    else()
+-        message( FATAL_ERROR "blaspp/CMakeLists.txt doesn't exist. Use:\n"
+-                 "    git submodule update --init\n"
+-                 "to checkout submodules." )
+-    endif()
+-else()
+-    message( STATUS "   BLAS++ already included" )
+-endif()
++set( blaspp_DIR "${CMAKE_INSTALL_PREFIX}" )
+ message( STATUS "BLAS++ done" )
+ 
+ #-------------------------------------------------------------------------------
+ # Search for LAPACK library, if not already included.
+ message( "" )
+ message( "---------------------------------------- LAPACK++" )
+-if (NOT TARGET lapackpp)
+-    find_package( lapackpp QUIET )
+-    if (lapackpp_FOUND)
+-        message( STATUS "   Found LAPACK++: ${lapackpp_DIR}" )
+-
+-    elseif (EXISTS "${CMAKE_SOURCE_DIR}/lapackpp/CMakeLists.txt")
+-        set( build_tests_save "${build_tests}" )
+-        set( build_tests "false" )
+-
+-        add_subdirectory( "lapackpp" )
+-
+-        set( build_tests "${build_tests_save}" )
+-        set( lapackpp_DIR "${CMAKE_BINARY_DIR}/lapackpp" )
+-
+-    else()
+-        message( FATAL_ERROR "lapackpp/CMakeLists.txt doesn't exist. Use:\n"
+-                 "    git submodule update --init\n"
+-                 "to checkout submodules." )
+-    endif()
+-else()
+-    message( STATUS "   LAPACK++ already included" )
+-endif()
++set( lapackpp_DIR "${CMAKE_INSTALL_PREFIX}" )
+ message( STATUS "LAPACK++ done" )
+ 
+ target_link_libraries( slate PUBLIC blaspp lapackpp )
+@@ -482,9 +438,9 @@
+ if (gpu_backend MATCHES "^(auto|cuda)$")
+     message( STATUS "${bold}Looking for CUDA${not_bold} (gpu_backend = ${gpu_backend})" )
+     if (gpu_backend STREQUAL "cuda")
+-        find_package( CUDAToolkit REQUIRED )
++        find_package( CUDAToolkit REQUIRED HINTS ${CUDA_PATH})
+     else()
+-        find_package( CUDAToolkit QUIET )
++        find_package( CUDAToolkit QUIET  HINTS ${CUDA_PATH} )
+     endif()
+     if (CUDAToolkit_FOUND)
+         set( gpu_backend "cuda" )

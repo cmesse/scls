@@ -3,6 +3,7 @@ version: 3.6.0
 summary: The OpenSSL cryptography and TLS library
 homepage: https://www.openssl.org/
 license: Apache 2.0
+bootstrap: true
 
 source:
   url: https://github.com/openssl/openssl/releases/download/openssl-%{version}/openssl-%{version}.tar.gz

@@ -1,0 +1,61 @@
+name: scotch
+version: 7.0.10
+summary: Graph, mesh and hypergraph partitioning library
+homepage: https://www.labri.fr/perso/pelegrin/scotch/
+license: CeCILL-C
+
+source:
+  url: https://gitlab.inria.fr/scotch/scotch/-/archive/v%{version}/scotch-v%{version}.tar.bz2
+
+patches:
+  all:
+    # Add missing mpi.h include for GCC 7+ compatibility
+    - scotch-include_headers.patch
+    # Force shared library builds with proper rpath
+    - scotch-shared.patch
+
+requires:
+  all:
+    - cmake
+    - openmpi
+
+features:
+  fortran: true
+  mpi: true
+  openmp: false
+  math: false
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_LIBESMUMPS=ON"
+    - "-DBUILD_LIBSCOTCHMETIS=OFF"
+    - "-DBUILD_PTSCOTCH=ON"
+    - "-DINSTALL_METIS_HEADERS=OFF"
+    - "-DTHREADS=OFF"
+    # Disable compression support (reduces dependencies)
+    - "-DCOMMON_FILE_COMPRESS_BZ2=OFF"
+    - "-DCOMMON_FILE_COMPRESS_GZ=OFF"
+    - "-DCOMMON_FILE_COMPRESS_LZMA=OFF"
+  # Integer interface: LP64 (32-bit) vs ILP64 (64-bit)
+  # Scotch uses INTSIZE cmake option
+  lp64_args:
+    - "-DINTSIZE=32"
+  ilp64_args:
+    - "-DINTSIZE=64"
+  optimization:
+    O_level: 2
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make test"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lscotch -lscotcherr -lptscotch -lptscotcherr"

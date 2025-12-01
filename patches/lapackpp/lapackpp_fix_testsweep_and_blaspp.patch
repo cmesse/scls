@@ -1,0 +1,159 @@
+--- a/configure.py
++++ b/configure.py
+@@ -92,26 +92,6 @@
+ 
+     config.gpu_blas()
+ 
+-    blaspp = config.get_package(
+-        'BLAS++',
+-        ['../blaspp', './blaspp'],
+-        'include/blas.hh',
+-        'https://github.com/icl-utk-edu/blaspp',
+-        'https://github.com/icl-utk-edu/blaspp/tarball/master',
+-        'blaspp.tar.gz' )
+-    if (not blaspp):
+-        raise Exception( 'LAPACK++ requires BLAS++.' )
+-
+-    testsweeper = config.get_package(
+-        'TestSweeper',
+-        ['../testsweeper', blaspp + '/testsweeper', './testsweeper'],
+-        'testsweeper.hh',
+-        'https://github.com/icl-utk-edu/testsweeper',
+-        'https://github.com/icl-utk-edu/testsweeper/tarball/master',
+-        'testsweeper.tar.gz' )
+-    if (not testsweeper):
+-        print_warn( 'LAPACK++ needs TestSweeper for testers.' )
+-
+     config.extract_defines_from_flags( 'CXXFLAGS', 'lapackpp_header_defines' )
+     config.output_files( ['make.inc', 'include/lapack/defines.h'] )
+     print( 'log in config/log.txt' )
+--- ./GNUmakefile	2023-11-06 12:28:50.000000000 -0800
++++ ../GNUmakefile	2023-12-18 21:20:42.920358495 -0800
+@@ -86,61 +86,28 @@
+ # todo: should configure.py save blaspp_dir & testsweeper_dir in make.inc?
+ # Order here (./blaspp, ../blaspp) is reverse of order in configure.py.
+ 
+-blaspp_dir = $(wildcard ./blaspp)
+-ifeq ($(blaspp_dir),)
+-    blaspp_dir = $(wildcard ../blaspp)
+-endif
+ 
+-blaspp_src = $(wildcard $(blaspp_dir)/src/*.cc $(blaspp_dir)/include/*.hh)
++blaspp_src = $(blaspp_dir)/include/*.hh)
+ 
+-libblaspp  = $(blaspp_dir)/lib/libblaspp.$(lib_ext)
++libblaspp  = $(abs_prefix)/lib/libblaspp.$(lib_ext)
+ 
+ blaspp: $(libblaspp)
+ 
+-ifneq ($(blaspp_dir),)
+-    $(libblaspp): $(libblaspp_src)
+-		cd $(blaspp_dir) && $(MAKE) lib CXX=$(CXX)
+-else
+-    $(lib_obj):
+-		$(error LAPACK++ requires BLAS++, which was not found. Run 'make config' \
+-		        or download manually from https://github.com/icl-utk-edu/blaspp)
+-endif
+-
+-# Compile BLAS++ before LAPACK++.
+-$(lib_obj) $(tester_obj): | $(libblaspp)
+-
+-
+ #-------------------------------------------------------------------------------
+ # TestSweeper
+ # Order here (./testsweeper, ../testsweeper) is reverse of order in configure.py.
+ 
+-testsweeper_dir = $(wildcard ./testsweeper)
+-ifeq ($(testsweeper_dir),)
+-    testsweeper_dir = $(wildcard $(blaspp_dir)/testsweeper)
+-endif
+-ifeq ($(testsweeper_dir),)
+-    testsweeper_dir = $(wildcard ../testsweeper)
+-endif
++# Set to the installed location of testsweeper, assuming it's in $(abs_prefix)
++testsweeper_dir = $(abs_prefix)
+ 
+-testsweeper_src = $(wildcard $(testsweeper_dir)/testsweeper.cc $(testsweeper_dir)/testsweeper.hh)
++# Update to include testsweeper headers, if needed
++testsweeper_src = $(wildcard $(testsweeper_dir)/include/testsweeper.hh)
+ 
+-testsweeper = $(testsweeper_dir)/libtestsweeper.$(lib_ext)
++# Point to the precompiled testsweeper library
++testsweeper = $(testsweeper_dir)/lib/libtestsweeper.$(lib_ext)
+ 
+ testsweeper: $(testsweeper)
+ 
+-ifneq ($(testsweeper_dir),)
+-    $(testsweeper): $(testsweeper_src)
+-		cd $(testsweeper_dir) && $(MAKE) lib CXX=$(CXX)
+-else
+-    $(tester_obj):
+-		$(error Tester requires TestSweeper, which was not found. Run 'make config' \
+-		        or download manually from https://github.com/icl-utk-edu/testsweeper)
+-endif
+-
+-# Compile TestSweeper before LAPACK++.
+-$(lib_obj) $(tester_obj): | $(libblaspp)
+-
+-
+ #-------------------------------------------------------------------------------
+ # Get Mercurial id, and make version.o depend on it via .id file.
+ 
+@@ -161,15 +128,10 @@
+ 
+ #-------------------------------------------------------------------------------
+ # LAPACK++ specific flags and libraries
+-CXXFLAGS += -I./include
+-CXXFLAGS += -I$(blaspp_dir)/include
+-
+-# additional flags and libraries for testers
+-$(tester_obj): CXXFLAGS += -I$(testsweeper_dir)
++CXXFLAGS += -I$(abs_prefix)/include -I./include
+ 
+ TEST_LDFLAGS += -L./lib -Wl,-rpath,$(abspath ./lib)
+-TEST_LDFLAGS += -L$(blaspp_dir)/lib -Wl,-rpath,$(abspath $(blaspp_dir)/lib)
+-TEST_LDFLAGS += -L$(testsweeper_dir) -Wl,-rpath,$(abspath $(testsweeper_dir))
++TEST_LDFLAGS += -L$(abs_prefix)/lib -Wl,-rpath,$(abs_prefix)/lib
+ TEST_LIBS    += -llapackpp -lblaspp -ltestsweeper
+ 
+ #-------------------------------------------------------------------------------
+@@ -192,7 +154,6 @@
+ 	cp include/lapack/*.hh $(DESTDIR)$(prefix)/include/lapack
+ 	cp -R lib/lib* $(DESTDIR)$(prefix)/lib$(LIB_SUFFIX)
+ 	cp $(pkg) $(DESTDIR)$(prefix)/lib$(LIB_SUFFIX)/pkgconfig/
+-	cd $(blaspp_dir) && make install prefix=$(prefix)
+ 
+ uninstall:
+ 	$(RM)    $(DESTDIR)$(prefix)/include/lapack.hh
+@@ -228,7 +189,7 @@
+ 
+ #-------------------------------------------------------------------------------
+ # tester
+-$(tester): $(tester_obj) $(lib) $(testsweeper) $(libblaspp)
++$(tester): $(tester_obj) $(lib)
+ 	$(LD) $(TEST_LDFLAGS) $(LDFLAGS) $(tester_obj) \
+ 		$(TEST_LIBS) $(LIBS) -o $@
+ 
+@@ -267,8 +228,8 @@
+ #-------------------------------------------------------------------------------
+ # pkgconfig
+ # Keep -std=c++11 in CXXFLAGS. Keep -fopenmp in LDFLAGS.
+-CXXFLAGS_clean = $(filter-out -O% -W% -pedantic -D% -I./include -I$(blaspp_dir)% -MMD -fPIC -fopenmp, $(CXXFLAGS))
+-CPPFLAGS_clean = $(filter-out -O% -W% -pedantic -D% -I./include -I$(blaspp_dir)% -MMD -fPIC -fopenmp, $(CPPFLAGS))
++CXXFLAGS_clean = $(filter-out -O% -W% -pedantic -D% -I./include -I$(abs_prefix)/include% -MMD -fPIC -fopenmp, $(CXXFLAGS))
++CPPFLAGS_clean = $(filter-out -O% -W% -pedantic -D% -I./include -I$(abs_prefix)/include% -MMD -fPIC -fopenmp, $(CPPFLAGS))
+ LDFLAGS_clean  = $(filter-out -fPIC, $(LDFLAGS))
+ 
+ .PHONY: $(pkg)
+
+--- a/test/test.hh
++++ b/test/test.hh
+@@ -6,7 +6,7 @@
+ #ifndef TEST_HH
+ #define TEST_HH
+ 
+-#include "testsweeper.hh"
++#include <testsweeper.hh>
+ #include "lapack/util.hh"
+ #include "matrix_params.hh"
+ #include "matrix_generator.hh"

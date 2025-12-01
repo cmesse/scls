@@ -29,8 +29,14 @@ configure:
     - -DBUILD_SHARED_LIBS=ON
   flavor_args:
     macos:
-    - -DINTERFACE64=OFF
     - -DTESTS=OFF
+  # Integer interface: LP64 (32-bit) vs ILP64 (64-bit)
+  lp64_args:
+    - "-DINTERFACE64=OFF"
+    - "-DICB=ON"
+  ilp64_args:
+    - "-DINTERFACE64=ON"
+    - "-DICB=ON"
 
 build:
   parallel: true

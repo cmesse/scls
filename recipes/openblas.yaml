@@ -29,7 +29,6 @@ configure:
 
 build:
   parallel: true
-  # INTERFACE64 is automatically set based on flavor's math.interface (lp64/ilp64)
   args:
     - "USE_OPENMP=1"
     - "NO_LAPACK=1"
@@ -43,16 +42,24 @@ build:
       - "NO_AVX512=1"
     debug:
       - "TARGET=GENERIC"
+  # Integer interface: LP64 (32-bit) vs ILP64 (64-bit)
+  lp64_args:
+    - "INTERFACE64=0"
+  ilp64_args:
+    - "INTERFACE64=1"
 
 install:
   args:
     - "PREFIX=%{prefix}"
   post:
-    # Create compatibility symlink: libblas -> libopenblas
+    # Create compatibility symlinks: libblas/libcblas -> libopenblas
+    # OpenBLAS includes both BLAS and CBLAS in the same library
     - "cd %{prefix}/lib && ln -sf libopenblas.so libblas.so || true"
+    - "cd %{prefix}/lib && ln -sf libopenblas.so libcblas.so || true"
   flavor_post:
     macos:
       - "cd %{prefix}/lib && ln -sf libopenblas.dylib libblas.dylib || true"
+      - "cd %{prefix}/lib && ln -sf libopenblas.dylib libcblas.dylib || true"
 
 test:
   commands:

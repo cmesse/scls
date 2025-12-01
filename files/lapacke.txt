@@ -1,0 +1,10 @@
+%{prefix}/include/lapacke_utils.h
+%{prefix}/include/lapacke.h
+%{prefix}/include/lapacke_config.h
+%{prefix}/include/lapack.h
+%{prefix}/include/lapacke_mangling.h
+%{prefix}/lib/pkgconfig/lapacke.pc
+%{prefix}/lib/cmake/lapacke-3.12.0/lapacke-config-version.cmake
+%{prefix}/lib/cmake/lapacke-3.12.0/lapacke-config.cmake
+%{prefix}/lib/cmake/lapacke-3.12.0/lapacke-targets.cmake
+%{prefix}/lib/cmake/lapacke-3.12.0/lapacke-targets-release.cmake

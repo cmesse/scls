@@ -1,0 +1,14 @@
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -446,9 +446,9 @@
+ 
+ .SUFFIXES: .c .F .o
+ .F.o:
+-	$(FC) $(OPTF) $(FPIC) -I. -I../include $(INCS) $(IORDERINGSF) $(ORDERINGSF) -c $*.F $(OUTF)$*.o
++	$(FC) $(OPTF) $(FPIC) -I. -I../include $(INCS) $(IORDERINGSF) $(ORDERINGSF) -c $*.F -o $(OUTF)$*.o
+ .c.o:
+-	$(CC) $(OPTC) $(FPIC) -I../include $(INCS) $(CDEFS) $(IORDERINGSC) $(ORDERINGSC) -c $*.c $(OUTC)$*.o
++	$(CC) $(OPTC) $(FPIC) -I../include $(INCS) $(CDEFS) $(IORDERINGSC) $(ORDERINGSC) -c $*.c -o $(OUTC)$*.o
+ 
+ $(ARITH)mumps_c.o:	mumps_c.c
+ 	$(CC) $(OPTC) $(FPIC) -I../include $(INCS) $(CDEFS) -DMUMPS_ARITH=MUMPS_ARITH_$(ARITH) \

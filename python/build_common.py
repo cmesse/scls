@@ -190,6 +190,47 @@ def get_optimization_flags(recipe: Dict, flavor: Dict, compiler: str) -> Tuple[s
     return cflags.strip(), cxxflags.strip(), fflags.strip()
 
 
+def get_interface_args(recipe: Dict, flavor: Dict, section: str = 'configure') -> List[str]:
+    """
+    Get arguments specific to LP64 or ILP64 interface.
+
+    Checks the recipe for 'lp64_args' and 'ilp64_args' keys under the specified
+    section and returns the appropriate list based on the flavor's math.interface setting.
+
+    Args:
+        recipe: The package recipe dictionary
+        flavor: The flavor configuration dictionary
+        section: Which section to look in ('configure' or 'build')
+
+    Returns:
+        List of arguments for the current interface type
+    """
+    args = []
+
+    if section not in recipe:
+        return args
+
+    section_config = recipe[section]
+
+    # Get interface type from flavor (default to lp64)
+    math_config = flavor.get('math', {})
+    interface = math_config.get('interface', 'lp64')
+
+    # Get interface-specific args
+    if interface == 'ilp64' and 'ilp64_args' in section_config:
+        ilp64_args = section_config['ilp64_args']
+        if isinstance(ilp64_args, list):
+            args.extend(ilp64_args)
+        print(f"Adding ILP64 {section} args: {ilp64_args}")
+    elif interface == 'lp64' and 'lp64_args' in section_config:
+        lp64_args = section_config['lp64_args']
+        if isinstance(lp64_args, list):
+            args.extend(lp64_args)
+        print(f"Adding LP64 {section} args: {lp64_args}")
+
+    return args
+
+
 def download_source(url: str, dest_dir: Path, package_name: str, version: str) -> Path:
     """Download source tarball if not already present"""
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -344,15 +385,26 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
         f"-DCMAKE_INSTALL_PREFIX={install_prefix}",
         "-DCMAKE_BUILD_TYPE=Release",
         "-DCMAKE_INSTALL_LIBDIR=lib",
+        # Help CMake find libraries/headers in our prefix (needed for try_run tests)
+        f"-DCMAKE_PREFIX_PATH={prefix}",
+        f"-DCMAKE_LIBRARY_PATH={prefix}/lib",
+        f"-DCMAKE_INCLUDE_PATH={prefix}/include",
+        # Pass linker flags so libraries in our prefix are found at link time
+        f"-DCMAKE_SHARED_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib",
+        f"-DCMAKE_EXE_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib",
     ]
 
     # Get defaults configuration if it exists
     defaults = recipe.get('configure', {}).get('defaults', {})
 
     # Check if we should add host/cross-compilation flags
+    # NOTE: For native builds, do NOT set CMAKE_SYSTEM_NAME or CMAKE_SYSTEM_PROCESSOR
+    # as this tells CMake it's cross-compiling and disables try_run() tests.
+    # These should only be set for actual cross-compilation scenarios.
     use_host_flags = defaults.get('host_flags', True)
-    if use_host_flags:
-        # For CMake, we can set the system name based on the host triple
+    cross_compile = defaults.get('cross_compile', False)
+    if use_host_flags and cross_compile:
+        # Only set these for actual cross-compilation
         if 'darwin' in host:
             args.append("-DCMAKE_SYSTEM_NAME=Darwin")
         elif 'linux' in host:
@@ -717,93 +769,124 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None) ->
     Registry files are stored in {prefix}/share/scls/registry/{package}.yaml
     and contain package metadata, dependencies, and build flags.
 
-    If a .pc file exists, the flags are extracted from it (via pkg-config or direct parsing).
+    This function is designed to NEVER fail - it will always write at least
+    a minimal registry entry with name and version.
 
     Args:
         prefix: The installation prefix
         recipe: The package recipe
         flavor_name: Optional flavor name for flavor-specific settings
     """
+    # Extract essential info first - these should never fail
+    package_name = recipe.get('name', 'unknown')
+    version = str(recipe.get('version', '0.0.0'))
+
+    # Create registry directory
     registry_dir = prefix / "share" / "scls" / "registry"
-    registry_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        registry_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"ERROR: Failed to create registry directory {registry_dir}: {e}")
+        return
 
-    package_name = recipe['name']
-    version = str(recipe['version'])
+    registry_file = registry_dir / f"{package_name}.yaml"
 
-    # Get dependencies
-    dependencies = get_package_dependencies(recipe, flavor_name)
+    # Start with minimal entry that we'll enhance
+    registry_entry = {
+        'name': package_name,
+        'version': version,
+        'dependencies': [],
+        'cflags': '',
+        'ldflags': '',
+        'features': {
+            'fortran': False,
+            'openmp': False,
+            'mpi': False,
+            'math': False
+        },
+        'has_pc_file': False
+    }
 
-    # Try to get flags from pkg-config (if .pc file exists and pkg-config is available)
-    pc_cflags = get_package_cflags(prefix, package_name)
-    pc_ldflags = get_package_libs(prefix, package_name)
+    # Try to get dependencies
+    try:
+        registry_entry['dependencies'] = get_package_dependencies(recipe, flavor_name)
+    except Exception as e:
+        print(f"Warning: Failed to get dependencies for {package_name}: {e}")
 
-    # If pkg-config failed, try parsing .pc file directly
+    # Try to get flags from pkg-config
+    pc_cflags = None
+    pc_ldflags = None
     has_pc_file = False
-    pkgconfig_dir = prefix / "lib" / "pkgconfig"
-    pc_file = pkgconfig_dir / f"{package_name}.pc"
 
-    if pc_cflags is None and pc_ldflags is None and pc_file.exists():
-        pc_cflags, pc_ldflags = parse_pc_file(pc_file, prefix)
-        if pc_cflags is not None or pc_ldflags is not None:
+    try:
+        pc_cflags = get_package_cflags(prefix, package_name)
+        pc_ldflags = get_package_libs(prefix, package_name)
+
+        # If pkg-config failed, try parsing .pc file directly
+        pkgconfig_dir = prefix / "lib" / "pkgconfig"
+        pc_file = pkgconfig_dir / f"{package_name}.pc"
+
+        if pc_cflags is None and pc_ldflags is None and pc_file.exists():
+            pc_cflags, pc_ldflags = parse_pc_file(pc_file, prefix)
+            if pc_cflags is not None or pc_ldflags is not None:
+                has_pc_file = True
+                print(f"Registry: Parsed .pc file directly for {package_name}")
+        elif pc_cflags is not None or pc_ldflags is not None:
             has_pc_file = True
-            print(f"Registry: Parsed .pc file directly for {package_name}")
-    elif pc_cflags is not None or pc_ldflags is not None:
-        has_pc_file = True
+    except Exception as e:
+        print(f"Warning: Failed to get pkg-config flags for {package_name}: {e}")
 
     # Default flags based on prefix
     default_cflags = f"-I{prefix}/include"
     default_ldflags = f"-L{prefix}/lib -Wl,-rpath,{prefix}/lib"
 
-    # Check if this is a library by looking for lib files (including versioned ones)
-    lib_dir = prefix / "lib"
+    # Check if this is a library
     is_library = False
-    if lib_dir.exists():
-        # Check for any library file matching the package name
-        for pattern in [f"lib{package_name}.so*", f"lib{package_name}.dylib", f"lib{package_name}.*.dylib", f"lib{package_name}.a"]:
-            if list(lib_dir.glob(pattern)):
-                is_library = True
-                break
-
-    # Also consider it a library if .pc file has Libs
-    if pc_ldflags:
-        is_library = True
+    try:
+        lib_dir = prefix / "lib"
+        if lib_dir.exists():
+            for pattern in [f"lib{package_name}.so*", f"lib{package_name}.dylib",
+                          f"lib{package_name}.*.dylib", f"lib{package_name}.a"]:
+                if list(lib_dir.glob(pattern)):
+                    is_library = True
+                    break
+        if pc_ldflags:
+            is_library = True
+    except Exception as e:
+        print(f"Warning: Failed to check library status for {package_name}: {e}")
 
     # Determine final flags
-    features = recipe.get('features', {})
-
-    if pc_cflags is not None:
-        cflags = pc_cflags
-    elif is_library:
-        cflags = default_cflags
-    else:
-        cflags = ""
-
-    if pc_ldflags is not None:
-        ldflags = pc_ldflags
-    elif is_library:
-        ldflags = default_ldflags
-    else:
-        ldflags = ""
-
-    # Add rpath for every -L directory
-    if ldflags:
-        ldflags = add_rpath_for_libdirs(ldflags)
-
-    # Build registry entry
-    registry_entry = {
-        'name': package_name,
-        'version': version,
-        'dependencies': dependencies,
-        'cflags': cflags,
-        'ldflags': ldflags,
-        'features': {
+    try:
+        features = recipe.get('features', {})
+        registry_entry['features'] = {
             'fortran': features.get('fortran', False),
             'openmp': features.get('openmp', False),
             'mpi': features.get('mpi', False),
             'math': features.get('math', False)
-        },
-        'has_pc_file': has_pc_file
-    }
+        }
+    except Exception as e:
+        print(f"Warning: Failed to get features for {package_name}: {e}")
+
+    # Set cflags
+    if pc_cflags is not None:
+        registry_entry['cflags'] = pc_cflags
+    elif is_library:
+        registry_entry['cflags'] = default_cflags
+
+    # Set ldflags
+    if pc_ldflags is not None:
+        registry_entry['ldflags'] = pc_ldflags
+    elif is_library:
+        registry_entry['ldflags'] = default_ldflags
+
+    # Add rpath for every -L directory
+    try:
+        if registry_entry['ldflags']:
+            registry_entry['ldflags'] = add_rpath_for_libdirs(registry_entry['ldflags'])
+    except Exception as e:
+        print(f"Warning: Failed to add rpath for {package_name}: {e}")
+
+    registry_entry['has_pc_file'] = has_pc_file
 
     # Log what we did
     if has_pc_file:
@@ -813,11 +896,21 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None) ->
     else:
         print(f"Registry: {package_name} is a tool (no library flags needed)")
 
-    registry_file = registry_dir / f"{package_name}.yaml"
-    with open(registry_file, 'w') as f:
-        yaml.dump(registry_entry, f, default_flow_style=False, sort_keys=False)
-
-    print(f"Registry entry written: {registry_file}")
+    # Write the registry file - this is critical and must not fail silently
+    try:
+        with open(registry_file, 'w') as f:
+            yaml.dump(registry_entry, f, default_flow_style=False, sort_keys=False)
+        print(f"Registry entry written: {registry_file}")
+    except Exception as e:
+        print(f"ERROR: Failed to write registry file {registry_file}: {e}")
+        # Try one more time with absolute minimal entry
+        try:
+            minimal_entry = {'name': package_name, 'version': version}
+            with open(registry_file, 'w') as f:
+                yaml.dump(minimal_entry, f)
+            print(f"Registry: Wrote minimal entry for {package_name}")
+        except Exception as e2:
+            print(f"CRITICAL: Cannot write registry entry for {package_name}: {e2}")
 
 
 def check_package_in_registry(prefix: Path, package_name: str) -> bool:

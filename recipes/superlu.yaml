@@ -1,0 +1,68 @@
+name: superlu
+version: 6.0.1
+summary: Subroutines to directly solve sparse linear systems
+homepage: https://github.com/xiaoyeli/superlu
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/xiaoyeli/superlu/archive/refs/tags/v%{version}.tar.gz
+
+requires:
+  all:
+    - cmake
+    - metis
+
+features:
+  fortran: true
+  mpi: false
+  openmp: false
+  math: serial
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DTPL_ENABLE_METISLIB=ON"
+    - "-DTPL_METIS_INCLUDE_DIRS=%{prefix}/include"
+    - "-Denable_fortran=ON"
+    - "-Denable_internal_blaslib=OFF"
+  # Integer interface: LP64 (32-bit) vs ILP64 (64-bit)
+  lp64_args:
+    - "-Denable_64bit_blas=OFF"
+  ilp64_args:
+    - "-Denable_64bit_blas=ON"
+  flavor_args:
+    macos:
+      - "-DTPL_METIS_LIBRARIES=%{prefix}/lib/libmetis.dylib"
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
+    debug:
+      - "-DTPL_METIS_LIBRARIES=%{prefix}/lib/libmetis.so"
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libblas.so;%{prefix}/lib/liblapack.so"
+    mkl:
+      - "-DTPL_METIS_LIBRARIES=%{prefix}/lib/libmetis.so"
+      # MKL BLAS provided via environment
+  optimization:
+    O_level: 3
+
+build:
+  parallel: true
+  post:
+    # Manually create shared libraries from object files if needed
+    - "if [ -d ./SRC/CMakeFiles/superlu.dir ] && [ ! -f ./SRC/libsuperlu.so ] && [ ! -f ./SRC/libsuperlu.dylib ]; then %{cc} %{ldflags} -shared -o ./SRC/libsuperlu.so ./SRC/CMakeFiles/superlu.dir/*.o 2>/dev/null || true; fi"
+    - "if [ -d ./FORTRAN/CMakeFiles/superlu_fortran.dir ] && [ ! -f ./FORTRAN/libsuperlu_fortran.so ] && [ ! -f ./FORTRAN/libsuperlu_fortran.dylib ]; then %{fc} %{ldflags} -shared -o ./FORTRAN/libsuperlu_fortran.so ./FORTRAN/CMakeFiles/superlu_fortran.dir/*.o 2>/dev/null || true; fi"
+
+install:
+  post:
+    # Install manually created shared libs if they exist
+    - "if [ -f ./SRC/libsuperlu.so ]; then install -m 755 ./SRC/libsuperlu.so %{buildroot}/%{prefix}/lib/; fi"
+    - "if [ -f ./FORTRAN/libsuperlu_fortran.so ]; then install -m 755 ./FORTRAN/libsuperlu_fortran.so %{buildroot}/%{prefix}/lib/; fi"
+
+test:
+  commands:
+    - "make test"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lsuperlu"

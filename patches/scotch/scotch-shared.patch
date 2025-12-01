@@ -1,0 +1,142 @@
+--- a/src/libscotch/CMakeLists.txt
++++ b/src/libscotch/CMakeLists.txt
+@@ -512,8 +512,10 @@
+   wgraph_part_zr.h
+   wgraph_store.c)
+ 
+-add_library(scotch
++add_library(scotch SHARED
+   ${SCOTCH_C_SOURCES})
++
++set_target_properties(scotch PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/lib")
+ add_library(SCOTCH::scotch ALIAS scotch)
+ set_target_properties(scotch PROPERTIES VERSION ${SCOTCH_VERSION_LONG}
+   SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE})
+@@ -589,8 +591,9 @@
+   target_compile_definitions(scotch PRIVATE SCOTCH_DEBUG_ALL)
+ endif()
+ 
+-add_library(scotcherr library_error.c)
++add_library(scotcherr SHARED library_error.c)
+ add_library(SCOTCH::scotcherr ALIAS scotcherr)
++set_target_properties(scotcherr PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/lib")
+ set_target_properties(scotcherr PROPERTIES VERSION ${SCOTCH_VERSION_LONG}
+   SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE})
+ target_include_directories(scotcherr PUBLIC
+@@ -600,7 +603,7 @@
+ 
+ add_dependencies(scotcherr scotch_h)
+ 
+-add_library(scotcherrexit library_error_exit.c)
++add_library(scotcherrexit SHARED library_error_exit.c)
+ add_library(SCOTCH::scotcherrexit ALIAS scotcherrexit)
+ set_target_properties(scotcherrexit PROPERTIES VERSION ${SCOTCH_VERSION_LONG}
+   SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE})
+@@ -609,6 +612,7 @@
+   $<BUILD_INTERFACE:${GENERATED_INCLUDE_DIR}>
+   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+ 
++set_target_properties(scotcherrexit PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/lib")
+ add_dependencies(scotcherrexit scotch_h)
+ 
+ #################
+@@ -830,10 +834,12 @@
+   vdgraph_store.c)
+ 
+ if(BUILD_PTSCOTCH)
+-  add_library(ptscotch
++  add_library(ptscotch SHARED
+     ${PTSCOTCH_C_SOURCES})
+   add_library(SCOTCH::ptscotch ALIAS ptscotch)
+ 
++  set_target_properties(ptscotch PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/lib")
++
+   set_target_properties(ptscotch PROPERTIES
+     VERSION ${SCOTCH_VERSION_LONG}
+     SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE}
+@@ -858,9 +864,11 @@
+     target_link_libraries(ptscotch PRIVATE Threads::Threads ${THREADS_PTHREADS_WIN32_LIBRARY})
+   endif()
+ 
+-  add_library(ptscotcherr library_error.c)
++  add_library(ptscotcherr SHARED library_error.c)
+   add_library(SCOTCH::ptscotcherr ALIAS ptscotcherr)
+ 
++  set_target_properties(ptscotcherr PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/lib")
++
+   set_target_properties(ptscotcherr PROPERTIES VERSION ${SCOTCH_VERSION_LONG}
+     SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE})
+   target_include_directories(ptscotcherr PUBLIC
+@@ -871,8 +879,9 @@
+ 
+   add_dependencies(ptscotcherr ptscotch_h scotch_h)
+ 
+-  add_library(ptscotcherrexit library_error_exit.c)
++  add_library(ptscotcherrexit SHARED library_error_exit.c)
+   add_library(SCOTCH::ptscotcherrexit ALIAS ptscotcherrexit)
++  set_target_properties(ptscotcherrexit PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/lib")
+   set_target_properties(ptscotcherrexit PROPERTIES VERSION ${SCOTCH_VERSION_LONG}
+     SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE})
+   target_include_directories(ptscotcherrexit PUBLIC
+--- a/src/libscotchmetis/CMakeLists.txt
++++ b/src/libscotchmetis/CMakeLists.txt
+@@ -72,7 +72,7 @@
+ 
+ # libScotchMeTiS
+ foreach(version 3 5)
+-  add_library(scotchmetisv${version}
++  add_library(scotchmetisv${version} SHARED
+     metis_graph_order.c
+     metis_graph_order_f.c
+     metis_graph_part.c
+@@ -90,6 +90,8 @@
+     ${GENERATED_INCLUDE_DIR}/metisf.h)
+   add_library(SCOTCH::scotchmetisv${version} ALIAS scotchmetisv${version})
+ 
++  set_target_properties(scotchmetisv${version} PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/lib")
++ 
+   set_target_properties(scotchmetisv${version} PROPERTIES VERSION ${SCOTCH_VERSION_LONG}
+     SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE})
+   target_compile_definitions(scotchmetisv${version} PUBLIC SCOTCH_METIS_VERSION=${version})
+@@ -159,7 +161,7 @@
+ 
+   # libPTScotchParMeTiS
+   foreach(version 3)
+-    add_library(ptscotchparmetisv${version}
++    add_library(ptscotchparmetisv${version} SHARED
+       parmetis_dgraph_dual.c
+       parmetis_dgraph_dual_f.c
+       parmetis_dgraph_order.c
+@@ -171,6 +173,8 @@
+       ${GENERATED_INCLUDE_DIR}/ptscotch.h
+       ${GENERATED_INCLUDE_DIR}/parmetis.h)
+ 
++    set_target_properties(ptscotchparmetisv${version} PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/lib")
++
+     set_target_properties(ptscotchparmetisv${version} PROPERTIES VERSION ${SCOTCH_VERSION_LONG}
+       SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE})
+     target_compile_definitions(ptscotchparmetisv${version} PUBLIC SCOTCH_PTSCOTCH SCOTCH_METIS_VERSION=${version})
+--- a/src/esmumps/CMakeLists.txt
++++ b/src/esmumps/CMakeLists.txt
+@@ -93,11 +93,12 @@
+   fax.h
+   ${GENERATED_INCLUDE_DIR}/esmumps.h)
+ 
+-add_library(esmumps ${esmumps_src} ${esmumps_headers})
++add_library(esmumps SHARED ${esmumps_src} ${esmumps_headers})
+ add_library(SCOTCH::esmumps ALIAS esmumps)
+ 
+ add_dependencies(esmumps esmumps_h)
+ 
++set_target_properties(esmumps PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/lib")
+ set_target_properties(esmumps PROPERTIES PUBLIC_HEADER "${GENERATED_INCLUDE_DIR}/esmumps.h")
+ set_target_properties(esmumps PROPERTIES VERSION ${SCOTCH_VERSION_LONG}
+   SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE})
+@@ -148,6 +149,7 @@
+ # Dummy PTEsMUMPS library file
+ if(BUILD_PTSCOTCH)
+   add_library(ptesmumps ${esmumps_src} ${esmumps_headers})
++  set_target_properties(ptesmumps PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_INSTALL_PREFIX}/lib")
+   add_library(SCOTCH::ptesmumps ALIAS ptesmumps)
+ 
+   if(APPLE)

@@ -23,7 +23,8 @@ from build_common import (
     add_rpath_for_libdirs,
     get_all_registry_entries,
     get_subpackages_for_flavor,
-    get_subpackage_dependencies
+    get_subpackage_dependencies,
+    get_interface_args
 )
 from patch_common import (
     copy_patches_to_sources,
@@ -334,6 +335,9 @@ class RPMBuilder:
                 for arg in self.recipe['configure']['flavor_args'][flavor_name]:
                     args.append(arg)
 
+        # Add interface-specific arguments (LP64/ILP64)
+        args.extend(get_interface_args(self.recipe, self.flavor))
+
         return args
 
     def get_direct_configure_command(self) -> str:
@@ -469,6 +473,9 @@ class RPMBuilder:
         if configure_type == 'cmake':
             cmake_args = self.get_cmake_args_with_paths()
 
+        # Get build args for make-based builds
+        build_args = self.get_build_args()
+
         # Prepare template variables
         context = {
             'flavor': self.flavor,
@@ -502,6 +509,7 @@ class RPMBuilder:
             'install_pre_commands': install_pre_commands,  # NEW: Pre-install commands
             'install_post_commands': install_post_commands,  # NEW: Post-install commands
             'cmake_args': cmake_args,
+            'build_args': build_args,  # For make-based builds (configure.type: none)
             'configure_env_vars': configure_env_vars,
             'patches': self.get_patches(),
             'test_commands': self.get_test_commands(),
@@ -551,6 +559,9 @@ class RPMBuilder:
         """Get CMake arguments with proper path substitutions"""
         args = get_cmake_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
 
+        # Add interface-specific arguments (LP64/ILP64)
+        args.extend(get_interface_args(self.recipe, self.flavor))
+
         # Process arguments for MKL and CUDA paths
         processed_args = []
         for arg in args:
@@ -570,6 +581,25 @@ class RPMBuilder:
             processed_args.append(arg)
 
         return processed_args
+
+    def get_build_args(self) -> List[str]:
+        """Get build arguments for make-based builds (configure.type: none)"""
+        args = []
+
+        # Add recipe build args
+        if 'build' in self.recipe and 'args' in self.recipe['build']:
+            args.extend(self.recipe['build']['args'])
+
+        # Add flavor-specific build args
+        if 'build' in self.recipe and 'flavor_args' in self.recipe['build']:
+            flavor_name = self.flavor.get('name', '')
+            if flavor_name in self.recipe['build']['flavor_args']:
+                args.extend(self.recipe['build']['flavor_args'][flavor_name])
+
+        # Add LP64/ILP64 interface-specific build args
+        args.extend(get_interface_args(self.recipe, self.flavor, 'build'))
+
+        return args
 
     def get_rpm_requires(self) -> tuple[list, list]:
         """Get RPM BuildRequires and Requires from recipe and flavor-specific settings"""
@@ -715,7 +745,7 @@ class RPMBuilder:
 
     def get_patches(self) -> list:
         """Get list of patches for SPEC file generation"""
-        patches = get_all_patches(self.recipe, self.package)
+        patches = get_all_patches(self.recipe, self.package, flavor=self.flavor)
 
         # Convert to RPM SPEC format
         rpm_patches = []

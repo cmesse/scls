@@ -44,6 +44,36 @@ def load_yaml_files(directory, flavor=None):
                         if 'gcc' not in requires['all']:
                             requires['all'] = ['gcc'] + requires['all']
 
+                # Packages with math features depend on math libraries
+                features = data.get('features', {})
+                math_type = features.get('math', None)
+                if math_type in ('serial', 'parallel', True):
+                    # Convert requires to dict format if needed for flavor-specific math deps
+                    if isinstance(requires, list):
+                        requires = {'all': requires}
+                    elif not isinstance(requires, dict):
+                        requires = {'all': []}
+
+                    # Add math library dependencies per flavor
+                    # macos: openblas + lapack
+                    if 'macos' not in requires:
+                        requires['macos'] = []
+                    if 'openblas' not in requires['macos'] and pkg_name != 'openblas':
+                        requires['macos'].append('openblas')
+                    if 'lapack' not in requires['macos'] and pkg_name != 'lapack':
+                        requires['macos'].append('lapack')
+
+                    # debug: blas + lapack (reference implementations from lapack recipe)
+                    if 'debug' not in requires:
+                        requires['debug'] = []
+                    if 'blas' not in requires['debug'] and pkg_name not in ('blas', 'lapack'):
+                        requires['debug'].append('blas')
+                    if 'lapack' not in requires['debug'] and pkg_name != 'lapack':
+                        requires['debug'].append('lapack')
+
+                    # mkl: Intel MKL provides BLAS/LAPACK, no additional deps needed
+                    # MKL is provided by Intel oneAPI installation, not built by SCLS
+
                 package = {
                     'name': pkg_name,
                     'requires': requires,

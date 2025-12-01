@@ -1,0 +1,46 @@
+name: metis
+version: 5.1.0
+summary: Serial Graph Partitioning and Fill-reducing Matrix Ordering
+homepage: http://glaros.dtc.umn.edu/gkhome/views/metis
+license: Apache-2.0
+
+source:
+  url: http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-%{version}.tar.gz
+
+patches:
+  all:
+    - metis_min_cmake_3.10.patch
+    - metis-libmetis.patch
+    - metis-GKlib.patch
+  # 64-bit index support for ILP64 flavors
+  ilp64:
+    - metis-width-datatype.patch
+
+requires:
+  all:
+    - cmake
+
+features:
+  fortran: false
+  mpi: false
+  openmp: true
+  math: false
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DSHARED=ON"
+    - "-DOPENMP=ON"
+
+  optimization:
+    O_level: 2
+
+build:
+  parallel: true
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lmetis"

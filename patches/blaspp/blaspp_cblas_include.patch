@@ -1,0 +1,15 @@
+--- a/cmake/CBLASConfig.cmake
++++ b/cmake/CBLASConfig.cmake
+@@ -35,6 +35,12 @@ if ("${blaspp_defs_}" MATCHES "HAVE_ACCELERATE")
+     endforeach()
+ endif()
+
++# For OpenBLAS and other BLAS libraries, check standard include paths
++# CMAKE_INCLUDE_PATH should be set by the build system
++if (NOT blaspp_cblas_include AND DEFINED CMAKE_INCLUDE_PATH)
++    set( blaspp_cblas_include "${CMAKE_INCLUDE_PATH}" )
++endif()
++
+ #-------------------------------------------------------------------------------
+ set( lib_list ";-lcblas" )
+ message( DEBUG "lib_list ${lib_list}" )

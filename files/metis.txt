@@ -1,0 +1,9 @@
+%{prefix}/bin/ndmetis
+%{prefix}/bin/cmpfillin
+%{prefix}/bin/m2gmetis
+%{prefix}/bin/mpmetis
+%{prefix}/bin/graphchk
+%{prefix}/bin/gpmetis
+%{prefix}/include/metis.h
+%{prefix}/lib/libmetis.0.dylib
+%{prefix}/lib/libmetis.dylib

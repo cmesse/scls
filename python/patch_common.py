@@ -9,31 +9,76 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 
-def get_patches_from_recipe(recipe: Dict) -> List[Dict]:
+def get_patches_from_recipe(recipe: Dict, flavor: Dict = None) -> List[Dict]:
     """
-    Extract patch information from recipe - simplified approach:
-    1. patches: [list] format (recommended - auto-discover files)
-    2. Legacy patch commands (still supported)
+    Extract patch information from recipe - supports multiple formats:
+    1. patches: [list] format (simple list of patches)
+    2. patches: {all: [...], ilp64: [...], flavor: [...]} format (conditional patches)
+
+    Conditional patches are applied based on:
+    - all: always applied
+    - ilp64: applied when flavor math.interface == 'ilp64'
+    - lp64: applied when flavor math.interface == 'lp64' (or default)
+    - <flavor_name>: applied for specific flavor (e.g., macos, debug, mkl)
     """
     patches = []
 
-    #  Simple patches list
-    if 'patches' in recipe:
-        for patch_entry in recipe['patches']:
-            if isinstance(patch_entry, str):
-                # Simple filename - default to -p1
-                patches.append({
-                    'file': patch_entry,
-                    'strip': 1,
-                    'source': 'recipe_patches'
-                })
-            elif isinstance(patch_entry, dict):
-                # Detailed patch specification with optional strip level
-                patches.append({
-                    'file': patch_entry['file'],
-                    'strip': patch_entry.get('strip', 1),  # Default to -p1
-                    'source': 'recipe_patches'
-                })
+    if 'patches' not in recipe:
+        return patches
+
+    patch_config = recipe['patches']
+
+    # Determine interface type from flavor
+    interface = 'lp64'  # default
+    flavor_name = ''
+    if flavor:
+        flavor_name = flavor.get('name', '')
+        math_config = flavor.get('math', {})
+        interface = math_config.get('interface', 'lp64')
+
+    def add_patch_entry(patch_entry):
+        """Helper to add a patch entry in either string or dict format"""
+        if isinstance(patch_entry, str):
+            patches.append({
+                'file': patch_entry,
+                'strip': 1,
+                'source': 'recipe_patches'
+            })
+        elif isinstance(patch_entry, dict):
+            patches.append({
+                'file': patch_entry['file'],
+                'strip': patch_entry.get('strip', 1),
+                'source': 'recipe_patches'
+            })
+
+    # Handle dict format with conditional keys
+    if isinstance(patch_config, dict):
+        # Apply 'all' patches (always)
+        if 'all' in patch_config:
+            for patch_entry in patch_config['all']:
+                add_patch_entry(patch_entry)
+
+        # Apply interface-specific patches (ilp64 or lp64)
+        if interface == 'ilp64' and 'ilp64' in patch_config:
+            print(f"Applying ILP64 patches (64-bit integers)")
+            for patch_entry in patch_config['ilp64']:
+                add_patch_entry(patch_entry)
+        elif interface == 'lp64' and 'lp64' in patch_config:
+            print(f"Applying LP64 patches (32-bit integers)")
+            for patch_entry in patch_config['lp64']:
+                add_patch_entry(patch_entry)
+
+        # Apply flavor-specific patches
+        if flavor_name and flavor_name in patch_config:
+            print(f"Applying {flavor_name}-specific patches")
+            for patch_entry in patch_config[flavor_name]:
+                add_patch_entry(patch_entry)
+
+    # Handle simple list format (legacy)
+    elif isinstance(patch_config, list):
+        for patch_entry in patch_config:
+            add_patch_entry(patch_entry)
+
     return patches
 
 
@@ -93,7 +138,7 @@ def infer_patch_level(patch_file: Path) -> int:
         return 1
 
 
-def get_all_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("patches")) -> List[Dict]:
+def get_all_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("patches"), flavor: Dict = None) -> List[Dict]:
     """
     Get all patches for a package, with smart auto-discovery
     Priority: recipe-specified patches first, then auto-discovered
@@ -101,7 +146,7 @@ def get_all_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("p
     patches = []
 
     # First, get patches specified in recipe (if any)
-    recipe_patches = get_patches_from_recipe(recipe)
+    recipe_patches = get_patches_from_recipe(recipe, flavor)
     patches.extend(recipe_patches)
 
     # If no patches specified in recipe, auto-discover all patches
@@ -124,14 +169,14 @@ def get_all_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("p
     return patches
 
 
-def copy_patches_to_sources(recipe: Dict, patches_dir: Path, sources_dir: Path, package_name: str) -> None:
+def copy_patches_to_sources(recipe: Dict, patches_dir: Path, sources_dir: Path, package_name: str, flavor: Dict = None) -> None:
     """
     Enhanced version that copies all relevant patches to sources directory
     """
     if 'source' not in recipe:
         return
 
-    patches = get_all_patches(recipe, package_name, patches_dir)
+    patches = get_all_patches(recipe, package_name, patches_dir, flavor)
 
     if not patches:
         print(f"No patches found for {package_name}")
@@ -155,11 +200,11 @@ def copy_patches_to_sources(recipe: Dict, patches_dir: Path, sources_dir: Path, 
             print(f"Warning: Patch file not found: {src_path}")
 
 
-def apply_patches(source_dir: Path, recipe: Dict, package_name: str, patches_dir: Path = Path("patches")) -> None:
+def apply_patches(source_dir: Path, recipe: Dict, package_name: str, patches_dir: Path = Path("patches"), flavor: Dict = None) -> None:
     """
     Enhanced patch application with better error handling and logging
     """
-    patches = get_all_patches(recipe, package_name, patches_dir)
+    patches = get_all_patches(recipe, package_name, patches_dir, flavor)
 
     if not patches:
         print(f"No patches to apply for {package_name}")

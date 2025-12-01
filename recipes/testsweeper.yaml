@@ -1,0 +1,40 @@
+name: testsweeper
+version: 2025.05.28
+summary: C++ testing framework for parameter sweeps
+homepage: https://github.com/icl-utk-edu/testsweeper
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/icl-utk-edu/testsweeper/releases/download/v%{version}/testsweeper-%{version}.tar.gz
+
+requires:
+  all:
+    - cmake
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-Dbuild_tests=ON"
+  optimization:
+    O_level: 2
+
+build:
+  parallel: true
+  in_source: false
+
+test:
+  commands:
+    - "make test"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -ltestsweeper"

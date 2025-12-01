@@ -51,11 +51,18 @@ configure:
 
   type: autotools
   args:
+    - --enable-bootstrap
     - --enable-checking=release
     - --enable-languages=c,c++,fortran,lto
     - --with-system-zlib
+    - --enable-shared
+    - --disable-static
+    - --enable-threads=posix
+    - --enable-__cxa_atexit
+    - --enable-plugin
     - --disable-nls
     - --disable-multilib
+    - --without-isl
 
   flavor_args:
     macos:

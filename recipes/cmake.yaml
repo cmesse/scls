@@ -3,6 +3,7 @@ version: 4.2.0
 summary: Cross-platform make system
 homepage: https://cmake.org/
 license: BSD-3-Clause
+bootstrap: true
 source:
   url: https://github.com/Kitware/CMake/releases/download/v%{version}/cmake-%{version}.tar.gz
 

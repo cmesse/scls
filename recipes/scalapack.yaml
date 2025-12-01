@@ -8,6 +8,10 @@ license: BSD
 source:
   url: https://github.com/Reference-ScaLAPACK/scalapack/archive/refs/tags/v%{version}.tar.gz
 
+patches:
+  all:
+    - scalapack_fix_prototypes.patch
+
 requires:
   all:
     - openmpi
@@ -33,6 +37,11 @@ configure:
     - -DCMAKE_Fortran_FLAGS='%{fcflags} -fallow-argument-mismatch'
     - -DMPI_BASE_DIR=%{prefix}
     - -DCMAKE_POLICY_VERSION_MINIMUM=4.0
+  # Integer interface: LP64 (32-bit) vs ILP64 (64-bit)
+  lp64_args:
+    - "-DINTERFACE64=OFF"
+  ilp64_args:
+    - "-DINTERFACE64=ON"
   optimization:
     O_level: 2
     strict_aliasing: true

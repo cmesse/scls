@@ -1,0 +1,32 @@
+--- a/GKlib/CMakeLists.txt
++++ b/GKlib/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 2.8)
++cmake_minimum_required(VERSION 3.10)
+ project(GKlib)
+ 
+ get_filename_component(abs "." ABSOLUTE)
+@@ -7,7 +7,12 @@
+ include(GKlibSystem.cmake)
+ 
+ include_directories(".")
+-add_library(GKlib STATIC ${GKlib_sources})
++if(SHARED)
++  add_library(GKlib SHARED ${GKlib_sources})
++else()
++  add_library(GKlib STATIC ${GKlib_sources})
++endif(SHARED)
++
+ if(UNIX)
+   target_link_libraries(GKlib m)
+ endif(UNIX)
+@@ -16,6 +21,6 @@
+ add_subdirectory("test")
+ 
+ install(TARGETS GKlib
+-  ARCHIVE DESTINATION lib
+-  LIBRARY DESTINATION lib)
+-install(FILES ${GKlib_includes} DESTINATION include)
++  ARCHIVE DESTINATION lib${LIB_SUFFIX})
++  LIBRARY DESTINATION lib${LIB_SUFFIX}))
++install(FILES ${GKlib_includes} DESTINATION include/metis)

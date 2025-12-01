@@ -1,0 +1,29 @@
+Description: include headers
+ Certain headers are missing, which prevents successful builds under
+ gcc 7 or when emulating parmetis
+---
+The information above should follow the Patch Tagging Guidelines, please
+checkout http://dep.debian.net/deps/dep3/ to learn about the format. Here
+are templates for supplementary fields that you might want to add:
+
+Origin: <vendor|upstream|other>, <url of original patch>
+Bug: <url in upstream bugtracker>
+Bug-Debian: https://bugs.debian.org/<bugnumber>
+Bug-Ubuntu: https://launchpad.net/bugs/<bugnumber>
+Forwarded: <no|not-needed|url proving that it has been forwarded>
+Reviewed-By: <name and email of someone who approved the patch>
+Last-Update: 2017-03-31
+
+Index: scotch/src/libscotch/library_pt.h
+===================================================================
+--- scotch.orig/src/libscotch/library_pt.h	2022-01-02 23:41:51.162930469 +0100
++++ scotch/src/libscotch/library_pt.h	2022-01-02 23:41:51.154930424 +0100
+@@ -79,6 +79,8 @@
+ 
+ /*+ Parallel processing flag. +*/
+ 
++#include <mpi.h>
++
+ #ifndef SCOTCH_PTSCOTCH
+ #define SCOTCH_DUMMYPTFLAG
+ #endif /* SCOTCH_PTSCOTCH */

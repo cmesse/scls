@@ -1,0 +1,8 @@
+%{prefix}/include/testsweeper.hh
+%{prefix}/lib/libtestsweeper.dylib
+%{prefix}/lib/libtestsweeper.2.0.0.dylib
+%{prefix}/lib/libtestsweeper.2.dylib
+%{prefix}/lib/cmake/testsweeper/testsweeperTargets-release.cmake
+%{prefix}/lib/cmake/testsweeper/testsweeperConfigVersion.cmake
+%{prefix}/lib/cmake/testsweeper/testsweeperTargets.cmake
+%{prefix}/lib/cmake/testsweeper/testsweeperConfig.cmake

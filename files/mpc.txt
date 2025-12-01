@@ -1,5 +1,5 @@
 %{prefix}/include/mpc.h
-%{prefix}/lib/libmpc.so
-%{prefix}/lib/libmpc.so.*
-%{prefix}/share/info/dir
+%{prefix}/lib/libmpc.dylib
+%{prefix}/lib/libmpc.3.dylib
 %{prefix}/share/info/mpc.info
+%{prefix}/share/info/dir

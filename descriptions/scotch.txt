@@ -1,0 +1,4 @@
+Scotch is a software package for graph and mesh/hypergraph partitioning and
+sparse matrix ordering. The parallel scotch libraries (PT-Scotch) provide
+MPI-based parallel graph partitioning capabilities.
+

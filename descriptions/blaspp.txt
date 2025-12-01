@@ -1,0 +1,18 @@
+The Basic Linear Algebra Subprograms (BLAS) have been around for many
+decades and serve as the de facto standard for performance-portable and
+numerically robust implementation of essential linear algebra
+functionality. Originally, they were written in Fortran, and later
+furnished with a C API (CBLAS).
+
+The objective of BLAS++ is to provide a convenient, performance
+oriented API for development in the C++ language, that,
+for the most part, preserves established conventions, while, at the
+same time, takes advantages of modern C++ features, such as:
+namespaces, templates, exceptions, etc.
+
+BLAS++ is part of the SLATE project
+(Software for Linear Algebra Targeting Exascale), which is funded by
+the Department of Energy as part of its Exascale Computing Initiative
+(ECP). Closely related to BLAS++ is the LAPACK++ project,
+which provides a C++ API for LAPACK.
+
