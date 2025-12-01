@@ -8,10 +8,6 @@ license: BSD
 source:
   url: https://github.com/Reference-ScaLAPACK/scalapack/archive/refs/tags/v%{version}.tar.gz
 
-patches:
-  all:
-    - scalapack_fix_prototypes.patch
-
 requires:
   all:
     - openmpi
@@ -32,8 +28,8 @@ configure:
     - "sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 4.0)/g' %{srcdir}/BLACS/INSTALL/CMakeLists.txt"
     - "sed -i 's/cmake_minimum_required(VERSION 3.9)/cmake_minimum_required(VERSION 4.0)/g' %{srcdir}/CMakeLists.txt"
   args:
-    - -DCMAKE_C_FLAGS='%{cflags} -Wno-implicit-function-declaration'
-    - -DCMAKE_CXX_FLAGS='%{cxxflags} -Wno-implicit-function-declaration'
+    # Use gnu11 to allow K&R style function declarations
+    - -DCMAKE_C_FLAGS='%{cflags} -std=gnu17 -Wno-error=implicit-function-declaration'
     - -DCMAKE_Fortran_FLAGS='%{fcflags} -fallow-argument-mismatch'
     - -DMPI_BASE_DIR=%{prefix}
     - -DCMAKE_POLICY_VERSION_MINIMUM=4.0
