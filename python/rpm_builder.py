@@ -288,6 +288,14 @@ class RPMBuilder:
 
         return pre_commands, post_commands
 
+    def get_install_commands(self) -> list:
+        """Get custom install commands from recipe (replaces default make install)"""
+        commands = []
+        if 'install' in self.recipe and 'commands' in self.recipe['install']:
+            for cmd in self.recipe['install']['commands']:
+                commands.append(cmd)
+        return commands
+
     def get_intel_oneapi_setup(self) -> list:
         """Get Intel OneAPI setup commands for MKL flavors"""
         setup_commands = []
@@ -464,6 +472,7 @@ class RPMBuilder:
         # Get pre/post commands
         configure_pre_commands, configure_post_commands = self.get_configure_pre_post_commands()
         install_pre_commands, install_post_commands = self.get_install_pre_post_commands()
+        install_commands = self.get_install_commands()
 
         # Get Intel OneAPI setup
         intel_oneapi_setup = self.get_intel_oneapi_setup()
@@ -508,6 +517,7 @@ class RPMBuilder:
             'configure_post_commands': configure_post_commands,  # NEW: Post-configure commands
             'install_pre_commands': install_pre_commands,  # NEW: Pre-install commands
             'install_post_commands': install_post_commands,  # NEW: Post-install commands
+            'install_commands': install_commands,  # NEW: Custom install commands (replaces make install)
             'cmake_args': cmake_args,
             'build_args': build_args,  # For make-based builds (configure.type: none)
             'configure_env_vars': configure_env_vars,

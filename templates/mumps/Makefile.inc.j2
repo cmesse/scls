@@ -16,6 +16,7 @@ AR = {{ mpifort }} -shared -o
 RANLIB = echo
 LIBEXT = {{ lib_ext }}
 LIBEXT_SHARED = {{ lib_ext }}
+SHARED_OPT = -shared
 {% if platform == 'macos' %}
 SONAME = -install_name
 {% else %}
@@ -49,7 +50,7 @@ ORDERINGSF = -Dscotch -Dmetis -Dpord -Dptscotch -Dparmetis
 ORDERINGSC = -Dscotch -Dmetis -Dpord -Dptscotch -Dparmetis
 IORDERINGSF = -I{{ prefix }}/include -I$(topdir)/PORD/include
 IORDERINGSC = -I{{ prefix }}/include -I$(topdir)/PORD/include
-LORDERINGS  = -lparmetis -lmetis -lpord -lptesmumps -lptscotch -lptscotcherr
+LORDERINGS  = -lparmetis -lmetis -lpord -lptesmumps -lptscotch -lptscotcherr -lscotch -lscotcherr
 
 # Library Settings
 {% if math_provider == 'mkl' %}

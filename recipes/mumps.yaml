@@ -5,7 +5,7 @@ homepage: https://mumps-solver.org
 license: CeCILL-C
 
 source:
-  url: http://mumps.enseeiht.fr/MUMPS_%{version}.tar.gz
+  url: https://mumps-solver.org/MUMPS_%{version}.tar.gz
 
 patches:
   all:
@@ -57,7 +57,7 @@ install:
   commands:
     - "mkdir -p %{buildroot}%{prefix}/lib"
     - "mkdir -p %{buildroot}%{prefix}/include"
-    - "install -m 755 lib/lib*.%{libext} %{buildroot}%{prefix}/lib/"
+    - "install -m 755 lib/lib*%{libext} %{buildroot}%{prefix}/lib/"
     - "install -m 644 include/*.h %{buildroot}%{prefix}/include/"
 
 registry:

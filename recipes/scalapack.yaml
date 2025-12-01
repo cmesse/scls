@@ -30,7 +30,7 @@ configure:
   args:
     # Use gnu11 to allow K&R style function declarations
     - -DCMAKE_C_FLAGS='%{cflags} -std=gnu17 -Wno-error=implicit-function-declaration'
-    - -DCMAKE_Fortran_FLAGS='%{fcflags} -fallow-argument-mismatch'
+    - -DCMAKE_Fortran_FLAGS='%{fcflags} -O3 -fallow-argument-mismatch'
     - -DMPI_BASE_DIR=%{prefix}
     - -DCMAKE_POLICY_VERSION_MINIMUM=4.0
   # Integer interface: LP64 (32-bit) vs ILP64 (64-bit)

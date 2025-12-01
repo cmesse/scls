@@ -170,7 +170,12 @@ make PREFIX=%{prefix}{% for arg in build_args %} {{ arg }}{% endfor %}
 {% endfor %}
 {% endif %}
 
-{% if configure_type == 'autotools' %}
+{% if install_commands %}
+# Custom install commands
+{% for cmd in install_commands %}
+{{ cmd }}
+{% endfor %}
+{% elif configure_type == 'autotools' %}
 %make_install
 {% elif configure_type == 'cmake' %}
 %cmake_install

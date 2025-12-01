@@ -436,6 +436,7 @@ class MacOSBuilder:
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             # Apply enhanced configure environment
+            from patch_common import apply_configure_environment
             env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
 
             # *** CALL IT HERE ***
@@ -457,12 +458,18 @@ class MacOSBuilder:
         cmd = [s.replace('%{cflags}', str(self.cflags)) for s in cmd]
         cmd = [s.replace('%{cxxflags}', str(self.cxxflags)) for s in cmd]
         cmd = [s.replace('%{fcflags}', str(self.fcflags)) for s in cmd]
-        cmd = [s.replace('%{ldflags}', str(self.fcflags)) for s in cmd]
+        cmd = [s.replace('%{ldflags}', str(self.ldflags)) for s in cmd]
         cmd = [s.replace('%{math_flags}', str(self.math_flags)) for s in cmd]
         cmd = [s.replace('%{math_ldflags}', str(self.math_ldflags)) for s in cmd]
         cmd = [s.replace('%{sources}', str(self.sources_dir)) for s in cmd]
         cmd = [s.replace('%{version}', str(self.recipe['version'])) for s in cmd]
         cmd = [s.replace('%{name}', str(self.recipe['name'])) for s in cmd]
+        # MPI compiler wrappers
+        cmd = [s.replace('%{mpicc}', 'mpicc') for s in cmd]
+        cmd = [s.replace('%{mpicxx}', 'mpicxx') for s in cmd]
+        cmd = [s.replace('%{mpifort}', 'mpifort') for s in cmd]
+        # Library extension
+        cmd = [s.replace('%{libext}', '.dylib') for s in cmd]
         # Substitute extra source info (e.g., %{gmp_version}, %{gmp_tarball})
         for name, info in self.extra_source_info.items():
             cmd = [s.replace(f'%{{{name}_version}}', info['version']) for s in cmd]
@@ -479,7 +486,20 @@ class MacOSBuilder:
         # Run any pre-build commands
         if 'build' in self.recipe and 'pre' in self.recipe['build']:
             for cmd in self.recipe['build']['pre']:
-                run_command(cmd.split(), build_dir, env, "pre-build")
+                expanded_cmd = self.check_args([cmd])[0]
+                run_command(['sh', '-c', expanded_cmd], build_dir, env, "pre-build")
+
+        # Run LP64/ILP64 interface-specific pre-build commands
+        if 'build' in self.recipe:
+            interface = self.flavor.get('math', {}).get('interface', 'lp64')
+            if interface == 'ilp64' and 'ilp64_pre' in self.recipe['build']:
+                for cmd in self.recipe['build']['ilp64_pre']:
+                    expanded_cmd = self.check_args([cmd])[0]
+                    run_command(['sh', '-c', expanded_cmd], build_dir, env, "pre-build (ilp64)")
+            elif interface == 'lp64' and 'lp64_pre' in self.recipe['build']:
+                for cmd in self.recipe['build']['lp64_pre']:
+                    expanded_cmd = self.check_args([cmd])[0]
+                    run_command(['sh', '-c', expanded_cmd], build_dir, env, "pre-build (lp64)")
 
         # Build command
         make_cmd = ['make', f'-j{jobs}']
@@ -539,12 +559,6 @@ class MacOSBuilder:
             for cmd in self.recipe['install']['pre']:
                 run_command(cmd.split(), build_dir, env, "pre-install")
 
-        # Install command with DESTDIR
-        install_cmd = ['make', 'install', f'DESTDIR={destdir}']
-        if 'install' in self.recipe and 'args' in self.recipe['install']:
-            args = self.check_args(self.recipe['install']['args'])
-            install_cmd.extend(args)
-
         # special case for Apple zlib - only if the zlib subdirectory exists
         if self.package == 'zlib' and (build_dir / 'zlib').exists():
             build_dir = build_dir / 'zlib'
@@ -553,7 +567,22 @@ class MacOSBuilder:
         if not build_dir.exists():
             raise BuildError(f"Build directory does not exist: {build_dir}")
 
-        run_command(install_cmd, build_dir, env, "install")
+        # Check if recipe defines custom install commands
+        if 'install' in self.recipe and 'commands' in self.recipe['install']:
+            # Run custom install commands instead of make install
+            for cmd in self.recipe['install']['commands']:
+                cmd = cmd.replace('%{buildroot}', str(destdir))
+                cmd = cmd.replace('%{prefix}', str(self.prefix))
+                cmd = cmd.replace('%{libext}', '.dylib')
+                expanded_cmd = self.check_args([cmd])[0]
+                run_command(['sh', '-c', expanded_cmd], build_dir, env, "install")
+        else:
+            # Default: make install with DESTDIR
+            install_cmd = ['make', 'install', f'DESTDIR={destdir}']
+            if 'install' in self.recipe and 'args' in self.recipe['install']:
+                args = self.check_args(self.recipe['install']['args'])
+                install_cmd.extend(args)
+            run_command(install_cmd, build_dir, env, "install")
 
         # Run any post-install commands (with DESTDIR)
         # %{prefix} = destdir path (for file operations during staging)
