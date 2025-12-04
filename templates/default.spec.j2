@@ -32,6 +32,9 @@ BuildRequires:  {{ req }}
 Requires:       {{ req }}
 {% endfor %}
 
+# Disable automatic dependency detection - we use custom prefix
+AutoReqProv:    no
+
 %description
 {{ description }}
 
