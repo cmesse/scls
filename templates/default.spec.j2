@@ -68,6 +68,7 @@ Requires:       {{ req }}
 {{ path_setup }}
 
 # Setup environment
+{% if not skip_compiler_env %}
 {% if features.mpi %}
 export CC=mpicc
 export CXX=mpicxx
@@ -85,6 +86,7 @@ export CXXFLAGS="{{ cxxflags }}"
 export FFLAGS="{{ fflags }}"
 export FCFLAGS="{{ fcflags }}"
 export LDFLAGS="{{ ldflags }}"
+{% endif %}
 
 # Configure-specific environment variables
 {% for env_var in configure_env_vars %}
@@ -97,6 +99,13 @@ export {{ env_var.name }}="${{ env_var.name }}"
 export {{ env_var.name }}="{{ env_var.value }}"
 {% endif %}
 {% endfor %}
+
+{% if build_pre_commands %}
+# Pre-build commands
+{% for cmd in build_pre_commands %}
+{{ cmd }}
+{% endfor %}
+{% endif %}
 
 {% if configure_type == 'autotools' %}
 {% if configure_pre_commands %}
@@ -152,6 +161,13 @@ make PREFIX=%{prefix}{% for arg in build_args %} {{ arg }}{% endfor %}
 
 {% endif %}
 
+{% if build_post_commands %}
+# Post-build commands
+{% for cmd in build_post_commands %}
+{{ cmd }}
+{% endfor %}
+{% endif %}
+
 %check
 # Ensure our binaries are still in PATH for tests
 {{ path_setup }}
@@ -176,11 +192,13 @@ make PREFIX=%{prefix}{% for arg in build_args %} {{ arg }}{% endfor %}
 {{ cmd }}
 {% endfor %}
 {% elif configure_type == 'autotools' %}
-%make_install
+%make_install{% if install_args %} {{ install_args | join(' ') }}{% endif %}
+
 {% elif configure_type == 'cmake' %}
 %cmake_install
 {% else %}
-make install DESTDIR=%{buildroot}
+make install DESTDIR=%{buildroot}{% if install_args %} {{ install_args | join(' ') }}{% endif %}
+
 {% endif %}
 
 {% if install_post_commands %}

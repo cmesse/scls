@@ -1,8 +1,15 @@
 %{prefix}/bin/gcov
+%{prefix}/bin/g++
+%{prefix}/bin/c++
 %{prefix}/bin/x86_64-apple-darwin24.6.0-gcc-ar
+%{prefix}/bin/gfortran
 %{prefix}/bin/x86_64-apple-darwin24.6.0-gcc-nm
+%{prefix}/bin/gcc-ranlib
 %{prefix}/bin/gcov-tool
+%{prefix}/bin/gcc-nm
+%{prefix}/bin/gcc-ar
 %{prefix}/bin/x86_64-apple-darwin24.6.0-gcc-15.2.0
+%{prefix}/bin/gcc
 %{prefix}/bin/lto-dump
 %{prefix}/bin/x86_64-apple-darwin24.6.0-g++
 %{prefix}/bin/gcov-dump

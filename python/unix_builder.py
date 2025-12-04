@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-macOS builder for SCLS packages
+Unix builder for SCLS packages
 Builds directly without creating SPEC files
+Supports macOS, Linux, and other Unix-like systems
 """
 
 import os
 import sys
 import argparse
+import platform
 import shutil
 import subprocess
 from pathlib import Path
@@ -40,7 +42,7 @@ from patch_common import (
 
 from math_common import ( get_math_link_line, get_math_compile_flags )
 
-class MacOSBuilder:
+class UnixBuilder:
     def __init__(self, package: str, flavor: str = "macos"):
         self.package = package
         self.flavor_name = flavor
@@ -49,9 +51,26 @@ class MacOSBuilder:
         self.recipe = load_recipe(package)
         self.flavor = load_flavor(flavor)
 
+        # Detect and validate platform from flavor
+        self.platform = self.flavor.get('platform', 'linux')
+
+        # Merge platform-specific recipe sections (linux: or macos:)
+        # This allows recipes to have different version/source per platform
+        if self.platform in self.recipe:
+            platform_section = self.recipe[self.platform]
+            # Merge version if specified
+            if 'version' in platform_section:
+                self.recipe['version'] = platform_section['version']
+            # Merge source if specified
+            if 'source' in platform_section:
+                if 'source' not in self.recipe:
+                    self.recipe['source'] = {}
+                self.recipe['source'].update(platform_section['source'])
+
         # Validate platform
-        if self.flavor.get('platform') != 'macos':
-            raise BuildError(f"Flavor {flavor} is not for macOS")
+        supported_platforms = ['macos', 'linux']
+        if self.platform not in supported_platforms:
+            raise BuildError(f"Platform {self.platform} not supported. Use: {supported_platforms}")
 
         # Check if package should be built
         if not should_build_package(self.recipe, self.flavor):
@@ -67,7 +86,7 @@ class MacOSBuilder:
         self.work_dir = self.build_dir
         self.rpms_dir = self.rpmbuild / "pkgs"
         self.srpms_dir = self.rpmbuild / "spkgs"
-        self.specs_dir = self.rpmbuild / "specs" # actually not needed on mac
+        self.specs_dir = self.rpmbuild / "specs"
         self.patch_dir = self.project_root / "patches" / package
 
         # this is set in run after extracting the package
@@ -75,18 +94,36 @@ class MacOSBuilder:
 
         self.nprocs = os.cpu_count()
 
-        # get the sdk
-        self.sdk = subprocess.check_output(
-            ["xcrun", "--sdk", "macosx", "--show-sdk-path"],text=True).strip()
-
-        self.host = "x86_64-apple-darwin" + subprocess.check_output(
-            ["uname", "-r"],text=True).strip()
+        # Platform-specific settings
+        if self.platform == 'macos':
+            # macOS: get SDK path and Darwin version
+            self.sdk = subprocess.check_output(
+                ["xcrun", "--sdk", "macosx", "--show-sdk-path"], text=True).strip()
+            uname_r = subprocess.check_output(["uname", "-r"], text=True).strip()
+            # Detect architecture
+            machine = platform.machine()
+            if machine == 'arm64':
+                self.host = f"aarch64-apple-darwin{uname_r}"
+            else:
+                self.host = f"x86_64-apple-darwin{uname_r}"
+            self.lib_ext = '.dylib'
+            self.soname_flag = '-install_name'
+        else:
+            # Linux and other Unix
+            self.sdk = ""  # No SDK needed
+            machine = platform.machine()
+            if machine == 'aarch64':
+                self.host = "aarch64-unknown-linux-gnu"
+            else:
+                self.host = "x86_64-unknown-linux-gnu"
+            self.lib_ext = '.so'
+            self.soname_flag = '-soname'
 
         # Feature flags
         self.openmp = False
         self.mpi = False
-        self.cuda = False  # Not used on macOS but kept for consistency
-        self.math = None  # 'reference', 'accelerate', or None
+        self.cuda = False
+        self.math = None  # 'reference', 'mkl', 'openblas', or None
 
         # flags to be filled later
         self.cflags = ""
@@ -183,13 +220,14 @@ class MacOSBuilder:
             env['CXXFLAGS'] = self.cxxflags
             env['FFLAGS'] = self.fcflags
             env['FCFLAGS'] = self.fcflags
-            env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, 'macos')
+            env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, self.platform)
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             # Apply enhanced configure environment (supports +=, -=, etc.)
-            from patch_common import apply_configure_environment
-
             env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
+
+            # Apply platform-specific environment variables
+            env = self.apply_platform_env(env)
 
             # apply special clang hack
             cmd = "for f in $(find . -name configure); do sed -i '' 's/--version -v -V -qversion/--version -v/g' $f; done"
@@ -201,6 +239,9 @@ class MacOSBuilder:
                     # Apply check_args to replace %{sdk} and %{host}
                     checked_cmd = self.check_args([cmd])[0]
                     run_command(['sh', '-c', checked_cmd], source_dir, env, "pre-configure")
+
+            # Run platform-specific pre-configure commands
+            self.run_platform_pre(source_dir, env)
 
             # Run configure
             cmd = self.check_args(['./configure'] + args)
@@ -216,8 +257,6 @@ class MacOSBuilder:
         elif configure_type == 'cmake':
 
             # Apply enhanced configure environment (supports +=, -=, etc.)
-            from patch_common import apply_configure_environment
-
             env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
 
             # Create build directory
@@ -261,12 +300,14 @@ class MacOSBuilder:
             env['CXXFLAGS'] = self.cxxflags
             env['FFLAGS'] = self.fcflags
             env['FCFLAGS'] = self.fcflags
-            env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, 'macos')
+            env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, self.platform)
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             # Apply enhanced configure environment (supports +=, -=, etc.)
-            from patch_common import apply_configure_environment
             env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
+
+            # Apply platform-specific environment variables
+            env = self.apply_platform_env(env)
 
             # Run any pre-configure commands
             if 'configure' in self.recipe and 'pre' in self.recipe['configure']:
@@ -274,6 +315,9 @@ class MacOSBuilder:
                     # Apply check_args to replace %{sdk} and %{host}
                     checked_cmd = self.check_args([cmd])[0]
                     run_command(['sh', '-c', checked_cmd], source_dir, env, "pre-configure")
+
+            # Run platform-specific pre-configure commands
+            self.run_platform_pre(source_dir, env)
 
             # Run CMake
             cmd = self.check_args(['cmake', '..'] + args)
@@ -291,23 +335,38 @@ class MacOSBuilder:
             return build_dir
 
         elif configure_type == 'custom':
-            # Custom configuration system (like OpenSSL's ./config)
+            # Custom configuration system (like OpenSSL's ./config or PETSc's ./configure)
             if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
                 self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
             else:
                 self.install_prefix = self.prefix
-                
-            # override compilers
-            if self.mpi:
-                env['CC'] = 'mpicc'
-                env['CXX'] = 'mpicxx'
-                env['FC'] = 'mpifort'
-                env['FF'] = 'mpifort'
-                env['F77'] = 'mpifort'
 
-            # Get optimization flags
+            # Check if we should skip setting compiler environment variables
+            # (Some packages like PETSc prefer command-line args and warn about env vars)
+            skip_compiler_env = self.recipe.get('configure', {}).get('skip_compiler_env', False)
+
+            if not skip_compiler_env:
+                # Set compilers in environment
+                if self.mpi:
+                    env['CC'] = 'mpicc'
+                    env['CXX'] = 'mpicxx'
+                    env['FC'] = 'mpifort'
+                    env['FF'] = 'mpifort'
+                    env['F77'] = 'mpifort'
+                else:
+                    # Use bootstrap compilers if this is a bootstrap package
+                    is_bootstrap = self.recipe.get('bootstrap', False)
+                    if is_bootstrap and 'bootstrap_compilers' in self.flavor:
+                        compilers = self.flavor['bootstrap_compilers']
+                    else:
+                        compilers = self.flavor.get('compilers', {})
+                    env['CC'] = compilers.get('cc', 'gcc')
+                    env['CXX'] = compilers.get('cxx', 'g++')
+                    env['FC'] = compilers.get('fc', 'gfortran')
+
+            # Get optimization flags (still needed for placeholder substitution)
             self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
-                self.recipe, self.flavor, env['CC']
+                self.recipe, self.flavor, env.get('CC', 'gcc')
             )
 
             # Get ldflags from flavor
@@ -320,18 +379,29 @@ class MacOSBuilder:
                 self.fcflags += f" {self.math_flags}"
                 self.ldflags += f" {self.math_ldflags}"
 
-            env['CFLAGS'] = self.cflags
-            env['CXXFLAGS'] = self.cxxflags
-            env['FFLAGS'] = self.fcflags
-            env['FCFLAGS'] = self.fcflags
-            env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, 'macos')
+            if not skip_compiler_env:
+                env['CFLAGS'] = self.cflags
+                env['CXXFLAGS'] = self.cxxflags
+                env['FFLAGS'] = self.fcflags
+                env['FCFLAGS'] = self.fcflags
+                env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, self.platform)
+
             env['PKG_CONFIG_PATH'] = pkg_config_path
+
+            # Apply enhanced configure environment (supports +=, -=, etc.)
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
+
+            # Apply platform-specific environment variables
+            env = self.apply_platform_env(env)
 
             # Run any pre-configure commands
             if 'configure' in self.recipe and 'pre' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['pre']:
                     checked_cmd = self.check_args([cmd])[0]
                     run_command(['sh', '-c', checked_cmd], source_dir, env, "pre-configure")
+
+            # Run platform-specific pre-configure commands
+            self.run_platform_pre(source_dir, env)
 
             # Get custom configure command and arguments
             configure_cmd = self.recipe.get('configure', {}).get('command', './config')
@@ -391,7 +461,7 @@ class MacOSBuilder:
             env['CXXFLAGS'] = self.cxxflags
             env['FFLAGS'] = self.fcflags
             env['FCFLAGS'] = self.fcflags
-            env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, 'macos')
+            env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, self.platform)
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             print("Skipping configure step (type: none)")
@@ -432,11 +502,10 @@ class MacOSBuilder:
             env['CXXFLAGS'] = self.cxxflags
             env['FFLAGS'] = self.fcflags
             env['FCFLAGS'] = self.fcflags
-            env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, 'macos')
+            env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, self.platform)
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             # Apply enhanced configure environment
-            from patch_common import apply_configure_environment
             env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
 
             # *** CALL IT HERE ***
@@ -464,17 +533,82 @@ class MacOSBuilder:
         cmd = [s.replace('%{sources}', str(self.sources_dir)) for s in cmd]
         cmd = [s.replace('%{version}', str(self.recipe['version'])) for s in cmd]
         cmd = [s.replace('%{name}', str(self.recipe['name'])) for s in cmd]
+        # Compilers (from flavor, with bootstrap fallback)
+        is_bootstrap = self.recipe.get('bootstrap', False)
+        if is_bootstrap and 'bootstrap_compilers' in self.flavor:
+            compilers = self.flavor['bootstrap_compilers']
+        else:
+            compilers = self.flavor.get('compilers', {})
+        cmd = [s.replace('%{cc}', compilers.get('cc', 'gcc')) for s in cmd]
+        cmd = [s.replace('%{cxx}', compilers.get('cxx', 'g++')) for s in cmd]
+        cmd = [s.replace('%{fc}', compilers.get('fc', 'gfortran')) for s in cmd]
         # MPI compiler wrappers
         cmd = [s.replace('%{mpicc}', 'mpicc') for s in cmd]
         cmd = [s.replace('%{mpicxx}', 'mpicxx') for s in cmd]
         cmd = [s.replace('%{mpifort}', 'mpifort') for s in cmd]
         # Library extension
-        cmd = [s.replace('%{libext}', '.dylib') for s in cmd]
+        cmd = [s.replace('%{libext}', self.lib_ext) for s in cmd]
+        # CUDA paths and architectures
+        cuda_path = self.flavor.get('nvidia', {}).get('cuda_path', '')
+        cuda_archs = self.flavor.get('nvidia', {}).get('architectures', '')
+        cmd = [s.replace('%{cuda}', cuda_path) for s in cmd]
+        cmd = [s.replace('%{cuda_architectures}', cuda_archs) for s in cmd]
+        # MKL paths and linker flags
+        mklroot = self.flavor.get('math', {}).get('mklroot', '/opt/intel/oneapi/mkl/latest')
+        cmd = [s.replace('%{mklroot}', mklroot) for s in cmd]
+        # MKL linker flags (simplified - actual flags come from math_common)
+        interface = self.flavor.get('math', {}).get('interface', 'lp64')
+        if interface == 'ilp64':
+            mkl_lp = 'ilp64'
+        else:
+            mkl_lp = 'lp64'
+        mkl_linker = f'-lmkl_intel_{mkl_lp} -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+        mkl_mpi_linker = f'-lmkl_scalapack_{mkl_lp} -lmkl_intel_{mkl_lp} -lmkl_gnu_thread -lmkl_core -lmkl_blacs_intelmpi_{mkl_lp} -lgomp -lpthread -lm -ldl'
+        cmd = [s.replace('%{mkl_linker_flags}', mkl_linker) for s in cmd]
+        cmd = [s.replace('%{mkl_mpi_linker_flags}', mkl_mpi_linker) for s in cmd]
+        # Platform (linux or macos)
+        cmd = [s.replace('%{platform}', self.platform) for s in cmd]
+        # System library paths (zlib, etc.) - check system_libraries setting in flavor
+        system_libs = self.flavor.get('system_libraries', {})
+        if system_libs.get('zlib', False):
+            # Use system zlib
+            if self.platform == 'linux':
+                cmd = [s.replace('%{zlib_include}', '/usr/include') for s in cmd]
+                cmd = [s.replace('%{zlib_lib}', '/usr/lib64/libz.so') for s in cmd]
+            else:
+                cmd = [s.replace('%{zlib_include}', '/usr/include') for s in cmd]
+                cmd = [s.replace('%{zlib_lib}', '/usr/lib/libz.dylib') for s in cmd]
+        else:
+            # Use our built zlib
+            cmd = [s.replace('%{zlib_include}', f'{self.prefix}/include') for s in cmd]
+            cmd = [s.replace('%{zlib_lib}', f'{self.prefix}/lib/libz{self.lib_ext}') for s in cmd]
         # Substitute extra source info (e.g., %{gmp_version}, %{gmp_tarball})
         for name, info in self.extra_source_info.items():
             cmd = [s.replace(f'%{{{name}_version}}', info['version']) for s in cmd]
             cmd = [s.replace(f'%{{{name}_tarball}}', info['tarball']) for s in cmd]
         return cmd
+
+    def run_platform_pre(self, source_dir: Path, env: Dict[str, str]) -> None:
+        """Run platform-specific pre-configure commands"""
+        if 'configure' not in self.recipe:
+            return
+        platform_pre = self.recipe['configure'].get('platform_pre', {})
+        if self.platform in platform_pre:
+            for cmd in platform_pre[self.platform]:
+                checked_cmd = self.check_args([cmd])[0]
+                run_command(['sh', '-c', checked_cmd], source_dir, env, f"platform-pre ({self.platform})")
+
+    def apply_platform_env(self, env: Dict[str, str]) -> Dict[str, str]:
+        """Apply platform-specific environment variables"""
+        if 'configure' not in self.recipe:
+            return env
+        platform_env = self.recipe['configure'].get('platform_env', {})
+        if self.platform in platform_env:
+            for key, value in platform_env[self.platform].items():
+                # Apply check_args to the value to expand placeholders
+                expanded_value = self.check_args([value])[0]
+                env[key] = expanded_value
+        return env
 
     def build(self, build_dir: Path, env: Dict[str, str]) -> None:
         """Run build step"""
@@ -504,13 +638,13 @@ class MacOSBuilder:
         # Build command
         make_cmd = ['make', f'-j{jobs}']
         if 'build' in self.recipe and 'args' in self.recipe['build']:
-            make_cmd.extend(self.recipe['build']['args'])
+            make_cmd.extend(self.check_args(self.recipe['build']['args']))
 
         # Add flavor-specific build args
         if 'build' in self.recipe and 'flavor_args' in self.recipe['build']:
             flavor_name = self.flavor.get('name', 'macos')
             if flavor_name in self.recipe['build']['flavor_args']:
-                make_cmd.extend(self.recipe['build']['flavor_args'][flavor_name])
+                make_cmd.extend(self.check_args(self.recipe['build']['flavor_args'][flavor_name]))
 
         # Add LP64/ILP64 interface-specific build args
         make_cmd.extend(get_interface_args(self.recipe, self.flavor, 'build'))
@@ -520,7 +654,8 @@ class MacOSBuilder:
         # Run any post-build commands
         if 'build' in self.recipe and 'post' in self.recipe['build']:
             for cmd in self.recipe['build']['post']:
-                run_command(cmd.split(), build_dir, env, "post-build")
+                expanded_cmd = self.check_args([cmd])[0]
+                run_command(['sh', '-c', expanded_cmd], build_dir, env, "post-build")
 
     def test(self, build_dir: Path, env: Dict[str, str]) -> None:
         """Run test step"""
@@ -557,7 +692,8 @@ class MacOSBuilder:
         # Run any pre-install commands
         if 'install' in self.recipe and 'pre' in self.recipe['install']:
             for cmd in self.recipe['install']['pre']:
-                run_command(cmd.split(), build_dir, env, "pre-install")
+                expanded_cmd = self.check_args([cmd])[0]
+                run_command(['sh', '-c', expanded_cmd], build_dir, env, "pre-install")
 
         # special case for Apple zlib - only if the zlib subdirectory exists
         if self.package == 'zlib' and (build_dir / 'zlib').exists():
@@ -573,7 +709,7 @@ class MacOSBuilder:
             for cmd in self.recipe['install']['commands']:
                 cmd = cmd.replace('%{buildroot}', str(destdir))
                 cmd = cmd.replace('%{prefix}', str(self.prefix))
-                cmd = cmd.replace('%{libext}', '.dylib')
+                cmd = cmd.replace('%{libext}', self.lib_ext)
                 expanded_cmd = self.check_args([cmd])[0]
                 run_command(['sh', '-c', expanded_cmd], build_dir, env, "install")
         else:
@@ -582,6 +718,12 @@ class MacOSBuilder:
             if 'install' in self.recipe and 'args' in self.recipe['install']:
                 args = self.check_args(self.recipe['install']['args'])
                 install_cmd.extend(args)
+            # Add flavor-specific install args
+            if 'install' in self.recipe and 'flavor_args' in self.recipe['install']:
+                flavor_name = self.flavor.get('name', 'macos')
+                if flavor_name in self.recipe['install']['flavor_args']:
+                    flavor_args = self.check_args(self.recipe['install']['flavor_args'][flavor_name])
+                    install_cmd.extend(flavor_args)
             run_command(install_cmd, build_dir, env, "install")
 
         # Run any post-install commands (with DESTDIR)
@@ -589,11 +731,12 @@ class MacOSBuilder:
         # %{final_prefix} = actual install prefix (for content that needs final paths, like .pc files)
         if 'install' in self.recipe and 'post' in self.recipe['install']:
             for cmd in self.recipe['install']['post']:
+                # Apply install-specific replacements FIRST (before check_args replaces %{prefix})
                 cmd = cmd.replace('%{buildroot}', str(destdir))
                 cmd = cmd.replace('%{final_prefix}', str(self.prefix))
                 cmd = cmd.replace('%{prefix}', str(destdir / str(self.prefix).lstrip('/')))
-                cmd = cmd.replace('%{version}', str(self.recipe['version']))
-                cmd = cmd.replace('%{name}', str(self.recipe['name']))
+                # Then apply check_args for %{host}, %{sdk}, %{version}, etc.
+                cmd = self.check_args([cmd])[0]
                 run_command(['sh', '-c', cmd], build_dir, env, "post-install")
 
         # Run flavor-specific post-install commands
@@ -601,12 +744,25 @@ class MacOSBuilder:
             flavor_name = self.flavor.get('name', 'macos')
             if flavor_name in self.recipe['install']['flavor_post']:
                 for cmd in self.recipe['install']['flavor_post'][flavor_name]:
+                    # Apply install-specific replacements FIRST (before check_args replaces %{prefix})
                     cmd = cmd.replace('%{buildroot}', str(destdir))
                     cmd = cmd.replace('%{final_prefix}', str(self.prefix))
                     cmd = cmd.replace('%{prefix}', str(destdir / str(self.prefix).lstrip('/')))
-                    cmd = cmd.replace('%{version}', str(self.recipe['version']))
-                    cmd = cmd.replace('%{name}', str(self.recipe['name']))
+                    # Then apply check_args for %{host}, %{sdk}, %{version}, etc.
+                    cmd = self.check_args([cmd])[0]
                     run_command(['sh', '-c', cmd], build_dir, env, "flavor-post-install")
+
+        # Run platform-specific post-install commands
+        if 'install' in self.recipe and 'platform_post' in self.recipe['install']:
+            if self.platform in self.recipe['install']['platform_post']:
+                for cmd in self.recipe['install']['platform_post'][self.platform]:
+                    # Apply install-specific replacements FIRST (before check_args replaces %{prefix})
+                    cmd = cmd.replace('%{buildroot}', str(destdir))
+                    cmd = cmd.replace('%{final_prefix}', str(self.prefix))
+                    cmd = cmd.replace('%{prefix}', str(destdir / str(self.prefix).lstrip('/')))
+                    # Then apply check_args for %{host}, %{sdk}, %{version}, etc.
+                    cmd = self.check_args([cmd])[0]
+                    run_command(['sh', '-c', cmd], build_dir, env, f"platform-post-install ({self.platform})")
 
         # Clean up .la files in destdir
         clean_libtool_files(destdir / str(self.prefix).lstrip('/'))
@@ -1115,13 +1271,13 @@ class MacOSBuilder:
 
         # Library type
         context['shared_libs'] = True
-        context['lib_ext'] = '.dylib'
+        context['lib_ext'] = self.lib_ext
 
         # Index size for packages that support it
         context['index_size'] = self.recipe.get('features', {}).get('index_size', 32)
 
         # Platform
-        context['platform'] = 'macos'
+        context['platform'] = self.platform
 
         # Compiler family (gnu, intel, etc.)
         cc = compilers.get('cc', 'gcc')
@@ -1176,22 +1332,28 @@ class MacOSBuilder:
         """Run final post-install commands after files are in their final location"""
         if 'install' not in self.recipe:
             return
-            
+
         env = setup_environment(self.flavor, self.prefix, self.source_dir, self.recipe)
         flavor_name = self.flavor.get('name', 'macos')
-        
+
         # Run general final post commands
         if 'final_post' in self.recipe['install']:
             for cmd in self.recipe['install']['final_post']:
+                # First apply check_args for %{host}, %{sdk}, etc.
+                cmd = self.check_args([cmd])[0]
+                # Then apply install-specific replacements
                 cmd = cmd.replace('%{prefix}', str(self.prefix))
-                cmd = cmd.replace('%{install_prefix}', str(self.prefix))  # For zlib, these are the same
+                cmd = cmd.replace('%{install_prefix}', str(self.prefix))
                 run_command(['sh', '-c', cmd], self.work_dir, env, "final-post-install")
-        
+
         # Run flavor-specific final post commands
         if 'flavor_final_post' in self.recipe['install'] and flavor_name in self.recipe['install']['flavor_final_post']:
             for cmd in self.recipe['install']['flavor_final_post'][flavor_name]:
+                # First apply check_args for %{host}, %{sdk}, etc.
+                cmd = self.check_args([cmd])[0]
+                # Then apply install-specific replacements
                 cmd = cmd.replace('%{prefix}', str(self.prefix))
-                cmd = cmd.replace('%{install_prefix}', str(self.prefix))  # For zlib, these are the same
+                cmd = cmd.replace('%{install_prefix}', str(self.prefix))
                 run_command(['sh', '-c', cmd], self.work_dir, env, "flavor-final-post-install")
 
     def fix_library_symlinks(self) -> None:
@@ -1203,37 +1365,58 @@ class MacOSBuilder:
 
         print("\n=== Fixing library symlinks ===")
 
-        # Find all .dylib files
-        dylib_files = list(lib_dir.glob("*.dylib"))
+        # Find all shared library files based on platform
+        if self.platform == 'macos':
+            lib_files = list(lib_dir.glob("*.dylib"))
+            lib_ext = '.dylib'
+            ext_len = 6  # len('.dylib')
+        else:
+            # Linux: find both .so and .so.* files
+            lib_files = list(lib_dir.glob("*.so")) + list(lib_dir.glob("*.so.*"))
+            lib_ext = '.so'
+            ext_len = 3  # len('.so')
 
         # Group by base name
         lib_groups = {}
-        for dylib in dylib_files:
+        for lib_file in lib_files:
             # Extract base name - handle both dot and dash separators
-            name = dylib.name
-            if name.endswith('.dylib'):
-                name_without_ext = name[:-6]  # Remove .dylib
+            name = lib_file.name
 
-                # Handle different versioning patterns:
-                # 1. libname.version.dylib (e.g., libgmp.4.dylib)
-                # 2. libname-version.dylib (e.g., libevent_core-2.1.7.dylib)
+            if self.platform == 'macos':
+                if name.endswith('.dylib'):
+                    name_without_ext = name[:-ext_len]  # Remove .dylib
 
-                if '-' in name_without_ext:
-                    # Check if this looks like libname-version
-                    parts = name_without_ext.split('-')
-                    # If the part after the dash starts with a digit, it's likely a version
-                    if len(parts) >= 2 and parts[1] and parts[1][0].isdigit():
-                        base_name = parts[0]  # Everything before first dash
+                    # Handle different versioning patterns:
+                    # 1. libname.version.dylib (e.g., libgmp.4.dylib)
+                    # 2. libname-version.dylib (e.g., libevent_core-2.1.7.dylib)
+
+                    if '-' in name_without_ext:
+                        # Check if this looks like libname-version
+                        parts = name_without_ext.split('-')
+                        # If the part after the dash starts with a digit, it's likely a version
+                        if len(parts) >= 2 and parts[1] and parts[1][0].isdigit():
+                            base_name = parts[0]  # Everything before first dash
+                        else:
+                            base_name = name_without_ext  # No version detected
                     else:
-                        base_name = name_without_ext  # No version detected
+                        # Standard dot-separated versioning
+                        parts = name_without_ext.split('.')
+                        base_name = parts[0]  # Everything before first dot
                 else:
-                    # Standard dot-separated versioning
-                    parts = name_without_ext.split('.')
-                    base_name = parts[0]  # Everything before first dot
+                    continue
+            else:
+                # Linux: libname.so.version or libname.so
+                import re
+                # Match libname.so or libname.so.version
+                so_match = re.match(r'(.+)\.so(?:\.\d+.*)?$', name)
+                if so_match:
+                    base_name = so_match.group(1)
+                else:
+                    continue
 
-                if base_name not in lib_groups:
-                    lib_groups[base_name] = []
-                lib_groups[base_name].append(dylib)
+            if base_name not in lib_groups:
+                lib_groups[base_name] = []
+            lib_groups[base_name].append(lib_file)
 
         # Process each group
         for base_name, files in lib_groups.items():
@@ -1241,17 +1424,27 @@ class MacOSBuilder:
                 continue
 
             # Sort by version specificity (most specific last)
-            # For dash-separated versions, we need a smarter sort
             def version_sort_key(f):
-                name = f.name[:-6]  # Remove .dylib
-                if '-' in name and any(c.isdigit() for c in name.split('-')[-1]):
-                    # Dash-separated version: count version components
-                    version_part = name.split('-', 1)[1]
-                    version_components = len(version_part.split('.'))
-                    return (version_components, name)
+                name = f.name
+                if self.platform == 'macos':
+                    name = name[:-6]  # Remove .dylib
+                    if '-' in name and any(c.isdigit() for c in name.split('-')[-1]):
+                        # Dash-separated version: count version components
+                        version_part = name.split('-', 1)[1]
+                        version_components = len(version_part.split('.'))
+                        return (version_components, name)
+                    else:
+                        # Dot-separated version: count all components
+                        return (len(name.split('.')), name)
                 else:
-                    # Dot-separated version: count all components
-                    return (len(name.split('.')), name)
+                    # Linux: libname.so.1.2.3 - count version parts after .so
+                    import re
+                    match = re.match(r'(.+\.so)(\..*)?$', name)
+                    if match and match.group(2):
+                        version_parts = match.group(2).count('.')
+                        return (version_parts, name)
+                    else:
+                        return (0, name)
 
             files.sort(key=version_sort_key)
 
@@ -1363,7 +1556,7 @@ def list_installed_packages(flavor_name: str = 'macos') -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Build SCLS packages for macOS')
+    parser = argparse.ArgumentParser(description='Build SCLS packages for Unix-like systems (macOS, Linux)')
     parser.add_argument('--package', '-p', help='Package name')
     parser.add_argument('--flavor', '-f', default='macos', help='Flavor name (default: macos)')
     parser.add_argument('--list', '-l', action='store_true', help='List installed packages')
@@ -1391,7 +1584,7 @@ def main():
             parser.error(f"invalid command: {cmd} (choose from build, test, install, pkg)")
 
     try:
-        builder = MacOSBuilder(args.package, args.flavor)
+        builder = UnixBuilder(args.package, args.flavor)
         builder.run(args.commands)
     except BuildError as e:
         print(f"\nERROR: {e}", file=sys.stderr)

@@ -16,6 +16,24 @@ bootstrap_compilers:
   cc: clang
   cxx: clang++
 
+# Core bootstrap packages - these are built first to make the build system
+# independent of the host system. Only requires a working C/C++ compiler.
+# Order matters: each package may depend on previous ones.
+bootstrap_packages:
+  - m4
+  - openssl
+  - texinfo
+  - zlib
+  - autoconf
+  - automake
+  - bison
+  - libtool
+  - make
+  - pkg-config
+  - sed
+  - cmake
+  - gcc       # After GCC, all other packages use our GCC
+
 flags:
   cflags: "-g -fPIC -fno-fast-math -march=native"
   cxxflags: "-g -fPIC -fno-fast-math -march=native"
@@ -27,3 +45,8 @@ math:
   linalg: openblas
   threading: openmp
   interface: lp64
+
+# System libraries configuration
+# When false, we build our own version; when true, use system-provided
+system_libraries:
+  zlib: false  # macOS requires Apple's modified zlib

@@ -1,0 +1,49 @@
+name: nlopt
+version: 2.7.1
+summary: Nonlinear optimization library
+homepage: https://nlopt.readthedocs.io/
+license: MIT
+
+source:
+  url: https://github.com/stevengj/nlopt/archive/v%{version}.tar.gz
+
+requires:
+  all:
+    - cmake
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: cmake
+  pre:
+    - "sed -i 's/cmake_minimum_required (VERSION 3.2)/cmake_minimum_required (VERSION 4.0)/g' %{srcdir}/CMakeLists.txt"
+    - "sed -i 's/cmake_minimum_required (VERSION 3.2)/cmake_minimum_required (VERSION 4.0)/g' %{srcdir}/cmake/generate-cpp.cmake"
+    - "sed -i 's/cmake_minimum_required (VERSION 3.2)/cmake_minimum_required (VERSION 4.0)/g' %{srcdir}/cmake/generate-fortran.cmake"
+  args:
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DNLOPT_CXX=ON"
+    - "-DNLOPT_FORTRAN=ON"
+    - "-DNLOPT_PYTHON=OFF"
+    - "-DNLOPT_OCTAVE=OFF"
+    - "-DNLOPT_MATLAB=OFF"
+    - "-DNLOPT_GUILE=OFF"
+    - "-DNLOPT_SWIG=OFF"
+    - "-DNLOPT_TESTS=ON"
+  optimization:
+    O_level: 3
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make test"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lnlopt"

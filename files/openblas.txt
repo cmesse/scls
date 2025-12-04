@@ -8,6 +8,7 @@
 %{prefix}/include/lapacke_mangling.h
 %{prefix}/lib/libopenblas.a
 %{prefix}/lib/libopenblas-r0.3.30.dylib
+%{prefix}/lib/libcblas.dylib
 %{prefix}/lib/libopenblas.dylib
 %{prefix}/lib/libblas.dylib
 %{prefix}/lib/libopenblas-r0.3.30.a

@@ -1,5 +1,5 @@
 name: armadillo
-version: 12.8.0
+version: 15.2.2
 summary: Fast C++ matrix library with syntax similar to MATLAB and Octave
 homepage: http://arma.sourceforge.net/
 license: Apache-2.0
@@ -29,8 +29,6 @@ configure:
     - "-DBUILD_SHARED_LIBS=ON"
     - "-DCMAKE_INSTALL_LIBDIR=lib"
     - "-DALLOW_FLEXIBLAS_LINUX=OFF"
-    - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
-    - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
   # Integer interface: LP64 (32-bit) vs ILP64 (64-bit)
   # Armadillo uses ALLOW_BLAS_LONG_LONG for ILP64 BLAS
   lp64_args:
@@ -44,9 +42,18 @@ configure:
       - "-DBLAS_LIBRARY=%{prefix}/lib/libopenblas.dylib"
       - "-DLAPACK_LIBRARY=%{prefix}/lib/liblapack.dylib"
     debug:
+      - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
+      - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
       - "-DBLAS_LIBRARY=%{prefix}/lib/libblas.so"
       - "-DLAPACK_LIBRARY=%{prefix}/lib/liblapack.so"
+
     mkl:
+      - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
+      - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
+      # MKL provides BLAS/LAPACK via environment
+    cuda:
+      - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
+      - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
       # MKL provides BLAS/LAPACK via environment
 
 build:

@@ -1,0 +1,81 @@
+name: superlu_dist
+version: 9.2.0
+summary: Distributed memory sparse direct solver
+homepage: https://github.com/xiaoyeli/superlu_dist
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/xiaoyeli/superlu_dist/archive/refs/tags/v%{version}.tar.gz
+
+requires:
+  all:
+    - cmake
+    - openmpi
+    - parmetis
+  macos:
+    - openblas
+    - lapack
+  debug:
+    - blas
+    - lapack
+  mkl:
+    []
+
+features:
+  fortran: true
+  mpi: true
+  openmp: true
+  math: parallel
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_STATIC_LIBS=OFF"
+    - "-DTPL_ENABLE_PARMETISLIB=ON"
+    - "-DTPL_PARMETIS_INCLUDE_DIRS=%{prefix}/include"
+    - "-DTPL_ENABLE_INTERNAL_BLASLIB=OFF"
+    - "-DTPL_ENABLE_LAPACKLIB=ON"
+    - "-DTPL_ENABLE_COMBBLASLIB=OFF"
+    - "-DTPL_ENABLE_CUDALIB=OFF"
+    - "-DTPL_ENABLE_HIPLIB=OFF"
+    - "-Denable_openmp=ON"
+  # Integer interface: LP64 (32-bit) vs ILP64 (64-bit)
+  lp64_args:
+    - "-DXSDK_INDEX_SIZE=32"
+  ilp64_args:
+    - "-DXSDK_INDEX_SIZE=64"
+  flavor_args:
+    macos:
+      - "-DTPL_PARMETIS_LIBRARIES=%{prefix}/lib/libparmetis.dylib;%{prefix}/lib/libmetis.dylib"
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
+      - "-DTPL_LAPACK_LIBRARIES=%{prefix}/lib/liblapack.dylib"
+    debug:
+      - "-DTPL_PARMETIS_LIBRARIES=%{prefix}/lib/libparmetis.so;%{prefix}/lib/libmetis.so"
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libblas.so"
+      - "-DTPL_LAPACK_LIBRARIES=%{prefix}/lib/liblapack.so"
+    gcc-mkl:
+      - "-DTPL_PARMETIS_LIBRARIES=%{prefix}/lib/libparmetis.so;%{prefix}/lib/libmetis.so"
+      # MKL BLAS/LAPACK provided via environment
+    intel-mkl:
+      - "-DTPL_PARMETIS_LIBRARIES=%{prefix}/lib/libparmetis.so;%{prefix}/lib/libmetis.so"
+      # MKL BLAS/LAPACK provided via environment
+    cuda:
+      - "-DTPL_PARMETIS_LIBRARIES=%{prefix}/lib/libparmetis.so;%{prefix}/lib/libmetis.so"
+      - "-DTPL_ENABLE_CUDALIB=ON"
+      - "-DCMAKE_CUDA_ARCHITECTURES=%{cuda_architectures}"
+  optimization:
+    O_level: 3
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make test"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lsuperlu_dist"

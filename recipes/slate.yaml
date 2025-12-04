@@ -1,5 +1,5 @@
 name: slate
-version: 2024.05.31
+version: 2025.05.28
 summary: Software for Linear Algebra Targeting Exascale
 homepage: https://icl.bitbucket.io/slate/
 license: BSD-3-Clause
@@ -31,16 +31,22 @@ configure:
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DCMAKE_INSTALL_LIBDIR=lib"
     - "-DBUILD_SHARED_LIBS=ON"
-    - "-Dgpu_backend=none"
     - "-Dblaspp_DIR=%{prefix}"
     - "-Dlapackpp_DIR=%{prefix}"
+  # LP64/ILP64: SLATE inherits integer interface from blaspp/lapackpp
   flavor_args:
     macos:
+      - "-Dgpu_backend=none"
       - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.dylib;%{prefix}/lib/liblapack.dylib;%{prefix}/lib/libopenblas.dylib"
     debug:
+      - "-Dgpu_backend=none"
       - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so;%{prefix}/lib/liblapack.so;%{prefix}/lib/libblas.so"
     mkl:
+      - "-Dgpu_backend=none"
       # MKL provides ScaLAPACK via linker flags
+    cuda:
+      - "-Dgpu_backend=cuda"
+    # MKL provides ScaLAPACK via linker flags
   optimization:
     O_level: 3
 

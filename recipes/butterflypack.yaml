@@ -1,0 +1,66 @@
+name: butterflypack
+version: 4.0.0
+summary: Rapid solving of large-scale dense linear systems using butterfly compression
+homepage: https://github.com/liuyangzhuan/ButterflyPACK
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/liuyangzhuan/ButterflyPACK/archive/refs/tags/v%{version}.tar.gz
+
+requires:
+  all:
+    - cmake
+    - arpack-ng
+    - openmpi
+  macos:
+    - openblas
+    - lapack
+    - scalapack
+  debug:
+    - blas
+    - lapack
+    - scalapack
+
+features:
+  fortran: true
+  mpi: true
+  openmp: true
+  math: parallel
+
+configure:
+  type: cmake
+  pre:
+    # Fix CMake deprecation warning about minimum version
+    - "sed -i 's/cmake_minimum_required(VERSION 3.3 FATAL_ERROR)/cmake_minimum_required(VERSION 3.10 FATAL_ERROR)/' CMakeLists.txt"
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_TESTING=OFF"
+
+  flavor_args:
+    macos:
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libopenblas%{libext}"
+      - "-DTPL_LAPACK_LIBRARIES=%{prefix}/lib/liblapack%{libext}"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack%{libext}"
+      - "-DTPL_ARPACK_LIBRARIES=%{prefix}/lib/libparpack%{libext};%{prefix}/lib/libarpack%{libext}"
+    debug:
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libblas%{libext}"
+      - "-DTPL_LAPACK_LIBRARIES=%{prefix}/lib/liblapack%{libext}"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack%{libext}"
+      - "-DTPL_ARPACK_LIBRARIES=%{prefix}/lib/libparpack%{libext};%{prefix}/lib/libarpack%{libext}"
+    mkl:
+      - "-DTPL_BLAS_LIBRARIES=%{math_ldflags}"
+      - "-DTPL_LAPACK_LIBRARIES=%{math_ldflags}"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{scalapack_ldflags}"
+      - "-DTPL_ARPACK_LIBRARIES=%{prefix}/lib/libparpack%{libext};%{prefix}/lib/libarpack%{libext}"
+  optimization:
+    O_level: 2
+
+build:
+  parallel: true
+  in_source: false
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -ldbutterflypack -lsbutterflypack -lcbutterflypack -lzbutterflypack"

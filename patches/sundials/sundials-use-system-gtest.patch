@@ -1,0 +1,12 @@
+--- a/cmake/SundialsSetupTesting.cmake
++++ b/cmake/SundialsSetupTesting.cmake
+@@ -160,7 +160,8 @@ endif()
+ # Check if GTest is needed
+ #
+ if(SUNDIALS_TEST_ENABLE_GTEST)
+-  # find_package(GTest)
++  # Try to find system GTest first
++  find_package(GTest)
+   if(NOT (TARGET GTest::gtest_main OR TARGET GTest::Main))
+     include(FetchContent)
+     FetchContent_Declare(

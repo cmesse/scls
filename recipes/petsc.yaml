@@ -1,0 +1,237 @@
+name: petsc
+version: 3.24.2
+
+summary: Portable Extensible Toolkit for Scientific Computation
+homepage: https://petsc.org/
+license: BSD-2-Clause
+
+source:
+  url: https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-%{version}.tar.gz
+
+requires:
+  all:
+    # Build tools
+    - cmake
+    # MPI
+    - openmpi
+    # Math support
+    - gmp
+    - mpfr
+    # Partitioners
+    - metis
+    - parmetis
+    - scotch
+    # Direct solvers
+    - suitesparse
+    - superlu
+    - superlu_dist
+    - mumps
+    - strumpack
+    # I/O libraries
+    - hdf5
+    - netcdf
+    - zfp
+    # Infrastructure
+    - hwloc
+    - googletest
+  macos:
+    - openblas
+    - lapack
+    - scalapack
+  debug:
+    - blas
+    - lapack
+    - scalapack
+
+features:
+  fortran: true
+  mpi: true
+  openmp: true
+  math: parallel
+
+configure:
+  type: custom
+  command: ./configure
+  # PETSc has its own sophisticated configure - let it handle compiler detection
+  # We just specify MPI compilers and optimization flags
+  # Skip setting compiler env vars - PETSc uses command line args instead
+  skip_compiler_env: true
+  args:
+    - "--prefix=%{prefix}"
+    - "--with-debugging=0"
+    - "--disable-static"
+    - "--enable-shared"
+    - "--with-pic=true"
+    # Specify MPI compilers
+    - "--with-cc=mpicc"
+    - "--with-cxx=mpicxx"
+    - "--with-fc=mpifort"
+    # Add our optimization flags (PETSc uses COPTFLAGS, not CFLAGS)
+    - "--COPTFLAGS=-O2 -fPIC"
+    - "--CXXOPTFLAGS=-O2 -fPIC"
+    - "--FOPTFLAGS=-O2 -fPIC"
+    - "--LDFLAGS=%{ldflags}"
+    - "--with-cmake-exec=%{prefix}/bin/cmake"
+    - "--with-ctest-exec=%{prefix}/bin/ctest"
+    - "--with-cmake-dir=%{prefix}"
+    - "--with-gmp-dir=%{prefix}"
+    - "--with-googletest-dir=%{prefix}"
+    - "--with-hdf5-dir=%{prefix}"
+    - "--with-hwloc-dir=%{prefix}"
+    - "--with-mpfr-dir=%{prefix}"
+    # Partitioners
+    - "--with-metis-include=%{prefix}/include"
+    - "--with-metis-lib=%{prefix}/lib/libmetis%{libext}"
+    - "--with-parmetis-include=%{prefix}/include"
+    - "--with-parmetis-lib=%{prefix}/lib/libparmetis%{libext}"
+    - "--with-ptscotch-dir=%{prefix}"
+    # Direct solvers
+    - "--with-suitesparse-dir=%{prefix}"
+    - "--with-superlu-dir=%{prefix}"
+    - "--with-superlu_dist-dir=%{prefix}"
+    - "--with-mumps-dir=%{prefix}"
+    - "--with-strumpack-dir=%{prefix}"
+    # I/O libraries
+    - "--with-netcdf-dir=%{prefix}"
+    - "--with-zfp-include=%{prefix}/include"
+    - "--with-zfp-lib=%{prefix}/lib/libzfp%{libext}"
+  # LP64/ILP64 integer interface
+  lp64_args:
+    - "--with-64-bit-blas-indices=0"
+  ilp64_args:
+    - "--with-64-bit-blas-indices=1"
+  # Flavor-specific arguments
+  flavor_args:
+    macos:
+      - "--with-cuda=0"
+      - "--with-blas-lib=%{prefix}/lib/libopenblas%{libext}"
+      - "--with-lapack-lib=%{prefix}/lib/liblapack%{libext}"
+      - "--with-scalapack-include=%{prefix}/include"
+      - "--with-scalapack-lib=%{prefix}/lib/libscalapack%{libext}"
+      - "--with-mpi-include=%{prefix}/include"
+      - "--with-mpi-lib=%{prefix}/lib/libmpi%{libext}"
+      - "--with-mpiexec=%{prefix}/bin/mpiexec"
+      - "--with-zlib-include=%{zlib_include}"
+      - "--with-zlib-lib=%{zlib_lib}"
+      - "--CC_LINKER_FLAGS=%{ldflags} -lgfortran"
+      - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
+      - "--with-openmp=1"
+    debug:
+      - "--with-cuda=0"
+      - "--with-blas-lib=%{prefix}/lib/libblas%{libext}"
+      - "--with-lapack-lib=%{prefix}/lib/liblapack%{libext}"
+      - "--with-scalapack-include=%{prefix}/include"
+      - "--with-scalapack-lib=%{prefix}/lib/libscalapack%{libext}"
+      - "--with-mpi-include=%{prefix}/include"
+      - "--with-mpi-lib=%{prefix}/lib/libmpi%{libext}"
+      - "--with-mpiexec=%{prefix}/bin/mpiexec"
+      - "--with-zlib-include=%{zlib_include}"
+      - "--with-zlib-lib=%{zlib_lib}"
+      - "--CC_LINKER_FLAGS=%{ldflags} -lgfortran"
+      - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
+      - "--with-openmp-include=/usr/include"
+      - "--with-openmp-lib=/usr/lib64/libgomp.so.1"
+    gcc-mkl:
+      - "--with-cuda=0"
+      - "--with-blaslapack-include=%{mklroot}/include"
+      - "--with-blaslapack-lib=%{mkl_linker_flags}"
+      - "--with-scalapack-include=%{mklroot}/include"
+      - "--with-scalapack-lib=%{mkl_mpi_linker_flags}"
+      - "--with-mpi-include=%{prefix}/include"
+      - "--with-mpi-lib=%{prefix}/lib/libmpi%{libext}"
+      - "--with-mpiexec=%{prefix}/bin/mpiexec"
+      - "--with-zlib-include=%{zlib_include}"
+      - "--with-zlib-lib=%{zlib_lib}"
+      - "--CC_LINKER_FLAGS=%{ldflags} -lgfortran"
+      - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
+      - "--with-openmp-include=/usr/include"
+      - "--with-openmp-lib=/usr/lib64/libgomp.so.1"
+    intel-mkl:
+      - "--with-cuda=0"
+      - "--with-blaslapack-include=%{mklroot}/include"
+      - "--with-blaslapack-lib=%{mkl_linker_flags}"
+      - "--with-scalapack-include=%{mklroot}/include"
+      - "--with-scalapack-lib=%{mkl_mpi_linker_flags}"
+      - "--with-mpi-include=%{prefix}/include"
+      - "--with-mpi-lib=%{prefix}/lib/libmpi%{libext}"
+      - "--with-mpiexec=%{prefix}/bin/mpiexec"
+      - "--with-zlib-include=%{zlib_include}"
+      - "--with-zlib-lib=%{zlib_lib}"
+      - "--CC_LINKER_FLAGS=%{ldflags}"
+      - "--CXX_LINKER_FLAGS=%{ldflags}"
+      - "--with-openmp-include=/opt/intel/oneapi/compiler/latest/include"
+      - "--with-openmp-lib=/opt/intel/oneapi/compiler/latest/lib/libiomp5.so"
+    cuda:
+      - "--with-cuda=1"
+      - "--CUDAC=%{cuda}/bin/nvcc"
+      - "--CUDAFLAGS=-I%{prefix}/include -I%{cuda}/include"
+      - "--with-cuda-arch=%{cuda_architectures}"
+      - "--with-cuda-dir=%{cuda}"
+      - "--with-blaslapack-include=%{mklroot}/include"
+      - "--with-blaslapack-lib=%{mkl_linker_flags}"
+      - "--with-scalapack-include=%{mklroot}/include"
+      - "--with-scalapack-lib=%{mkl_mpi_linker_flags}"
+      - "--with-mpi-include=%{prefix}/include"
+      - "--with-mpi-lib=%{prefix}/lib/libmpi%{libext}"
+      - "--with-mpiexec=%{prefix}/bin/mpiexec"
+      - "--with-zlib-include=%{zlib_include}"
+      - "--with-zlib-lib=%{zlib_lib}"
+      - "--CC_LINKER_FLAGS=%{ldflags} -lgfortran"
+      - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
+      - "--with-openmp-include=/usr/include"
+      - "--with-openmp-lib=/usr/lib64/libgomp.so.1"
+  optimization:
+    O_level: 2
+
+build:
+  parallel: true
+  args:
+    - "PETSC_DIR=%{srcdir}"
+  # Platform-specific PETSC_ARCH
+  flavor_args:
+    macos:
+      - "PETSC_ARCH=arch-darwin-c-opt"
+    debug:
+      - "PETSC_ARCH=arch-linux-c-opt"
+    gcc-mkl:
+      - "PETSC_ARCH=arch-linux-c-opt"
+    intel-mkl:
+      - "PETSC_ARCH=arch-linux-c-opt"
+    cuda:
+      - "PETSC_ARCH=arch-linux-c-opt"
+
+install:
+  args:
+    - "PETSC_DIR=%{srcdir}"
+  # Platform-specific PETSC_ARCH for install
+  flavor_args:
+    macos:
+      - "PETSC_ARCH=arch-darwin-c-opt"
+    debug:
+      - "PETSC_ARCH=arch-linux-c-opt"
+    gcc-mkl:
+      - "PETSC_ARCH=arch-linux-c-opt"
+    intel-mkl:
+      - "PETSC_ARCH=arch-linux-c-opt"
+    cuda:
+      - "PETSC_ARCH=arch-linux-c-opt"
+  post:
+    # Fix Python shebangs
+    - "find %{prefix}/lib/petsc/bin -type f -exec grep -l '/usr/bin' {} \\; | xargs -I {} sed -i 's|#!/usr/bin/env python|#!/usr/bin/python3|g; s|#!/usr/bin/python$|#!/usr/bin/python3|g' {} 2>/dev/null || true"
+
+# Subpackage for examples
+subpackages:
+  - name: petsc-examples
+    summary: Examples for PETSc
+    requires:
+      - petsc
+    files:
+      - "%{prefix}/share/petsc/CMakeLists.txt"
+      - "%{prefix}/share/petsc/Makefile*"
+      - "%{prefix}/share/petsc/datafiles"
+      - "%{prefix}/share/petsc/examples"
+      - "%{prefix}/share/petsc/xml"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lpetsc"

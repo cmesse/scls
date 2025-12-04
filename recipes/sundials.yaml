@@ -1,0 +1,77 @@
+name: sundials
+version: 7.5.0
+summary: Nonlinear and Differential/Algebraic Equation Solvers
+homepage: https://computing.llnl.gov/projects/sundials
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/LLNL/sundials/releases/download/v%{version}/sundials-%{version}.tar.gz
+
+requires:
+  all:
+    - cmake
+    - suitesparse
+    - openmpi
+    - petsc
+
+features:
+  fortran: false
+  mpi: true
+  openmp: true
+  math: serial
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_STATIC_LIBS=OFF"
+    - "-DSUNDIALS_INSTALL_CMAKEDIR=lib/cmake/sundials"
+    - "-DENABLE_MPI=ON"
+    - "-DENABLE_OPENMP=ON"
+    # PETSc integration (NVECTOR_PETSC, SUNNONLINSOL_PETSCSNES)
+    - "-DENABLE_PETSC=ON"
+    - "-DPETSC_DIR=%{prefix}"
+    # SuiteSparse KLU solver
+    - "-DENABLE_KLU=ON"
+    - "-DKLU_INCLUDE_DIR=%{prefix}/include/suitesparse"
+    - "-DKLU_LIBRARY=%{prefix}/lib/libklu%{libext}"
+    - "-DMPIEXEC_EXECUTABLE=%{prefix}/bin/mpiexec"
+    - "-DEXAMPLES_ENABLE_C=OFF"
+    - "-DEXAMPLES_ENABLE_CXX=OFF"
+    - "-DEXAMPLES_INSTALL=OFF"
+    # Testing - disable GTest (SUNDIALS bundles old version incompatible with GCC 15)
+    - "-DSUNDIALS_TEST_ENABLE_UNIT_TESTS=OFF"
+    - "-DSUNDIALS_TEST_ENABLE_GTEST=OFF"
+    - "-DSUNDIALS_TEST_ENABLE_DIFF_OUTPUT=OFF"
+  # LP64/ILP64 index size
+  lp64_args:
+    - "-DSUNDIALS_INDEX_SIZE=32"
+  ilp64_args:
+    - "-DSUNDIALS_INDEX_SIZE=64"
+  flavor_args:
+    cuda:
+      - "-DENABLE_CUDA=ON"
+      - "-DCMAKE_CUDA_COMPILER=%{cuda}/bin/nvcc"
+      - "-DCMAKE_CUDA_ARCHITECTURES=%{cuda_architectures}"
+  # ILP64 with MKL enables oneMKL
+  ilp64_flavor_args:
+    gcc-mkl:
+      - "-DENABLE_ONEMKL=ON"
+    intel-mkl:
+      - "-DENABLE_ONEMKL=ON"
+    cuda:
+      - "-DENABLE_ONEMKL=ON"
+  optimization:
+    O_level: 3
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make test"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lsundials_cvode -lsundials_nvecserial"

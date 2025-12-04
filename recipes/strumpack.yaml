@@ -1,0 +1,86 @@
+name: strumpack
+version: 8.0.0
+summary: STRUctured Matrix PACKage - sparse and dense rank-structured linear solvers
+homepage: https://portal.nersc.gov/project/sparse/strumpack
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/pghysels/STRUMPACK/archive/v%{version}.tar.gz
+
+patches:
+  all:
+    - strumpack_bpack_inttype.patch
+
+requires:
+  all:
+    - cmake
+    - openmpi
+    - metis
+    - parmetis
+    - scotch
+    - zfp
+    - butterflypack
+  macos:
+    - openblas
+    - lapack
+    - scalapack
+  debug:
+    - blas
+    - lapack
+    - scalapack
+  cuda:
+    - slate
+
+features:
+  fortran: true
+  mpi: true
+  openmp: true
+  math: parallel
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_TESTING=OFF"
+    - "-DSTRUMPACK_USE_MPI=ON"
+    - "-DSTRUMPACK_USE_HIP=OFF"
+    - "-DSTRUMPACK_USE_SYCL=OFF"
+    - "-DTPL_ENABLE_BPACK=ON"
+    - "-DTPL_ENABLE_PARMETIS=ON"
+    - "-DTPL_ENABLE_SCOTCH=ON"
+    - "-DTPL_ENABLE_PTSCOTCH=ON"
+    - "-DTPL_ENABLE_ZFP=ON"
+  # LP64/ILP64 integer interface
+  lp64_args:
+    - "-DSTRUMPACK_USE_BLAS64=OFF"
+  ilp64_args:
+    - "-DSTRUMPACK_USE_BLAS64=ON"
+  flavor_args:
+    macos:
+      - "-DSTRUMPACK_USE_CUDA=OFF"
+      - "-DTPL_ENABLE_SLATE=OFF"
+    debug:
+      - "-DSTRUMPACK_USE_CUDA=OFF"
+      - "-DTPL_ENABLE_SLATE=OFF"
+    mkl:
+      - "-DSTRUMPACK_USE_CUDA=OFF"
+      - "-DTPL_ENABLE_SLATE=OFF"
+    cuda:
+      - "-DSTRUMPACK_USE_CUDA=ON"
+      - "-DTPL_ENABLE_SLATE=ON"
+      - "-Dblaspp_DIR=%{prefix}/lib/cmake/blaspp"
+      - "-Dlapackpp_DIR=%{prefix}/lib/cmake/lapackpp"
+      - "-Dslate_DIR=%{prefix}/lib/cmake/slate"
+      - "-DCMAKE_CUDA_ARCHITECTURES=%{cuda_architectures}"
+  optimization:
+    O_level: 3
+
+build:
+  parallel: true
+  in_source: false
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lstrumpack"

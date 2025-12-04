@@ -8,6 +8,8 @@ nvidia:
   hpc: "25.5"
   gds: "12.9"
   target: "sm_80"
+  # CUDA compute capabilities to target (semicolon-separated for CMake)
+  architectures: "50;52;60;61;70;75;80;86;89;90"
 
 # RPM package dependencies (for bootstrap packages only - we build our own GCC)
 rpm_build_requires:
@@ -50,3 +52,8 @@ math:
 
 # MPI implementation
 mpi: openmpi
+
+# System libraries configuration
+# When true, use system-provided libraries; when false, build our own
+system_libraries:
+  zlib: true  # Use system zlib on Linux (typically /usr/lib64/libz.so)

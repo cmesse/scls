@@ -9,7 +9,7 @@ source:
 
 features:
   fortran: true
-  mpi: false
+  mpi: true
   openmp: false
   math: serial
 
@@ -21,6 +21,7 @@ configure:
     - -DCMAKE_C_FLAGS='%{cflags} %{math_flags} -Wno-implicit-function-declaration'
     - -DCMAKE_CXX_FLAGS='%{cxxflags} %{math_flags} -Wno-implicit-function-declaration'
     - -DCMAKE_Fortran_FLAGS='%{fcflags} %{math_flags} -fallow-argument-mismatch'
+    - -DMPI=ON
     - -DMPI_BASE_DIR=%{prefix}
     - -DCMAKE_POLICY_VERSION_MINIMUM=4.0
     - -DBLAS_LIBRARIES='%{math_ldflags}'

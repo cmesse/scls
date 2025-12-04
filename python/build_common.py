@@ -197,6 +197,9 @@ def get_interface_args(recipe: Dict, flavor: Dict, section: str = 'configure') -
     Checks the recipe for 'lp64_args' and 'ilp64_args' keys under the specified
     section and returns the appropriate list based on the flavor's math.interface setting.
 
+    Also supports 'lp64_flavor_args' and 'ilp64_flavor_args' for flavor-specific
+    overrides of interface-dependent settings (e.g., MKL vendor strings).
+
     Args:
         recipe: The package recipe dictionary
         flavor: The flavor configuration dictionary
@@ -215,6 +218,7 @@ def get_interface_args(recipe: Dict, flavor: Dict, section: str = 'configure') -
     # Get interface type from flavor (default to lp64)
     math_config = flavor.get('math', {})
     interface = math_config.get('interface', 'lp64')
+    flavor_name = flavor.get('name', '')
 
     # Get interface-specific args
     if interface == 'ilp64' and 'ilp64_args' in section_config:
@@ -227,6 +231,22 @@ def get_interface_args(recipe: Dict, flavor: Dict, section: str = 'configure') -
         if isinstance(lp64_args, list):
             args.extend(lp64_args)
         print(f"Adding LP64 {section} args: {lp64_args}")
+
+    # Get interface + flavor specific args (e.g., ilp64_flavor_args for MKL vendor)
+    if interface == 'ilp64' and 'ilp64_flavor_args' in section_config:
+        ilp64_flavor_args = section_config['ilp64_flavor_args']
+        if isinstance(ilp64_flavor_args, dict) and flavor_name in ilp64_flavor_args:
+            flavor_specific = ilp64_flavor_args[flavor_name]
+            if isinstance(flavor_specific, list):
+                args.extend(flavor_specific)
+            print(f"Adding ILP64 flavor-specific {section} args for {flavor_name}: {flavor_specific}")
+    elif interface == 'lp64' and 'lp64_flavor_args' in section_config:
+        lp64_flavor_args = section_config['lp64_flavor_args']
+        if isinstance(lp64_flavor_args, dict) and flavor_name in lp64_flavor_args:
+            flavor_specific = lp64_flavor_args[flavor_name]
+            if isinstance(flavor_specific, list):
+                args.extend(flavor_specific)
+            print(f"Adding LP64 flavor-specific {section} args for {flavor_name}: {flavor_specific}")
 
     return args
 
@@ -331,7 +351,30 @@ def should_build_package(recipe: Dict, flavor: Dict) -> bool:
 
 def get_configure_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_prefix: Path) -> List[str]:
     """Get configure arguments for autotools packages"""
-    args = [f"--prefix={install_prefix}"]
+    # Determine compilers based on MPI feature
+    features = recipe.get('features', {})
+    use_mpi = features.get('mpi', False)
+
+    if use_mpi:
+        # Use MPI compiler wrappers
+        cc = 'mpicc'
+        cxx = 'mpicxx'
+        fc = 'mpifort'
+    else:
+        # Use compilers from flavor
+        compilers = flavor.get('compilers', {})
+        cc = compilers.get('cc', 'gcc')
+        cxx = compilers.get('cxx', 'g++')
+        fc = compilers.get('fc', 'gfortran')
+
+    args = [
+        f"--prefix={install_prefix}",
+        # Explicitly set compilers to avoid configure picking up system defaults
+        f"CC={cc}",
+        f"CXX={cxx}",
+        f"FC={fc}",
+        f"F77={fc}",
+    ]
 
     # Get defaults configuration if it exists
     defaults = recipe.get('configure', {}).get('defaults', {})
@@ -381,10 +424,30 @@ def get_configure_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, inst
 
 def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_prefix: Path) -> List[str]:
     """Get CMake arguments"""
+    # Determine compilers based on MPI feature
+    features = recipe.get('features', {})
+    use_mpi = features.get('mpi', False)
+
+    if use_mpi:
+        # Use MPI compiler wrappers
+        cc = 'mpicc'
+        cxx = 'mpicxx'
+        fc = 'mpifort'
+    else:
+        # Use compilers from flavor
+        compilers = flavor.get('compilers', {})
+        cc = compilers.get('cc', 'gcc')
+        cxx = compilers.get('cxx', 'g++')
+        fc = compilers.get('fc', 'gfortran')
+
     args = [
         f"-DCMAKE_INSTALL_PREFIX={install_prefix}",
         "-DCMAKE_BUILD_TYPE=Release",
         "-DCMAKE_INSTALL_LIBDIR=lib",
+        # Explicitly set compilers to avoid CMake picking up system defaults
+        f"-DCMAKE_C_COMPILER={cc}",
+        f"-DCMAKE_CXX_COMPILER={cxx}",
+        f"-DCMAKE_Fortran_COMPILER={fc}",
         # Help CMake find libraries/headers in our prefix (needed for try_run tests)
         f"-DCMAKE_PREFIX_PATH={prefix}",
         f"-DCMAKE_LIBRARY_PATH={prefix}/lib",
@@ -836,6 +899,15 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None) ->
     except Exception as e:
         print(f"Warning: Failed to get pkg-config flags for {package_name}: {e}")
 
+    # Check for custom registry section in recipe (with variable substitution)
+    recipe_cflags = None
+    recipe_ldflags = None
+    if 'registry' in recipe:
+        if 'cflags' in recipe['registry']:
+            recipe_cflags = recipe['registry']['cflags'].replace('%{prefix}', str(prefix))
+        if 'ldflags' in recipe['registry']:
+            recipe_ldflags = recipe['registry']['ldflags'].replace('%{prefix}', str(prefix))
+
     # Default flags based on prefix
     default_cflags = f"-I{prefix}/include"
     default_ldflags = f"-L{prefix}/lib -Wl,-rpath,{prefix}/lib"
@@ -867,14 +939,20 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None) ->
     except Exception as e:
         print(f"Warning: Failed to get features for {package_name}: {e}")
 
-    # Set cflags
-    if pc_cflags is not None:
+    # Set cflags - priority: recipe > pkg-config > default
+    if recipe_cflags is not None:
+        registry_entry['cflags'] = recipe_cflags
+        print(f"Registry: Using cflags from recipe for {package_name}")
+    elif pc_cflags is not None:
         registry_entry['cflags'] = pc_cflags
     elif is_library:
         registry_entry['cflags'] = default_cflags
 
-    # Set ldflags
-    if pc_ldflags is not None:
+    # Set ldflags - priority: recipe > pkg-config > default
+    if recipe_ldflags is not None:
+        registry_entry['ldflags'] = recipe_ldflags
+        print(f"Registry: Using ldflags from recipe for {package_name}")
+    elif pc_ldflags is not None:
         registry_entry['ldflags'] = pc_ldflags
     elif is_library:
         registry_entry['ldflags'] = default_ldflags
@@ -996,22 +1074,32 @@ def get_subpackages_for_flavor(recipe: Dict, flavor_name: str) -> List[Dict]:
         return []
 
     subpackages = []
-    for subpkg_name, subpkg_config in recipe['subpackages'].items():
-        # Check if this subpackage should be built for this flavor
-        allowed_flavors = subpkg_config.get('flavors', None)
+    recipe_subpackages = recipe['subpackages']
 
-        if allowed_flavors is None:
-            # No restriction - build for all flavors
-            subpackages.append({
-                'name': subpkg_name,
-                **subpkg_config
-            })
-        elif flavor_name in allowed_flavors:
-            # Flavor is in the allowed list
-            subpackages.append({
-                'name': subpkg_name,
-                **subpkg_config
-            })
+    # Handle both list and dictionary formats
+    if isinstance(recipe_subpackages, list):
+        # List format: [{'name': 'foo', 'summary': '...'}, ...]
+        for subpkg_config in recipe_subpackages:
+            subpkg_name = subpkg_config.get('name', '')
+            allowed_flavors = subpkg_config.get('flavors', None)
+
+            if allowed_flavors is None or flavor_name in allowed_flavors:
+                subpackages.append(subpkg_config)
+    else:
+        # Dictionary format: {'foo': {'summary': '...'}, ...}
+        for subpkg_name, subpkg_config in recipe_subpackages.items():
+            allowed_flavors = subpkg_config.get('flavors', None)
+
+            if allowed_flavors is None:
+                subpackages.append({
+                    'name': subpkg_name,
+                    **subpkg_config
+                })
+            elif flavor_name in allowed_flavors:
+                subpackages.append({
+                    'name': subpkg_name,
+                    **subpkg_config
+                })
 
     return subpackages
 

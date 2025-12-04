@@ -30,19 +30,18 @@ features:
   openmp: false
   math: false
 configure:
-  type: autotools
-  defaults:
-    shared: false
-    host_flags: false
+  type: custom
+  command: ./configure
+  args:
+    - '--prefix=%{prefix}'
+    - '--no-qt-gui'
+    - '--parallel=%{nprocs}'
+    - '--system-zlib'
   optimization:
     O_level: 2
     strict_aliasing: true
   pre:
      - "sed -i '/\"lib64\"/s/64//' Modules/GNUInstallDirs.cmake"
-  args:
-    - '--no-qt-gui'
-    - '--parallel=$(nproc)'
-    - '--system-zlib'
   flavor_env:
     all:
       SED: "sed"

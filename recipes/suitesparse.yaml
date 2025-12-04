@@ -1,0 +1,92 @@
+name: suitesparse
+version: 7.12.1
+summary: A collection of sparse matrix libraries
+homepage: http://faculty.cse.tamu.edu/davis/suitesparse.html
+license: LGPL-2.1-or-later AND BSD-3-Clause AND GPL-2.0-or-later
+
+source:
+  url: https://github.com/DrTimothyAldenDavis/SuiteSparse/archive/refs/tags/v%{version}.tar.gz
+
+requires:
+  all:
+    - cmake
+    - gmp
+    - mpfr
+    - metis
+  macos:
+    - openblas
+    - lapack
+  debug:
+    - blas
+    - lapack
+
+features:
+  fortran: true
+  mpi: false
+  openmp: true
+  math: serial
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_STATIC_LIBS=OFF"
+    - "-DBLA_STATIC=OFF"
+    - "-DBUILD_TESTING=ON"
+  # LP64/ILP64 integer interface
+  lp64_args:
+    - "-DSUITESPARSE_USE_64BIT_BLAS=OFF"
+  ilp64_args:
+    - "-DSUITESPARSE_USE_64BIT_BLAS=ON"
+  # BLA_VENDOR is always explicitly set per flavor
+  # For non-MKL flavors: set directly in flavor_args
+  # For MKL flavors: set via lp64_flavor_args/ilp64_flavor_args (vendor differs by interface)
+  flavor_args:
+    macos:
+      - "-DBLA_VENDOR=OpenBLAS"
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas%{libext}"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/liblapack%{libext}"
+      - "-DSUITESPARSE_USE_CUDA=OFF"
+    debug:
+      - "-DBLA_VENDOR=Generic"
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libblas%{libext}"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/liblapack%{libext}"
+      - "-DSUITESPARSE_USE_CUDA=OFF"
+    gcc-mkl:
+      - "-DSUITESPARSE_USE_CUDA=OFF"
+    intel-mkl:
+      - "-DSUITESPARSE_USE_CUDA=OFF"
+    cuda:
+      - "-DSUITESPARSE_USE_CUDA=ON"
+  # MKL vendor depends on interface (LP64 vs ILP64)
+  lp64_flavor_args:
+    gcc-mkl:
+      - "-DBLA_VENDOR=Intel10_64lp"
+    intel-mkl:
+      - "-DBLA_VENDOR=Intel10_64lp"
+    cuda:
+      - "-DBLA_VENDOR=Intel10_64lp"
+  ilp64_flavor_args:
+    gcc-mkl:
+      - "-DBLA_VENDOR=Intel10_64ilp"
+    intel-mkl:
+      - "-DBLA_VENDOR=Intel10_64ilp"
+    cuda:
+      - "-DBLA_VENDOR=Intel10_64ilp"
+  optimization:
+    O_level: 2
+
+build:
+  parallel: true
+  in_source: false
+
+# Tests disabled for now - can be enabled later
+# test:
+#   commands:
+#     - "make test"
+
+registry:
+  cflags: "-I%{prefix}/include/suitesparse"
+  ldflags: "-L%{prefix}/lib -lumfpack -lcholmod -lamd -lcolamd -lsuitesparseconfig"

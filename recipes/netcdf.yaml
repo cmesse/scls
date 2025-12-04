@@ -1,0 +1,58 @@
+name: netcdf
+version: 4.9.3
+summary: Libraries for the Unidata network Common Data Form
+homepage: http://www.unidata.ucar.edu/software/netcdf/
+license: NetCDF
+
+source:
+  url: https://downloads.unidata.ucar.edu/netcdf-c/%{version}/netcdf-c-%{version}.tar.gz
+
+requires:
+  all:
+    - cmake
+    - hdf5
+    - openmpi
+
+features:
+  fortran: false
+  mpi: true
+  openmp: false
+  math: none
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_STATIC_LIBS=OFF"
+    # HDF5 settings
+    - "-DNETCDF_ENABLE_HDF5=ON"
+    - "-DHDF5_DIR=%{prefix}"
+    - "-DHDF5_C_COMPILER_EXECUTABLE=%{prefix}/bin/h5cc"
+    - "-DHDF5_C_INCLUDE_DIR=%{prefix}/include"
+    - "-DHDF5_DIFF_EXECUTABLE=%{prefix}/bin/h5diff"
+    - "-DHDF5_hdf5_LIBRARY_RELEASE=%{prefix}/lib/libhdf5%{libext}"
+    - "-DHDF5_hdf5_hl_LIBRARY_RELEASE=%{prefix}/lib/libhdf5_hl%{libext}"
+    # Disable optional features we don't need
+    - "-DNETCDF_ENABLE_DAP=OFF"
+    - "-DNETCDF_ENABLE_DAP2=OFF"
+    - "-DNETCDF_ENABLE_DAP4=OFF"
+    - "-DNETCDF_ENABLE_EXAMPLES=OFF"
+    - "-DNETCDF_ENABLE_HDF4=OFF"
+    - "-DNETCDF_ENABLE_LIBXML2=OFF"
+    - "-DNETCDF_ENABLE_DISKLESS=OFF"
+    - "-DNETCDF_ENABLE_PLUGINS=OFF"
+    - "-DNETCDF_ENABLE_NCZARR=OFF"
+    - "-DNETCDF_ENABLE_FILTER_TESTING=OFF"
+    # MPI settings
+    - "-DMPIEXEC_EXECUTABLE=%{prefix}/bin/mpiexec"
+  optimization:
+    O_level: 2
+
+build:
+  parallel: true
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lnetcdf"

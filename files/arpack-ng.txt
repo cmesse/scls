@@ -1,6 +1,10 @@
+%{prefix}/lib/libparpack.2.1.0.dylib
+%{prefix}/lib/libparpack.dylib
+%{prefix}/lib/libparpack.2.dylib
 %{prefix}/lib/libarpack.dylib
 %{prefix}/lib/libarpack.2.1.0.dylib
 %{prefix}/lib/libarpack.2.dylib
+%{prefix}/lib/pkgconfig/parpack.pc
 %{prefix}/lib/pkgconfig/arpack.pc
 %{prefix}/lib/cmake/arpackng/arpackngTargets-release.cmake
 %{prefix}/lib/cmake/arpackng/arpackng-config.cmake
@@ -10,11 +14,13 @@
 %{prefix}/include/arpack/arpackdef.h
 %{prefix}/include/arpack/debug.h
 %{prefix}/include/arpack/debug_c.hpp
+%{prefix}/include/arpack/parpack.hpp
 %{prefix}/include/arpack/arpackicb.h
 %{prefix}/include/arpack/stat.h
 %{prefix}/include/arpack/arpack.hpp
 %{prefix}/include/arpack/debug_c.h
 %{prefix}/include/arpack/statF90.h
+%{prefix}/include/arpack/parpack.h
 %{prefix}/include/arpack/arpack.h
 %{prefix}/include/arpack/debugF90.h
 %{prefix}/include/arpack/stat_c.h

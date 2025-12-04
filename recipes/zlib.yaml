@@ -1,15 +1,18 @@
 name: zlib
-version: 1.2.12
 summary: Compression and decompression library
-homepage: https://www.zlip.net
-license: zlib and boost
+homepage: https://zlib.net
+license: zlib and Boost
 bootstrap: true  # Build with system compiler before scls gcc is available
 
-source:
-  url: https://github.com/apple-oss-distributions/zlib/archive/zlib-100.tar.gz
-
-flavors:
-  - macos
+# Platform-specific source and version
+linux:
+  version: 1.3.1
+  source:
+    url: https://zlib.net/zlib-%{version}.tar.xz
+macos:
+  version: 1.2.12
+  source:
+    url: https://github.com/apple-oss-distributions/zlib/archive/zlib-100.tar.gz
 
 features:
   fortran: false
@@ -18,22 +21,27 @@ features:
   math: false
 
 configure:
-  type: autotools
-  defaults:
-    host_flags: false
-    shared: false
+  type: custom
+  command: ./configure
+  args:
+    - "--prefix=%{prefix}"
   optimization:
     O_level: 2
     strict_aliasing: true
-  pre:
-    - "ln -s %{srcdir}/libz.exp %{srcdir}/zlib/libz.exp"
-  env:
-     - SRCROOT: "%{srcdir}/zlib"
-     - LDFLAGS: "-headerpad_max_install_names"
+  # Platform-specific pre-configure commands
+  platform_pre:
+    macos:
+      # Apple's zlib source has a different structure
+      - "ln -s %{srcdir}/libz.exp %{srcdir}/zlib/libz.exp"
+  # Platform-specific environment variables
+  platform_env:
+    macos:
+      SRCROOT: "%{srcdir}/zlib"
+      LDFLAGS: "-headerpad_max_install_names"
 
 install:
   post:
-    - "rm -v %{prefix}/lib/libz.a"
+    - "rm -vf %{prefix}/lib/libz.a"
     # Write a clean zlib.pc file (use %{final_prefix} for content, %{prefix} for file path)
     - |
       mkdir -p %{prefix}/lib/pkgconfig
@@ -51,16 +59,16 @@ install:
       Libs: -L\${libdir} -lz
       Cflags: -I\${includedir}
       EOF
-  flavor_post:
+  # Platform-specific post-install (library naming conventions differ)
+  platform_post:
     macos:
-      - "if [ -f %{prefix}/lib/libz.so.1.2.12 ]; then cd %{prefix}/lib && mv libz.so.1.2.12 libz.1.2.12.dylib; fi"
+      # Apple's build creates .so files, rename to .dylib
+      - "if [ -f %{prefix}/lib/libz.so.%{version} ]; then cd %{prefix}/lib && mv libz.so.%{version} libz.%{version}.dylib; fi"
       - "if [ -f %{prefix}/lib/libz.so.1 ]; then cd %{prefix}/lib && rm libz.so.1; fi"
       - "if [ -f %{prefix}/lib/libz.so ]; then cd %{prefix}/lib && rm libz.so; fi"
-      - "cd %{prefix}/lib && ln -sf libz.1.2.12.dylib libz.1.dylib"
-      - "cd %{prefix}/lib && ln -sf libz.1.2.12.dylib libz.dylib"
-  flavor_final_post:
-    macos:
-      - "install_name_tool -id %{prefix}/lib/libz.1.2.12.dylib %{prefix}/lib/libz.1.2.12.dylib"
+      - "cd %{prefix}/lib && ln -sf libz.%{version}.dylib libz.1.dylib"
+      - "cd %{prefix}/lib && ln -sf libz.%{version}.dylib libz.dylib"
+      - "install_name_tool -id %{prefix}/lib/libz.%{version}.dylib %{prefix}/lib/libz.%{version}.dylib"
 
 build:
   parallel: true

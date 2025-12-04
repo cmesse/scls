@@ -1,0 +1,62 @@
+name: slepc
+version: 3.24.1
+summary: Scalable Library for Eigenvalue Problem Computations
+homepage: https://slepc.upv.es/
+license: BSD-2-Clause
+
+source:
+  url: https://slepc.upv.es/download/distrib/slepc-%{version}.tar.gz
+
+requires:
+  all:
+    - petsc
+    - arpack-ng
+    - scalapack
+
+features:
+  fortran: true
+  mpi: true
+  openmp: true
+  math: parallel
+
+configure:
+  type: custom
+  command: ./configure
+  skip_compiler_env: true
+  # SLEPc needs PETSC_DIR set in environment
+  env:
+    PETSC_DIR: "%{prefix}"
+  args:
+    - "--prefix=%{prefix}"
+    # Use our ARPACK
+    - "--with-arpack-dir=%{prefix}"
+    # ScaLAPACK from PETSc
+    - "--with-scalapack=1"
+  flavor_args:
+    macos:
+      []
+    debug:
+      []
+    gcc-mkl:
+      # FEAST requires MKL
+      - "--with-feast=1"
+    intel-mkl:
+      - "--with-feast=1"
+  optimization:
+    O_level: 2
+
+# SLEPc needs PETSC_DIR and SLEPC_DIR during build
+build:
+  parallel: true
+  args:
+    - "SLEPC_DIR=%{srcdir}"
+    - "PETSC_DIR=%{prefix}"
+
+install:
+  args:
+    - "SLEPC_DIR=%{srcdir}"
+    - "PETSC_DIR=%{prefix}"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lslepc"

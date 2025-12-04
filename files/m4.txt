@@ -1,6 +1,6 @@
 %{prefix}/bin/m4
-%{prefix}/share/info/m4.info
-%{prefix}/share/info/m4.info-1
 %{prefix}/share/info/m4.info-2
-%{prefix}/share/man/man1
+%{prefix}/share/info/m4.info
+%{prefix}/share/info/dir
+%{prefix}/share/info/m4.info-1
 %{prefix}/share/man/man1/m4.1

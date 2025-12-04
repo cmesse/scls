@@ -34,8 +34,8 @@ build:
 
 install:
   post:
-    - "rm -vf %{prefix}/lib/libcrypto.a"
-    - "rm -vf %{prefix}/lib/libssl.a"
+    # Remove all static libraries - we only want shared libs
+    - "rm -vf %{prefix}/lib/*.a"
 
 test:
   commands:

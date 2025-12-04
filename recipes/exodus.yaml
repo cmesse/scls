@@ -1,0 +1,69 @@
+name: exodus
+version: 2025.10.14
+summary: EXODUS - Advanced finite element data file format
+homepage: https://github.com/sandialabs/seacas
+license: BSD-3-Clause
+
+# Version uses dots but tag uses dashes
+source:
+  url: https://github.com/sandialabs/seacas/archive/refs/tags/v2025-10-14.tar.gz
+  # Extracted directory uses dashes too
+  extract_dir: seacas-2025-10-14
+
+requires:
+  all:
+    - cmake
+    - hdf5
+    - netcdf
+    - openmpi
+
+features:
+  fortran: true
+  mpi: true
+  openmp: false
+  math: none
+
+configure:
+  type: cmake
+  pre:
+    # Fix Python shebangs (using find to handle any Python scripts)
+    - "find ./packages -name '*.py' -exec sed -i 's|#!/usr/bin/env python$|#!/usr/bin/env python3|g' {} \\; 2>/dev/null || true"
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DCMAKE_INSTALL_RPATH=%{prefix}/lib"
+    # Build only EXODUS from SEACAS
+    - "-DSeacas_ENABLE_SEACASExodus=ON"
+    - "-DSeacas_ENABLE_SEACASExodus_for=OFF"
+    - "-DSeacas_ENABLE_SEACASExoIIv2for32=OFF"
+    - "-DSeacas_ENABLE_TESTS=OFF"
+    - "-DSeacas_SKIP_FORTRANCINTERFACE_VERIFY_TEST=ON"
+    - "-DSeacas_HIDE_DEPRECATED_CODE=ON"
+    - "-DSeacas_ENABLE_Fortran=ON"
+    - "-DBUILD_TESTING=OFF"
+    # Shared library settings
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DSEACASExodus_ENABLE_SHARED=ON"
+    - "-DSEACASExodus_ENABLE_STATIC=OFF"
+    # Third-party libraries
+    - "-DTPL_ENABLE_Netcdf=ON"
+    - "-DTPL_ENABLE_MPI=ON"
+    - "-DTPL_ENABLE_Pthread=OFF"
+    - "-DSEACASExodus_ENABLE_THREADSAFE=OFF"
+    # HDF5 settings
+    - "-DHDF5_ROOT=%{prefix}"
+    - "-DHDF5_DIR=%{prefix}"
+    - "-DHDF5_NO_SYSTEM_PATHS=YES"
+    # NetCDF settings
+    - "-DNetCDF_ROOT=%{prefix}"
+    # MPI settings
+    - "-DMPI_BIN_DIR=%{prefix}/bin"
+  optimization:
+    O_level: 2
+
+build:
+  parallel: true
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lexodus"

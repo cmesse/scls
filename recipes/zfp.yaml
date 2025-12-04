@@ -1,0 +1,50 @@
+name: zfp
+version: 1.0.1
+summary: Library for compressed numerical arrays with high throughput R/W random access
+homepage: https://computation.llnl.gov/projects/floating-point-compression
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/LLNL/zfp/archive/%{version}/zfp-%{version}.tar.gz
+
+requires:
+  all:
+    - cmake
+
+features:
+  fortran: false
+  mpi: false
+  openmp: true
+  math: none
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DZFP_ENABLE_PIC=ON"
+  flavor_args:
+    macos:
+      - "-DZFP_WITH_CUDA=OFF"
+    debug:
+      - "-DZFP_WITH_CUDA=OFF"
+    mkl:
+      - "-DZFP_WITH_CUDA=OFF"
+    cuda:
+      - "-DZFP_WITH_CUDA=ON"
+      - "-DCMAKE_CUDA_ARCHITECTURES=%{cuda_architectures}"
+  optimization:
+    O_level: 3
+
+build:
+  parallel: true
+  in_source: false
+
+test:
+  commands:
+    - "make test"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lzfp"

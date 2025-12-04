@@ -95,6 +95,22 @@ class RPMBuilder:
         self.recipe = load_recipe(package)
         self.flavor = load_flavor(flavor)
 
+        # Platform is always linux for RPM builder
+        self.platform = 'linux'
+
+        # Merge platform-specific recipe sections (linux:)
+        # This allows recipes to have different version/source per platform
+        if 'linux' in self.recipe:
+            platform_section = self.recipe['linux']
+            # Merge version if specified
+            if 'version' in platform_section:
+                self.recipe['version'] = platform_section['version']
+            # Merge source if specified
+            if 'source' in platform_section:
+                if 'source' not in self.recipe:
+                    self.recipe['source'] = {}
+                self.recipe['source'].update(platform_section['source'])
+
         # Validate platform
         if self.flavor.get('platform') != 'linux':
             raise BuildError(f"Flavor {flavor} is not for Linux")
@@ -117,8 +133,15 @@ class RPMBuilder:
         self.sources_dir = self.rpm_base / "SOURCES" # DO NOT CHANGE!!!
         self.specs_dir = self.rpm_base / "SPECS" # DO NOT CHANGE!!!
 
-        self.host = "x86_64-redhat-linux"
+        # Determine host triple based on architecture
+        import platform as platform_mod
+        machine = platform_mod.machine()
+        if machine == 'aarch64':
+            self.host = "aarch64-redhat-linux"
+        else:
+            self.host = "x86_64-redhat-linux"
         self.nprocs = os.cpu_count()
+        self.lib_ext = '.so'  # Linux always uses .so
 
         # flags to be filled later
         self.cflags = ""
@@ -131,6 +154,9 @@ class RPMBuilder:
 
         # Extra source info for recipe references (populated during download_sources)
         self.extra_source_info = {}
+
+        # Source directory (set during spec generation for %{srcdir} placeholder)
+        self.source_dir = ""
 
         # Set install prefix
         if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
@@ -222,7 +248,7 @@ class RPMBuilder:
         return processed_commands
 
     def get_configure_pre_post_commands(self) -> tuple[list, list]:
-        """Get pre and post configure commands from recipe, including flavor-specific ones"""
+        """Get pre and post configure commands from recipe, including flavor-specific and platform-specific ones"""
         pre_commands = []
         post_commands = []
         flavor_name = self.flavor.get('name', '')
@@ -232,17 +258,22 @@ class RPMBuilder:
             if 'pre' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['pre']:
                     pre_commands.append(cmd)
-            
+
             # Flavor-specific pre commands
             if 'flavor_pre' in self.recipe['configure'] and flavor_name in self.recipe['configure']['flavor_pre']:
                 for cmd in self.recipe['configure']['flavor_pre'][flavor_name]:
                     pre_commands.append(cmd)
 
+            # Platform-specific pre commands (linux for RPM builder)
+            if 'platform_pre' in self.recipe['configure'] and self.platform in self.recipe['configure']['platform_pre']:
+                for cmd in self.recipe['configure']['platform_pre'][self.platform]:
+                    pre_commands.append(self.check_args([cmd])[0])
+
             # General post commands
             if 'post' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['post']:
                     post_commands.append(cmd)
-            
+
             # Flavor-specific post commands
             if 'flavor_post' in self.recipe['configure'] and flavor_name in self.recipe['configure']['flavor_post']:
                 for cmd in self.recipe['configure']['flavor_post'][flavor_name]:
@@ -250,17 +281,87 @@ class RPMBuilder:
 
         return pre_commands, post_commands
 
+    def get_platform_env_vars(self) -> List[Dict[str, str]]:
+        """Get platform-specific environment variables for SPEC file"""
+        env_vars = []
+
+        if 'configure' not in self.recipe:
+            return env_vars
+
+        platform_env = self.recipe['configure'].get('platform_env', {})
+        if self.platform in platform_env:
+            for var, val in platform_env[self.platform].items():
+                # Apply check_args to expand placeholders
+                expanded_val = self.check_args([str(val)])[0]
+                env_vars.append({'name': var, 'value': expanded_val})
+
+        return env_vars
+
     def check_args(self, cmd):
         cmd = [s.replace('%{prefix}', str(self.prefix)) for s in cmd]
         cmd = [s.replace('%{install_prefix}', str(self.install_prefix)) for s in cmd]
         cmd = [s.replace('%{host}', self.host) for s in cmd]
         cmd = [s.replace('%{nprocs}', str(self.nprocs)) for s in cmd]
+        cmd = [s.replace('%{srcdir}', str(self.source_dir)) for s in cmd]
+        cmd = [s.replace('%{cflags}', str(self.cflags)) for s in cmd]
+        cmd = [s.replace('%{cxxflags}', str(self.cxxflags)) for s in cmd]
+        cmd = [s.replace('%{fcflags}', str(self.fcflags)) for s in cmd]
+        cmd = [s.replace('%{ldflags}', str(self.ldflags)) for s in cmd]
+        cmd = [s.replace('%{math_flags}', str(self.math_flags)) for s in cmd]
+        cmd = [s.replace('%{math_ldflags}', str(self.math_ldflags)) for s in cmd]
+        cmd = [s.replace('%{sources}', str(self.sources_dir)) for s in cmd]
+        cmd = [s.replace('%{version}', str(self.recipe['version'])) for s in cmd]
+        cmd = [s.replace('%{name}', str(self.recipe['name'])) for s in cmd]
+        # Compilers (from flavor, with bootstrap fallback)
+        is_bootstrap = self.recipe.get('bootstrap', False)
+        if is_bootstrap and 'bootstrap_compilers' in self.flavor:
+            compilers = self.flavor['bootstrap_compilers']
+        else:
+            compilers = self.flavor.get('compilers', {})
+        cmd = [s.replace('%{cc}', compilers.get('cc', 'gcc')) for s in cmd]
+        cmd = [s.replace('%{cxx}', compilers.get('cxx', 'g++')) for s in cmd]
+        cmd = [s.replace('%{fc}', compilers.get('fc', 'gfortran')) for s in cmd]
+        # MPI compiler wrappers
+        cmd = [s.replace('%{mpicc}', 'mpicc') for s in cmd]
+        cmd = [s.replace('%{mpicxx}', 'mpicxx') for s in cmd]
+        cmd = [s.replace('%{mpifort}', 'mpifort') for s in cmd]
+        # Library extension
+        cmd = [s.replace('%{libext}', self.lib_ext) for s in cmd]
+        # CUDA paths and architectures
         cmd = [s.replace('%{cuda}', str(self.cuda_path)) for s in cmd]
-        cmd = [s.replace('%{mklroot}', str( self.mkl_root)) for s in cmd]
+        cuda_archs = self.flavor.get('nvidia', {}).get('architectures', '')
+        cmd = [s.replace('%{cuda_architectures}', cuda_archs) for s in cmd]
+        # MKL paths and linker flags
+        cmd = [s.replace('%{mklroot}', str(self.mkl_root)) for s in cmd]
+        interface = self.flavor.get('math', {}).get('interface', 'lp64')
+        if interface == 'ilp64':
+            mkl_lp = 'ilp64'
+        else:
+            mkl_lp = 'lp64'
+        mkl_linker = f'-lmkl_intel_{mkl_lp} -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+        mkl_mpi_linker = f'-lmkl_scalapack_{mkl_lp} -lmkl_intel_{mkl_lp} -lmkl_gnu_thread -lmkl_core -lmkl_blacs_intelmpi_{mkl_lp} -lgomp -lpthread -lm -ldl'
+        cmd = [s.replace('%{mkl_linker_flags}', mkl_linker) for s in cmd]
+        cmd = [s.replace('%{mkl_mpi_linker_flags}', mkl_mpi_linker) for s in cmd]
+        # Platform
+        cmd = [s.replace('%{platform}', self.platform) for s in cmd]
+        # System library paths (zlib, etc.) - check system_libraries setting in flavor
+        system_libs = self.flavor.get('system_libraries', {})
+        if system_libs.get('zlib', False):
+            # Use system zlib (Linux)
+            cmd = [s.replace('%{zlib_include}', '/usr/include') for s in cmd]
+            cmd = [s.replace('%{zlib_lib}', '/usr/lib64/libz.so') for s in cmd]
+        else:
+            # Use our built zlib
+            cmd = [s.replace('%{zlib_include}', f'{self.prefix}/include') for s in cmd]
+            cmd = [s.replace('%{zlib_lib}', f'{self.prefix}/lib/libz.so') for s in cmd]
+        # Substitute extra source info (e.g., %{gmp_version}, %{gmp_tarball})
+        for name, info in self.extra_source_info.items():
+            cmd = [s.replace(f'%{{{name}_version}}', info['version']) for s in cmd]
+            cmd = [s.replace(f'%{{{name}_tarball}}', info['tarball']) for s in cmd]
         return cmd
 
     def get_install_pre_post_commands(self) -> tuple[list, list]:
-        """Get pre and post install commands from recipe, including flavor-specific ones"""
+        """Get pre and post install commands from recipe, including flavor-specific and platform-specific ones"""
         pre_commands = []
         post_commands = []
         flavor_name = self.flavor.get('name', '')
@@ -269,22 +370,29 @@ class RPMBuilder:
             # General pre commands
             if 'pre' in self.recipe['install']:
                 for cmd in self.recipe['install']['pre']:
-                    pre_commands.append(cmd)
-            
+                    # Apply check_args for %{host}, %{prefix}, etc.
+                    pre_commands.append(self.check_args([cmd])[0])
+
             # Flavor-specific pre commands
             if 'flavor_pre' in self.recipe['install'] and flavor_name in self.recipe['install']['flavor_pre']:
                 for cmd in self.recipe['install']['flavor_pre'][flavor_name]:
-                    pre_commands.append(cmd)
+                    pre_commands.append(self.check_args([cmd])[0])
 
             # General post commands
             if 'post' in self.recipe['install']:
                 for cmd in self.recipe['install']['post']:
-                    post_commands.append(cmd)
-            
+                    # Apply check_args for %{host}, %{prefix}, etc.
+                    post_commands.append(self.check_args([cmd])[0])
+
             # Flavor-specific post commands
             if 'flavor_post' in self.recipe['install'] and flavor_name in self.recipe['install']['flavor_post']:
                 for cmd in self.recipe['install']['flavor_post'][flavor_name]:
-                    post_commands.append(cmd)
+                    post_commands.append(self.check_args([cmd])[0])
+
+            # Platform-specific post commands (linux for RPM builder)
+            if 'platform_post' in self.recipe['install'] and self.platform in self.recipe['install']['platform_post']:
+                for cmd in self.recipe['install']['platform_post'][self.platform]:
+                    post_commands.append(self.check_args([cmd])[0])
 
         return pre_commands, post_commands
 
@@ -293,8 +401,36 @@ class RPMBuilder:
         commands = []
         if 'install' in self.recipe and 'commands' in self.recipe['install']:
             for cmd in self.recipe['install']['commands']:
-                commands.append(cmd)
+                # Apply check_args for %{host}, %{prefix}, etc.
+                commands.append(self.check_args([cmd])[0])
         return commands
+
+    def get_build_pre_post_commands(self) -> tuple[list, list]:
+        """Get pre and post build commands from recipe, including LP64/ILP64 specific ones"""
+        pre_commands = []
+        post_commands = []
+
+        if 'build' in self.recipe:
+            # General pre commands
+            if 'pre' in self.recipe['build']:
+                for cmd in self.recipe['build']['pre']:
+                    pre_commands.append(self.check_args([cmd])[0])
+
+            # LP64/ILP64 interface-specific pre commands
+            interface = self.flavor.get('math', {}).get('interface', 'lp64')
+            if interface == 'ilp64' and 'ilp64_pre' in self.recipe['build']:
+                for cmd in self.recipe['build']['ilp64_pre']:
+                    pre_commands.append(self.check_args([cmd])[0])
+            elif interface == 'lp64' and 'lp64_pre' in self.recipe['build']:
+                for cmd in self.recipe['build']['lp64_pre']:
+                    pre_commands.append(self.check_args([cmd])[0])
+
+            # General post commands
+            if 'post' in self.recipe['build']:
+                for cmd in self.recipe['build']['post']:
+                    post_commands.append(self.check_args([cmd])[0])
+
+        return pre_commands, post_commands
 
     def get_intel_oneapi_setup(self) -> list:
         """Get Intel OneAPI setup commands for MKL flavors"""
@@ -312,7 +448,30 @@ class RPMBuilder:
 
     def get_configure_args_for_rpm(self) -> List[str]:
         """Get configure arguments for RPM SPEC file, preserving RPM macros"""
-        args = ["--prefix=%{prefix}"]
+        # Determine compilers based on MPI feature
+        features = self.recipe.get('features', {})
+        use_mpi = features.get('mpi', False)
+
+        if use_mpi:
+            # Use MPI compiler wrappers (env vars set in SPEC template)
+            cc = 'mpicc'
+            cxx = 'mpicxx'
+            fc = 'mpifort'
+        else:
+            # Use compilers from flavor
+            compilers = self.flavor.get('compilers', {})
+            cc = compilers.get('cc', 'gcc')
+            cxx = compilers.get('cxx', 'g++')
+            fc = compilers.get('fc', 'gfortran')
+
+        args = [
+            "--prefix=%{prefix}",
+            # Explicitly set compilers to avoid configure picking up system defaults
+            f"CC={cc}",
+            f"CXX={cxx}",
+            f"FC={fc}",
+            f"F77={fc}",
+        ]
 
         # Get defaults configuration if it exists
         defaults = self.recipe.get('configure', {}).get('defaults', {})
@@ -345,6 +504,33 @@ class RPMBuilder:
 
         # Add interface-specific arguments (LP64/ILP64)
         args.extend(get_interface_args(self.recipe, self.flavor))
+
+        return args
+
+    def get_custom_configure_args(self) -> List[str]:
+        """Get configure arguments for custom configure type (e.g., PETSc, SLEPc, OpenSSL)"""
+        args = []
+
+        # Add prefix first
+        args.append(f"--prefix=%{{prefix}}")
+
+        # Get recipe-specific configure args
+        if 'configure' in self.recipe and 'args' in self.recipe['configure']:
+            for arg in self.recipe['configure']['args']:
+                args.append(arg)
+
+        # Add flavor-specific args from recipe
+        if 'configure' in self.recipe and 'flavor_args' in self.recipe['configure']:
+            flavor_name = self.flavor.get('name', '')
+            if flavor_name in self.recipe['configure']['flavor_args']:
+                for arg in self.recipe['configure']['flavor_args'][flavor_name]:
+                    args.append(arg)
+
+        # Add interface-specific arguments (LP64/ILP64)
+        args.extend(get_interface_args(self.recipe, self.flavor))
+
+        # Process placeholders
+        args = self.check_args(args)
 
         return args
 
@@ -404,6 +590,10 @@ class RPMBuilder:
 
     def generate_spec(self) -> Path:
         """Generate RPM SPEC file from template"""
+        # Set source_dir for %{srcdir} placeholder - in RPM context, commands run from source dir
+        # so we use $PWD to reference the current (source) directory
+        self.source_dir = "$PWD"
+
         # Resolve extra sources if not already done (for spec-only mode)
         if not self.extra_source_info:
             self.resolve_extra_sources()
@@ -460,6 +650,10 @@ class RPMBuilder:
         # Process configure environment for SPEC file
         configure_env_vars = self.get_configure_env_vars()
 
+        # Add platform-specific environment variables
+        platform_env_vars = self.get_platform_env_vars()
+        configure_env_vars.extend(platform_env_vars)
+
         # Get parallel make command
         make_command = self.get_parallel_make_flags()
 
@@ -473,6 +667,7 @@ class RPMBuilder:
         configure_pre_commands, configure_post_commands = self.get_configure_pre_post_commands()
         install_pre_commands, install_post_commands = self.get_install_pre_post_commands()
         install_commands = self.get_install_commands()
+        build_pre_commands, build_post_commands = self.get_build_pre_post_commands()
 
         # Get Intel OneAPI setup
         intel_oneapi_setup = self.get_intel_oneapi_setup()
@@ -482,8 +677,16 @@ class RPMBuilder:
         if configure_type == 'cmake':
             cmake_args = self.get_cmake_args_with_paths()
 
+        # Get custom configure args if needed (for custom configure type like PETSc, SLEPc)
+        configure_args = []
+        if configure_type == 'custom':
+            configure_args = self.get_custom_configure_args()
+
         # Get build args for make-based builds
         build_args = self.get_build_args()
+
+        # Get install args
+        install_args = self.get_install_args()
 
         # Prepare template variables
         context = {
@@ -518,13 +721,18 @@ class RPMBuilder:
             'install_pre_commands': install_pre_commands,  # NEW: Pre-install commands
             'install_post_commands': install_post_commands,  # NEW: Post-install commands
             'install_commands': install_commands,  # NEW: Custom install commands (replaces make install)
+            'build_pre_commands': build_pre_commands,  # NEW: Pre-build commands
+            'build_post_commands': build_post_commands,  # NEW: Post-build commands
             'cmake_args': cmake_args,
+            'configure_args': configure_args,  # For custom configure type (PETSc, SLEPc, OpenSSL)
             'build_args': build_args,  # For make-based builds (configure.type: none)
+            'install_args': install_args,  # For install phase (e.g., PETSC_DIR)
             'configure_env_vars': configure_env_vars,
             'patches': self.get_patches(),
             'test_commands': self.get_test_commands(),
             'pre_build_setup': intel_oneapi_setup,  # UPDATED: Intel OneAPI setup
             'cuda': self.cuda_path,
+            'cuda_architectures': self.flavor.get('nvidia', {}).get('architectures', ''),
             'nv_hpc_compilers' : self.nv_hpc_compilers,
             'nv_gpu_target' : self.nv_gpu_target,
             'nprocs': "$(nproc)",
@@ -532,6 +740,7 @@ class RPMBuilder:
             'self.math_flags': self.math_flags,
             'math_ldflags': self.math_ldflags,
             'features': self.recipe.get('features', {}),
+            'skip_compiler_env': self.recipe.get('configure', {}).get('skip_compiler_env', False),
             'path_setup': self.get_path_setup(),
             'library_symlink_fixes': self.get_library_symlink_fixes(),
             'extra_source_info': self.extra_source_info,  # For recipe-referenced sources
@@ -588,6 +797,9 @@ class RPMBuilder:
             arg = arg.replace('%{ldflags}', self.ldflags)
             arg = arg.replace('%{math_flags}', self.math_flags)
             arg = arg.replace('%{math_ldflags}', self.math_ldflags)
+            # Replace CUDA architectures
+            cuda_archs = self.flavor.get('nvidia', {}).get('architectures', '')
+            arg = arg.replace('%{cuda_architectures}', cuda_archs)
             processed_args.append(arg)
 
         return processed_args
@@ -598,16 +810,35 @@ class RPMBuilder:
 
         # Add recipe build args
         if 'build' in self.recipe and 'args' in self.recipe['build']:
-            args.extend(self.recipe['build']['args'])
+            args.extend(self.check_args(self.recipe['build']['args']))
 
         # Add flavor-specific build args
         if 'build' in self.recipe and 'flavor_args' in self.recipe['build']:
             flavor_name = self.flavor.get('name', '')
             if flavor_name in self.recipe['build']['flavor_args']:
-                args.extend(self.recipe['build']['flavor_args'][flavor_name])
+                args.extend(self.check_args(self.recipe['build']['flavor_args'][flavor_name]))
 
         # Add LP64/ILP64 interface-specific build args
         args.extend(get_interface_args(self.recipe, self.flavor, 'build'))
+
+        return args
+
+    def get_install_args(self) -> List[str]:
+        """Get install arguments for make install"""
+        args = []
+
+        # Add recipe install args
+        if 'install' in self.recipe and 'args' in self.recipe['install']:
+            args.extend(self.check_args(self.recipe['install']['args']))
+
+        # Add flavor-specific install args
+        if 'install' in self.recipe and 'flavor_args' in self.recipe['install']:
+            flavor_name = self.flavor.get('name', '')
+            if flavor_name in self.recipe['install']['flavor_args']:
+                args.extend(self.check_args(self.recipe['install']['flavor_args'][flavor_name]))
+
+        # Add LP64/ILP64 interface-specific install args
+        args.extend(get_interface_args(self.recipe, self.flavor, 'install'))
 
         return args
 
