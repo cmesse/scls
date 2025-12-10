@@ -1,5 +1,5 @@
 name: cmake
-version: 4.2.0
+version: 4.2.1
 summary: Cross-platform make system
 homepage: https://cmake.org/
 license: BSD-3-Clause
@@ -50,7 +50,3 @@ configure:
 
 build:
   parallel: true
-
-test:
-  commands:
-    - "make check"

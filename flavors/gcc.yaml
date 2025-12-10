@@ -1,0 +1,32 @@
+# Linux GCC + reference BLAS/LAPACK flavor configuration
+name: gcc
+platform: linux
+description: "Default build with GCC compilers and OpenBLAS"
+prefix: /opt/scls/gcc
+
+# RPM package dependencies
+rpm_build_requires:
+  - gcc
+  - gcc-c++
+  - gcc-gfortran
+  - rpm-build
+
+bootstrap_packages:
+  - cmake
+
+# Default compilers (our custom GCC in prefix/bin - used for most packages)
+compilers:
+  cc: gcc
+  cxx: g++
+  fc: gfortran
+
+flags:
+  cflags: "-g -march=x86-64-v3 -fPIC -fno-fast-math"
+  cxxflags: "-g -march=x86-64-v3 -fPIC -fno-fast-math"
+  fflags: "-g -march=x86-64-v3 -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
+  ldflags: "-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib"
+
+math:
+  linalg: openblas
+  threading: openmp
+  interface: lp64  # 32-bit integers
