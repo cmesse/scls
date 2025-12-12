@@ -171,11 +171,11 @@ make PREFIX=%{prefix}{% for arg in build_args %} {{ arg }}{% endfor %}
 {% endfor %}
 {% endif %}
 
+{% if test_commands %}
 %check
 # Ensure our binaries are still in PATH for tests
 {{ path_setup }}
 
-{% if test_commands %}
 {% for cmd in test_commands %}
 {{ cmd }}
 {% endfor %}
@@ -211,11 +211,6 @@ make install DESTDIR=%{buildroot}{% if install_args %} {{ install_args | join(' 
 {% endfor %}
 {% endif %}
 
-%post
-{% for cmd in library_symlink_fixes %}
-{{ cmd }}
-{% endfor %}
-
 # Remove libtool archives
 find %{buildroot} -name '*.la' -delete 2>/dev/null || true
 
@@ -223,8 +218,8 @@ find %{buildroot} -name '*.la' -delete 2>/dev/null || true
 rm -rf %{buildroot}%{prefix}/share/info
 
 # Create SCLS registry entry
-mkdir -p %{prefix}/share/scls/registry
-cat > %{prefix}/share/scls/registry/{{ package_name }}.yaml << 'EOF'
+mkdir -p %{buildroot}%{prefix}/share/scls/registry
+cat > %{buildroot}%{prefix}/share/scls/registry/{{ package_name }}.yaml << 'EOF'
 name: {{ package_name }}
 version: {{ version }}
 dependencies:
@@ -240,6 +235,11 @@ features:
   math: {{ 'true' if features.math else 'false' }}
 has_pc_file: false
 EOF
+
+%post
+{% for cmd in library_symlink_fixes %}
+{{ cmd }}
+{% endfor %}
 
 # Update registry with pkg-config flags if .pc file exists
 if pkg-config --exists {{ package_name }} 2>/dev/null; then
