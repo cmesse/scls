@@ -293,7 +293,11 @@ class RPMBuilder:
             for var, val in platform_env[self.platform].items():
                 # Apply check_args to expand placeholders
                 expanded_val = self.check_args([str(val)])[0]
-                env_vars.append({'name': var, 'value': expanded_val})
+                # Handle += append syntax
+                if expanded_val.startswith('+='):
+                    env_vars.append({'name': var, 'value': expanded_val[2:], 'operation': 'append'})
+                else:
+                    env_vars.append({'name': var, 'value': expanded_val, 'operation': 'set'})
 
         return env_vars
 
@@ -850,12 +854,8 @@ class RPMBuilder:
         # Get flavor-specific RPM requirements from recipe
         flavor_name = self.flavor_name
 
-        # Non-bootstrap packages depend on our custom GCC
-        is_bootstrap = self.recipe.get('bootstrap', False)
-        if not is_bootstrap and self.package != 'gcc':
-            scls_gcc = f"scls-{self.flavor_name}-gcc"
-            build_requires.append(scls_gcc)
-            requires.append(scls_gcc)
+        # GCC dependency is handled via recipe requires section (like macOS)
+        # No automatic injection - if a package needs gcc, it should list it in requires
 
         # Add flavor-specific build requirements
         if 'rpm_build_requires' in self.recipe:
@@ -887,8 +887,7 @@ class RPMBuilder:
         features = self.recipe.get('features', {})
 
         # Bootstrap packages need system compilers
-        # Non-bootstrap packages use our SCLS GCC (already added above)
-        if is_bootstrap:
+        if self.is_bootstrap:
             compiler_cc = self.flavor.get('bootstrap_compilers', {}).get('cc', '/usr/bin/gcc')
             if 'gcc' in compiler_cc:
                 build_requires.append('gcc')
@@ -962,25 +961,34 @@ class RPMBuilder:
         """Get configure environment variables for SPEC file"""
         env_vars = []
 
-        env_vars.append({'name': 'PKG_CONFIG_PATH', 'value': "%{prefix}/lib/pkgconfig:/usr/lib/pkgconfig"})
+        env_vars.append({'name': 'PKG_CONFIG_PATH', 'value': "%{prefix}/lib/pkgconfig:/usr/lib/pkgconfig", 'operation': 'set'})
 
         if 'configure' not in self.recipe or 'env' not in self.recipe['configure']:
             return env_vars
 
         env_config = self.recipe['configure']['env']
 
+        def process_env_value(var, val):
+            """Process env value, handling += append syntax"""
+            val = str(val)
+            # Handle += append syntax: "+=-std=gnu17" means append to existing value
+            if val.startswith('+='):
+                append_val = val[2:]  # Remove the += prefix
+                return {'name': var, 'value': append_val, 'operation': 'append'}
+            else:
+                # Replace %{prefix} with RPM macro
+                val = val.replace('%{prefix}', '%{prefix}')
+                return {'name': var, 'value': val, 'operation': 'set'}
+
         # Handle both dict and list formats
         if isinstance(env_config, dict):
             for var, val in env_config.items():
-                # Replace %{prefix} with RPM macro
-                val = str(val).replace('%{prefix}', '%{prefix}')
-                env_vars.append({'name': var, 'value': val})
+                env_vars.append(process_env_value(var, val))
         elif isinstance(env_config, list):
             for env_item in env_config:
                 if isinstance(env_item, dict):
                     for var, val in env_item.items():
-                        val = str(val).replace('%{prefix}', '%{prefix}')
-                        env_vars.append({'name': var, 'value': val})
+                        env_vars.append(process_env_value(var, val))
 
         return env_vars
 
@@ -1136,6 +1144,12 @@ class RPMBuilder:
         rpm_files = []
         skipped_macos = []
 
+        # Get flavor short name from prefix (e.g., /opt/scls/gcc -> gcc)
+        # This is used to strip duplicate flavor prefixes from macOS file lists
+        flavor_short_name = self.prefix.name  # Last component of prefix path
+        # Also get the base compiler name (e.g., gcc-debug -> gcc, intel-mkl -> intel)
+        flavor_base_name = flavor_short_name.split('-')[0] if '-' in flavor_short_name else None
+
         for file_path in files:
             # Normalize to %{prefix} format
             if file_path.startswith('%{prefix}'):
@@ -1146,6 +1160,15 @@ class RPMBuilder:
                     rel_path = rel_path[1:]
             else:
                 rel_path = file_path
+
+            # Strip flavor prefix if present (avoids double prefix like /opt/scls/gcc/gcc/...)
+            # This can happen when macOS file lists are recorded relative to /opt/scls
+            # but contain gcc/ subdirectories that would duplicate the Linux prefix
+            # Check both full flavor name (gcc-debug) and base compiler name (gcc)
+            if rel_path.startswith(f'{flavor_short_name}/'):
+                rel_path = rel_path[len(flavor_short_name) + 1:]
+            elif flavor_base_name and rel_path.startswith(f'{flavor_base_name}/'):
+                rel_path = rel_path[len(flavor_base_name) + 1:]
 
             # Skip macOS-specific files
             if '.dSYM' in rel_path or rel_path.endswith('.plist'):

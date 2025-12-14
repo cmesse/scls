@@ -94,7 +94,7 @@ export LDFLAGS="{{ ldflags }}"
 # Configure-specific environment variables
 {% for env_var in configure_env_vars %}
 {% if env_var.operation == 'append' %}
-export {{ env_var.name }}="${{ env_var.name }}:{{ env_var.value }}"
+export {{ env_var.name }}="${{ env_var.name }} {{ env_var.value }}"
 {% elif env_var.operation == 'remove' %}
 # Remove operation for {{ env_var.name }} - needs manual implementation
 export {{ env_var.name }}="${{ env_var.name }}"
@@ -130,13 +130,14 @@ export {{ env_var.name }}="{{ env_var.value }}"
 {{ make_command }}
 
 {% elif configure_type == 'cmake' %}
-%cmake \
+mkdir -p build && cd build
+cmake .. \
 {% for arg in cmake_args %}
     {{ arg }}{% if not loop.last %} \{% endif %}
 
 {% endfor %}
 
-%cmake_build
+{{ make_command }}
 
 {% elif configure_type == 'custom' %}
 # Custom configuration system
@@ -198,7 +199,7 @@ make PREFIX=%{prefix}{% for arg in build_args %} {{ arg }}{% endfor %}
 %make_install{% if install_args %} {{ install_args | join(' ') }}{% endif %}
 
 {% elif configure_type == 'cmake' %}
-%cmake_install
+cd build && make install DESTDIR=%{buildroot}{% if install_args %} {{ install_args | join(' ') }}{% endif %}
 {% else %}
 make install DESTDIR=%{buildroot}{% if install_args %} {{ install_args | join(' ') }}{% endif %}
 

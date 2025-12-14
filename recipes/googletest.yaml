@@ -1,11 +1,11 @@
 name: googletest
-version: 1.14.0
+version: 1.17.0
 summary: GoogleTest - Google Testing and Mocking Framework
 homepage: https://github.com/google/googletest
 license: BSD-3-Clause
 
 source:
-  url: https://github.com/google/googletest/archive/refs/tags/v%{version}.tar.gz
+  url: https://github.com/google/googletest/releases/download/v%{version}/googletest-%{version}.tar.gz
 
 requires:
   all:

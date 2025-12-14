@@ -4,9 +4,5 @@
 %{prefix}/lib/libgmp.dylib
 %{prefix}/lib/libgmp.10.dylib
 %{prefix}/lib/libgmpxx.dylib
-%{prefix}/share/info/gmp.info-1
-%{prefix}/share/info/gmp.info
-%{prefix}/share/info/gmp.info-2
-%{prefix}/share/info/dir
 %{prefix}/lib/pkgconfig/gmp.pc
 %{prefix}/lib/pkgconfig/gmpxx.pc

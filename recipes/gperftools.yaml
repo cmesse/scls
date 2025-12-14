@@ -1,5 +1,5 @@
 name: gperftools
-version: 2.15
+version: 2.17.2
 summary: Very fast malloc and performance analysis tools
 homepage: https://github.com/gperftools/gperftools
 license: BSD
@@ -8,13 +8,17 @@ source:
   url: https://github.com/gperftools/gperftools/releases/download/gperftools-%{version}/gperftools-%{version}.tar.gz
 
 requires:
-  all:
+  macos:
     - autoconf
     - automake
     - libtool
     - make
 
 rpm_build_requires:
+  - autoconf
+  - automake
+  - libtool
+  - make
   - libunwind-devel
   - perl-generators
 
