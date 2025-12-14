@@ -1,0 +1,10 @@
+#!/bin/bash
+# SCLS - Scientific Core Libraries
+# Shell wrapper for scls.py
+
+# Find the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCLS_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Execute the Python script with all arguments
+exec python3 "$SCLS_ROOT/python/scls.py" "$@"
