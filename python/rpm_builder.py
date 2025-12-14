@@ -588,6 +588,135 @@ class RPMBuilder:
                         'url': ref_url
                     }
 
+    def is_generated_package(self) -> bool:
+        """Check if this is a generated package (no external source)."""
+        source = self.recipe.get('source', {})
+        return source.get('type') == 'generated'
+
+    def generate_generated_spec(self) -> Path:
+        """
+        Generate RPM SPEC file for a generated package (no source, templates only).
+
+        This creates a SPEC file that processes Jinja2 templates and installs
+        them to the prefix. Used for packages like scls-environment.
+        """
+        spec_file = self.specs_dir / f"scls-{self.flavor_name}-{self.package}.spec"
+
+        # Get templates config from recipe
+        templates_config = self.recipe.get('install', {}).get('templates', [])
+
+        # Build the %install section commands
+        install_commands = [
+            f"mkdir -p %{{buildroot}}%{{prefix}}/share/scls/registry",
+        ]
+
+        # For each template, we need to include the rendered content in the SPEC
+        # We'll use the jinja_env to render them now and embed the content
+        from jinja2 import Environment, FileSystemLoader
+
+        templates_dir = Path(__file__).parent.parent / "templates"
+        jinja_env = Environment(
+            loader=FileSystemLoader(str(templates_dir)),
+            trim_blocks=True,
+            lstrip_blocks=True
+        )
+
+        # Build template context
+        context = {
+            'flavor': self.flavor,
+            'prefix': str(self.prefix),
+            'package': self.package,
+            'version': self.recipe['version'],
+            'build_date': datetime.now().strftime('%Y-%m-%d'),
+            'scls_version': '1.0',
+        }
+
+        files_list = []
+
+        for tmpl_config in templates_config:
+            src_template = tmpl_config['src']
+            dest_path = tmpl_config['dest']
+            file_mode = tmpl_config.get('mode', '0644')
+
+            # Render the template
+            try:
+                template = jinja_env.get_template(src_template)
+                rendered = template.render(**context)
+            except Exception as e:
+                raise BuildError(f"Failed to render template {src_template}: {e}")
+
+            # Create install command using cat with heredoc
+            full_dest = f"%{{buildroot}}%{{prefix}}/{dest_path}"
+            parent_dir = str(Path(dest_path).parent)
+            if parent_dir != '.':
+                install_commands.append(f"mkdir -p %{{buildroot}}%{{prefix}}/{parent_dir}")
+
+            # Escape any % characters in the content (RPM macro issue)
+            escaped_content = rendered.replace('%', '%%')
+
+            install_commands.append(f"cat > {full_dest} << 'SCLS_EOF'")
+            install_commands.append(escaped_content)
+            install_commands.append("SCLS_EOF")
+            install_commands.append(f"chmod {file_mode} {full_dest}")
+
+            files_list.append(f"%{{prefix}}/{dest_path}")
+
+        # Add registry file
+        files_list.append(f"%{{prefix}}/share/scls/registry/{self.package}.yaml")
+
+        # Generate the SPEC file content
+        spec_content = f"""# Generated SPEC file for scls-{self.flavor_name}-{self.package}
+# This is a generated package - no external source
+
+%define package_name {self.package}
+%define package_version {self.recipe['version']}
+%define scls_flavor {self.flavor_name}
+%define prefix {self.prefix}
+
+Name:           scls-%{{scls_flavor}}-%{{package_name}}
+Version:        %{{package_version}}
+Release:        1%{{?dist}}
+Summary:        {self.recipe.get('summary', 'SCLS environment package')}
+License:        {self.recipe.get('license', 'BSD-3-Clause')}
+BuildArch:      noarch
+
+%description
+{self.recipe.get('summary', 'SCLS environment setup and activation scripts.')}
+
+%install
+{chr(10).join(install_commands)}
+
+# Create registry entry
+mkdir -p %{{buildroot}}%{{prefix}}/share/scls/registry
+cat > %{{buildroot}}%{{prefix}}/share/scls/registry/{self.package}.yaml << 'SCLS_EOF'
+name: {self.package}
+version: "{self.recipe['version']}"
+dependencies: []
+cflags: ""
+ldflags: ""
+features:
+  fortran: false
+  openmp: false
+  mpi: false
+  math: false
+has_pc_file: false
+SCLS_EOF
+
+%files
+{chr(10).join(files_list)}
+
+%changelog
+* {datetime.now().strftime('%a %b %d %Y')} SCLS Builder <scls@lbl.gov> - {self.recipe['version']}-1
+- Initial package
+"""
+
+        # Write the SPEC file
+        with open(spec_file, 'w') as f:
+            f.write(spec_content)
+
+        print(f"Generated SPEC file: {spec_file}")
+        return spec_file
+
     def generate_spec(self) -> Path:
         """Generate RPM SPEC file from template"""
         # Set source_dir for %{srcdir} placeholder - in RPM context, commands run from source dir
@@ -1230,11 +1359,16 @@ class RPMBuilder:
         # Setup rpmbuild directory
         self.setup_rpmbuild()
 
-        # Download sources
-        self.download_sources()
-
-        # Generate SPEC file
-        spec_file = self.generate_spec()
+        # Handle generated packages differently
+        if self.is_generated_package():
+            print("Generated package - skipping source download")
+            # Generate SPEC file for generated package
+            spec_file = self.generate_generated_spec()
+        else:
+            # Download sources
+            self.download_sources()
+            # Generate SPEC file
+            spec_file = self.generate_spec()
 
         # Build RPM
         self.build_rpm(spec_file)
@@ -1400,7 +1534,11 @@ def main():
         builder = RPMBuilder(args.package, args.flavor)
 
         if args.spec_only:
-            spec_file = builder.generate_spec()
+            # Use appropriate spec generator based on package type
+            if builder.is_generated_package():
+                spec_file = builder.generate_generated_spec()
+            else:
+                spec_file = builder.generate_spec()
             print(f"\nSPEC file generated: {spec_file}")
             print("To build RPM, run:")
             print(f"  rpmbuild -ba {builder.specs_dir}/{spec_file.name}")

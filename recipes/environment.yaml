@@ -1,0 +1,28 @@
+name: environment
+version: "2026"
+summary: SCLS environment setup, activation scripts, and configuration
+license: BSD-3-Clause
+bootstrap: true
+
+# This package has no external source - files are generated from templates
+source:
+  type: generated
+
+configure:
+  type: none
+
+# No build step needed
+build:
+  skip: true
+
+# Installation creates the activation scripts and config from templates
+install:
+  templates:
+    - src: scls-config.yaml.j2
+      dest: share/scls/config.yaml
+    - src: scls-activate.sh.j2
+      dest: share/scls/activate.sh
+      mode: "0755"
+    - src: scls-deactivate.sh.j2
+      dest: share/scls/deactivate.sh
+      mode: "0755"

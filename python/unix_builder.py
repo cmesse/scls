@@ -789,12 +789,6 @@ class UnixBuilder:
                     self.installed_files.append(dest_path)
 
             print(f"Installed {len(self.installed_files)} files")
-
-            # Save installed files list for PKG creation
-            file_list_path = self.work_dir / "installed_files.txt"
-            with open(file_list_path, 'w') as f:
-                for file in self.installed_files:
-                    f.write(f"{file}\n")
         else:
             raise BuildError(f"No files found in {src_prefix}")
 
@@ -809,6 +803,17 @@ class UnixBuilder:
 
         # Write registry entry for this package
         write_registry_entry(self.prefix, self.recipe, self.flavor_name)
+
+        # Add registry file to installed files list so it gets included in PKG
+        registry_file = self.prefix / "share" / "scls" / "registry" / f"{self.recipe['name']}.yaml"
+        if registry_file.exists():
+            self.installed_files.append(registry_file)
+
+        # Save installed files list for PKG creation (after registry entry is added)
+        file_list_path = self.work_dir / "installed_files.txt"
+        with open(file_list_path, 'w') as f:
+            for file in self.installed_files:
+                f.write(f"{file}\n")
 
     def generate_rpm_file_list(self) -> None:
         """
@@ -1019,6 +1024,94 @@ class UnixBuilder:
             print(f"Warning: Failed to create PKG {pkg_name}: {e}")
             print("Package is installed but PKG creation failed")
 
+    def install_generated(self) -> None:
+        """
+        Install a generated package (no source, templates only).
+
+        Processes Jinja2 templates from the templates/ directory and installs
+        them to the prefix. Used for packages like scls-environment that don't
+        have external source code.
+        """
+        from jinja2 import Environment, FileSystemLoader
+
+        print("\n=== Installing generated package ===")
+
+        # Setup Jinja2 environment
+        templates_dir = self.project_root / "templates"
+        jinja_env = Environment(
+            loader=FileSystemLoader(str(templates_dir)),
+            trim_blocks=True,
+            lstrip_blocks=True
+        )
+
+        # Build template context
+        context = {
+            'flavor': self.flavor,
+            'prefix': str(self.prefix),
+            'package': self.package,
+            'version': self.recipe['version'],
+            'build_date': datetime.now().strftime('%Y-%m-%d'),
+            'scls_version': '1.0',  # TODO: get from somewhere central
+        }
+
+        # Track installed files
+        self.installed_files = []
+
+        # Process each template in the install section
+        templates_config = self.recipe.get('install', {}).get('templates', [])
+
+        for tmpl_config in templates_config:
+            src_template = tmpl_config['src']
+            dest_path = tmpl_config['dest']
+            file_mode = tmpl_config.get('mode', '0644')
+
+            print(f"Processing template: {src_template} -> {dest_path}")
+
+            # Load and render template
+            try:
+                template = jinja_env.get_template(src_template)
+                rendered = template.render(**context)
+            except Exception as e:
+                raise BuildError(f"Failed to render template {src_template}: {e}")
+
+            # Determine full destination path
+            full_dest = self.prefix / dest_path
+
+            # Create parent directories
+            full_dest.parent.mkdir(parents=True, exist_ok=True)
+
+            # Write rendered content
+            with open(full_dest, 'w') as f:
+                f.write(rendered)
+
+            # Set file mode
+            os.chmod(full_dest, int(file_mode, 8))
+
+            self.installed_files.append(full_dest)
+            print(f"  Installed: {full_dest}")
+
+        print(f"\nInstalled {len(self.installed_files)} files")
+
+        # Write registry entry
+        write_registry_entry(self.prefix, self.recipe, self.flavor_name)
+
+        # Add registry file to installed files
+        registry_file = self.prefix / "share" / "scls" / "registry" / f"{self.recipe['name']}.yaml"
+        if registry_file.exists():
+            self.installed_files.append(registry_file)
+
+        # Save installed files list for PKG creation
+        self.work_dir.mkdir(parents=True, exist_ok=True)
+        file_list_path = self.work_dir / "installed_files.txt"
+        with open(file_list_path, 'w') as f:
+            for file in self.installed_files:
+                f.write(f"{file}\n")
+
+    def is_generated_package(self) -> bool:
+        """Check if this is a generated package (no external source)."""
+        source = self.recipe.get('source', {})
+        return source.get('type') == 'generated'
+
     def check_dependencies(self) -> None:
         """Check that all required dependencies are installed before building."""
         deps = get_package_dependencies(self.recipe, self.flavor_name)
@@ -1048,6 +1141,18 @@ class UnixBuilder:
 
         # Check all dependencies before starting
         self.check_dependencies()
+
+        # Handle generated packages (no source, templates only)
+        if self.is_generated_package():
+            print("Generated package - skipping download/build")
+            if 'install' in commands or 'build' in commands:
+                self.install_generated()
+            if 'pkg' in commands:
+                self.create_pkg()
+            print(f"\n{'=' * 60}")
+            print(f"Successfully completed: {', '.join(commands)}")
+            print(f"{'=' * 60}\n")
+            return
 
         # Clean work directory if it exists
         if self.work_dir.exists() and 'build' in commands:
