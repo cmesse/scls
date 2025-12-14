@@ -4009,5 +4009,3 @@
 %{prefix}/doc/cmake-4.2/cmsys/Copyright.txt
 %{prefix}/doc/cmake-4.2/cmlibarchive/COPYING
 %{prefix}/doc/cmake-4.2/cmzstd/LICENSE
-%{prefix}/gcc/doc/cmake-4.2/cmcurl/COPYING
-%{prefix}/gcc/doc/cmake-4.2/cmnghttp2/COPYING

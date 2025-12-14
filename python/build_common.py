@@ -1055,6 +1055,224 @@ def get_all_registry_entries(prefix: Path) -> Dict[str, Dict]:
     return packages
 
 
+def get_reverse_dependencies(prefix: Path, package_name: str) -> List[str]:
+    """
+    Find all packages that depend on the given package.
+
+    Args:
+        prefix: The installation prefix
+        package_name: Name of the package to check
+
+    Returns:
+        List of package names that depend on this package
+    """
+    reverse_deps = []
+    all_entries = get_all_registry_entries(prefix)
+
+    for pkg_name, entry in all_entries.items():
+        if pkg_name == package_name:
+            continue
+        deps = entry.get('dependencies', [])
+        if package_name in deps:
+            reverse_deps.append(pkg_name)
+
+    return sorted(reverse_deps)
+
+
+def get_package_files(prefix: Path, package_name: str) -> List[Path]:
+    """
+    Get the list of installed files for a package.
+
+    Reads from files/{package}.txt and converts %{prefix} paths to absolute paths.
+
+    Args:
+        prefix: The installation prefix
+        package_name: Name of the package
+
+    Returns:
+        List of absolute file paths
+    """
+    # Try to find files list in the files/ directory
+    files_list_path = Path("files") / f"{package_name}.txt"
+
+    if not files_list_path.exists():
+        return []
+
+    files = []
+    prefix_str = str(prefix)
+
+    with open(files_list_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Convert %{prefix} to actual prefix
+            if line.startswith('%{prefix}'):
+                abs_path = line.replace('%{prefix}', prefix_str)
+            else:
+                abs_path = line
+
+            # Handle wildcards - expand them
+            if '*' in abs_path:
+                import glob
+                for expanded in glob.glob(abs_path):
+                    files.append(Path(expanded))
+            else:
+                files.append(Path(abs_path))
+
+    return files
+
+
+def uninstall_package(
+    prefix: Path,
+    package_name: str,
+    with_dependencies: bool = False,
+    dry_run: bool = False,
+    force: bool = False
+) -> Tuple[bool, List[str]]:
+    """
+    Uninstall a package and optionally its dependencies.
+
+    Args:
+        prefix: The installation prefix
+        package_name: Name of the package to uninstall
+        with_dependencies: If True, also uninstall packages that this package depends on
+                          (but only if they are not required by other packages)
+        dry_run: If True, only show what would be done without actually uninstalling
+        force: If True, uninstall even if other packages depend on this one
+
+    Returns:
+        Tuple of (success, list of uninstalled packages)
+    """
+    # Check if package is installed
+    if not check_package_in_registry(prefix, package_name):
+        print(f"Package '{package_name}' is not installed")
+        return False, []
+
+    # Check for reverse dependencies (packages that depend on this one)
+    reverse_deps = get_reverse_dependencies(prefix, package_name)
+    if reverse_deps and not force:
+        print(f"Cannot uninstall '{package_name}': the following packages depend on it:")
+        for dep in reverse_deps:
+            print(f"  - {dep}")
+        print("\nUninstall those packages first, use --uninstall-dependents, or use --force.")
+        return False, []
+    elif reverse_deps and force:
+        print(f"Warning: Force-removing '{package_name}' - the following packages will be broken:")
+        for dep in reverse_deps:
+            print(f"  - {dep}")
+
+    # Build list of packages to uninstall
+    packages_to_uninstall = [package_name]
+
+    if with_dependencies:
+        entry = get_registry_entry(prefix, package_name)
+        if entry:
+            deps = entry.get('dependencies', [])
+            for dep in deps:
+                # Only add if no other package needs it
+                dep_reverse_deps = get_reverse_dependencies(prefix, dep)
+                # Remove the package we're uninstalling from the reverse deps
+                dep_reverse_deps = [d for d in dep_reverse_deps if d != package_name]
+                if not dep_reverse_deps:
+                    packages_to_uninstall.append(dep)
+                else:
+                    print(f"  Keeping '{dep}': still required by {', '.join(dep_reverse_deps)}")
+
+    uninstalled = []
+    for pkg in packages_to_uninstall:
+        success = _uninstall_single_package(prefix, pkg, dry_run)
+        if success:
+            uninstalled.append(pkg)
+
+    return True, uninstalled
+
+
+def _uninstall_single_package(prefix: Path, package_name: str, dry_run: bool = False) -> bool:
+    """
+    Uninstall a single package (internal function).
+
+    Args:
+        prefix: The installation prefix
+        package_name: Name of the package to uninstall
+        dry_run: If True, only show what would be done
+
+    Returns:
+        True if successful
+    """
+    import shutil
+
+    print(f"\n{'[DRY RUN] ' if dry_run else ''}Uninstalling {package_name}...")
+
+    # Get list of files to remove
+    files = get_package_files(prefix, package_name)
+
+    if not files:
+        print(f"  Warning: No file list found for {package_name}")
+        print(f"  Will only remove registry entry")
+
+    # Remove files
+    removed_count = 0
+    for file_path in files:
+        if file_path.exists():
+            if dry_run:
+                print(f"  Would remove: {file_path}")
+            else:
+                try:
+                    if file_path.is_dir():
+                        shutil.rmtree(file_path)
+                    else:
+                        file_path.unlink()
+                    removed_count += 1
+                except OSError as e:
+                    print(f"  Warning: Could not remove {file_path}: {e}")
+
+    if not dry_run:
+        print(f"  Removed {removed_count} files")
+
+    # Clean up empty directories
+    if not dry_run:
+        _cleanup_empty_dirs(prefix)
+
+    # Remove registry entry
+    registry_file = prefix / "share" / "scls" / "registry" / f"{package_name}.yaml"
+    if registry_file.exists():
+        if dry_run:
+            print(f"  Would remove registry: {registry_file}")
+        else:
+            try:
+                registry_file.unlink()
+                print(f"  Removed registry entry")
+            except OSError as e:
+                print(f"  Warning: Could not remove registry entry: {e}")
+
+    return True
+
+
+def _cleanup_empty_dirs(prefix: Path) -> None:
+    """
+    Remove empty directories under the prefix.
+
+    Walks the prefix tree bottom-up and removes empty directories.
+    """
+    # Walk bottom-up to remove empty directories
+    for dirpath, dirnames, filenames in os.walk(str(prefix), topdown=False):
+        dir_path = Path(dirpath)
+        # Don't remove the prefix itself or the registry directory
+        if dir_path == prefix:
+            continue
+        if 'registry' in str(dir_path):
+            continue
+
+        try:
+            # Check if directory is empty
+            if not any(dir_path.iterdir()):
+                dir_path.rmdir()
+        except OSError:
+            pass  # Directory not empty or permission error
+
+
 # =============================================================================
 # Subpackage Functions
 # =============================================================================
