@@ -45,3 +45,4 @@
 %{prefix}/include/event2/dns_struct.h
 %{prefix}/include/event2/bufferevent_compat.h
 %{prefix}/include/event2/event_struct.h
+%{prefix}/share/scls/registry/libevent.yaml

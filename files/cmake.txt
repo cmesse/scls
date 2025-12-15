@@ -4009,3 +4009,4 @@
 %{prefix}/doc/cmake-4.2/cmsys/Copyright.txt
 %{prefix}/doc/cmake-4.2/cmlibarchive/COPYING
 %{prefix}/doc/cmake-4.2/cmzstd/LICENSE
+%{prefix}/share/scls/registry/cmake.yaml

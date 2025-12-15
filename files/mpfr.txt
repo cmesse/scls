@@ -19,3 +19,4 @@
 %{prefix}/share/doc/mpfr/examples/divworst.c
 %{prefix}/share/doc/mpfr/examples/threads.c
 %{prefix}/lib/pkgconfig/mpfr.pc
+%{prefix}/share/scls/registry/mpfr.yaml

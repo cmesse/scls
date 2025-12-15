@@ -7,3 +7,4 @@
 %{prefix}/lib/liblapack.3.12.0.dylib
 %{prefix}/lib/liblapack.3.dylib
 %{prefix}/lib/liblapacke.dylib
+%{prefix}/share/scls/registry/lapack.yaml

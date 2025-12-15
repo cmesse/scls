@@ -6,3 +6,4 @@
 %{prefix}/lib/cmake/testsweeper/testsweeperConfigVersion.cmake
 %{prefix}/lib/cmake/testsweeper/testsweeperTargets.cmake
 %{prefix}/lib/cmake/testsweeper/testsweeperConfig.cmake
+%{prefix}/share/scls/registry/testsweeper.yaml

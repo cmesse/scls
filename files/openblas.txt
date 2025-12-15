@@ -16,3 +16,4 @@
 %{prefix}/lib/pkgconfig/openblas.pc
 %{prefix}/lib/cmake/openblas/OpenBLASConfigVersion.cmake
 %{prefix}/lib/cmake/openblas/OpenBLASConfig.cmake
+%{prefix}/share/scls/registry/openblas.yaml

@@ -4,3 +4,4 @@
 %{prefix}/bin/ptest
 %{prefix}/include/parmetis.h
 %{prefix}/lib/libparmetis.dylib
+%{prefix}/share/scls/registry/parmetis.yaml

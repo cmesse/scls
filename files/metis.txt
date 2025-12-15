@@ -7,3 +7,4 @@
 %{prefix}/include/metis.h
 %{prefix}/lib/libmetis.0.dylib
 %{prefix}/lib/libmetis.dylib
+%{prefix}/share/scls/registry/metis.yaml

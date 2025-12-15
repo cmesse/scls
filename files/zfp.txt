@@ -65,3 +65,4 @@
 %{prefix}/include/zfp/internal/array/pointer1.hpp
 %{prefix}/include/zfp/internal/codec/zfpheader.hpp
 %{prefix}/include/zfp/internal/codec/genheader.hpp
+%{prefix}/share/scls/registry/zfp.yaml
