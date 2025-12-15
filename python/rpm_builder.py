@@ -43,6 +43,77 @@ from math_common import (
     get_nv_gpu_targets )
 
 
+def ensure_changelog_exists(package_name: str, version: str, release: str = "1",
+                            changelogs_dir: Path = Path("changelogs")) -> None:
+    """
+    Ensure changelog file exists for package. Creates it if missing,
+    and adds a new version entry if the current version is not present.
+
+    Args:
+        package_name: Name of the package
+        version: Current package version
+        release: Release number (default "1")
+        changelogs_dir: Directory containing changelog files
+    """
+    changelogs_dir.mkdir(exist_ok=True)
+    changelog_path = changelogs_dir / f"{package_name}.md"
+
+    # Get current date in changelog format
+    date_str = datetime.now().strftime('%a %b %d %Y')
+    version_release = f"{version}-{release}"
+
+    if not changelog_path.exists():
+        # Create new changelog file
+        content = f"""# {package_name.capitalize()} Changelog
+
+## Version {version_release} - {date_str}
+- Initial SCLS package for {package_name} {version}
+"""
+        with open(changelog_path, 'w') as f:
+            f.write(content)
+        print(f"Created changelog: {changelog_path}")
+    else:
+        # Check if current version already exists
+        with open(changelog_path, 'r') as f:
+            content = f.read()
+
+        # Look for this version in the changelog
+        # Match both "Version X.Y.Z" and "Version X.Y.Z-R" formats
+        version_pattern = f"## Version {version}"
+        if version_pattern not in content:
+            # Add new version entry at the top (after the title)
+            lines = content.split('\n')
+            new_content_lines = []
+            title_found = False
+            version_added = False
+
+            for line in lines:
+                new_content_lines.append(line)
+                # Insert new version after the title line
+                if line.startswith('# ') and not title_found:
+                    title_found = True
+                    new_content_lines.append('')
+                    new_content_lines.append(f"## Version {version_release} - {date_str}")
+                    new_content_lines.append(f"- Updated to version {version}")
+                    version_added = True
+
+            # If no title was found, prepend the new version
+            if not version_added:
+                new_content_lines = [
+                    f"# {package_name.capitalize()} Changelog",
+                    '',
+                    f"## Version {version_release} - {date_str}",
+                    f"- Updated to version {version}",
+                    ''
+                ] + lines
+
+            with open(changelog_path, 'w') as f:
+                f.write('\n'.join(new_content_lines))
+            print(f"Updated changelog with version {version}: {changelog_path}")
+        else:
+            print(f"Changelog up-to-date for {package_name} {version}")
+
+
 def load_changelog(package_name: str, changelogs_dir: Path = Path("changelogs")) -> str:
     """Load package changelog from changelogs directory and convert to RPM format"""
     changelog_path = changelogs_dir / f"{package_name}.md"
@@ -53,14 +124,14 @@ def load_changelog(package_name: str, changelogs_dir: Path = Path("changelogs"))
         # Convert Markdown to RPM changelog format
         changelog_lines = []
         current_author = "Christian Messe <cmesse@lbl.gov>"  # Default author
-        
+
         for line in content.split('\n'):
             line = line.strip()
-            
+
             # Skip empty lines and main title
             if not line or line.startswith('# '):
                 continue
-                
+
             if line.startswith('## Version'):  # Version headers
                 # Extract version and date from "## Version X.Y.Z-R - Day Mon DD YYYY"
                 parts = line.replace('## Version', '').strip()
@@ -70,14 +141,14 @@ def load_changelog(package_name: str, changelogs_dir: Path = Path("changelogs"))
                     changelog_lines.append(f"* {date_part} {current_author} - {version_part}")
                 else:
                     changelog_lines.append(f"* {parts} {current_author}")
-                    
+
             elif line.startswith('-'):  # Bullet points
                 # Keep existing bullet points
                 changelog_lines.append(line)
-                
+
             elif line.startswith('Author:'):  # Handle author lines if present
                 current_author = line.replace('Author:', '').strip()
-                
+
             elif line and not line.startswith('#'):  # Regular text
                 changelog_lines.append(f"- {line}")
 
@@ -777,7 +848,8 @@ SCLS_EOF
             description_lines.append(line.strip())
         formatted_description = '\n'.join(description_lines).strip()
 
-        # Load changelog from logs directory
+        # Ensure changelog exists and is up-to-date, then load it
+        ensure_changelog_exists(self.package, self.recipe['version'], self.get_release_string())
         changelog = load_changelog(self.package)
 
         # Process configure environment for SPEC file
