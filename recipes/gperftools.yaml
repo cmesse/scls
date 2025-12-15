@@ -21,6 +21,11 @@ rpm_build_requires:
   - make
   - libunwind-devel
   - perl-generators
+  - pprof
+
+rpm_requires:
+    - epel-release
+    - pprof
 
 features:
   fortran: false
