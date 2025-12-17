@@ -63,9 +63,12 @@ if [[ -f "$SCLS/share/scls/registry/slepc.yaml" ]]; then
 fi
 
 # MPI (OpenMPI or MPICH)
-if [[ -f "$SCLS/share/scls/registry/openmpi.yaml" ]] || \
-   [[ -f "$SCLS/share/scls/registry/mpich.yaml" ]]; then
+if [[ -f "$SCLS/share/scls/registry/openmpi.yaml" ]]; then
     export MPI_HOME="$SCLS"
+    export PRTE_MCA_hwloc_default_binding_policy=none
+elif [[ -f "$SCLS/share/scls/registry/mpich.yaml" ]]; then
+    export MPI_HOME="$SCLS"
+    export HYDRA_BINDING=none
 fi
 
 # Read flavor from config
