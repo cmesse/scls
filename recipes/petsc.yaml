@@ -62,6 +62,9 @@ configure:
     - "--disable-static"
     - "--enable-shared"
     - "--with-pic=true"
+    - "--with-threadsafety"
+    - "--with-threadsafety"
+    - "--with-openmp"
     # Specify MPI compilers
     - "--with-cc=mpicc"
     - "--with-cxx=mpicxx"
