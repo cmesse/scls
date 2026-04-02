@@ -1,5 +1,5 @@
 name: butterflypack
-version: 4.0.0
+version: 4.1.0
 summary: Rapid solving of large-scale dense linear systems using butterfly compression
 homepage: https://github.com/liuyangzhuan/ButterflyPACK
 license: BSD-3-Clause
@@ -12,9 +12,11 @@ requires:
     - cmake
     - arpack-ng
     - openmpi
+  gcc:
+    - openblas
+    - scalapack
   macos:
     - openblas
-    - lapack
     - scalapack
   debug:
     - blas
@@ -39,6 +41,11 @@ configure:
     - "-DBUILD_TESTING=OFF"
 
   flavor_args:
+    gcc:
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libopenblas%{libext}"
+      - "-DTPL_LAPACK_LIBRARIES=%{prefix}/lib/liblapack%{libext}"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack%{libext}"
+      - "-DTPL_ARPACK_LIBRARIES=%{prefix}/lib/libparpack%{libext};%{prefix}/lib/libarpack%{libext}"
     macos:
       - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libopenblas%{libext}"
       - "-DTPL_LAPACK_LIBRARIES=%{prefix}/lib/liblapack%{libext}"
@@ -56,6 +63,16 @@ configure:
       - "-DTPL_ARPACK_LIBRARIES=%{prefix}/lib/libparpack%{libext};%{prefix}/lib/libarpack%{libext}"
   optimization:
     O_level: 2
+
+install:
+  post:
+    # STRUMPACK expects sC_BPACK_wrapper.h etc. headers which are just the
+    # precision-specific C interface headers. Create symlinks from the installed
+    # xBPACK_wrapper.h headers.
+    - "cd %{prefix}/include && ln -sf sBPACK_wrapper.h sC_BPACK_wrapper.h"
+    - "cd %{prefix}/include && ln -sf dBPACK_wrapper.h dC_BPACK_wrapper.h"
+    - "cd %{prefix}/include && ln -sf cBPACK_wrapper.h cC_BPACK_wrapper.h"
+    - "cd %{prefix}/include && ln -sf zBPACK_wrapper.h zC_BPACK_wrapper.h"
 
 build:
   parallel: true

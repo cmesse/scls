@@ -1,0 +1,35 @@
+name: gklib
+version: 0.0.1
+summary: A library of various helper routines and frameworks used by KarypisLab software
+homepage: https://github.com/KarypisLab/GKlib
+license: Apache-2.0
+
+source:
+  # Pinned to commit e2856c2 (2026-02-23)
+  url: https://github.com/KarypisLab/GKlib/archive/e2856c2f595b.tar.gz
+
+requires:
+  - cmake
+
+features:
+  fortran: false
+  mpi: false
+  openmp: true
+  math: false
+
+configure:
+  type: cmake
+  args:
+    - -DCMAKE_BUILD_TYPE=Release
+    - -DCMAKE_INSTALL_LIBDIR=lib
+    # Built as a static library with -fPIC so it can be linked into libmetis.so.
+    # METIS's CMakeLists is patched to pull all GKlib symbols into libmetis.so,
+    # keeping the same single-library interface as METIS 5.1.0.
+    - -DBUILD_SHARED_LIBS=OFF
+    - -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    - -DOPENMP=ON
+  optimization:
+    O_level: 2
+
+build:
+  parallel: true

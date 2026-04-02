@@ -10,6 +10,10 @@ source:
 requires:
   all:
     - cmake
+  gcc:
+    - openblas
+  macos:
+    - openblas
 
 features:
   fortran: false
@@ -31,9 +35,12 @@ configure:
   ilp64_args:
     - "-DBLAZE_BLAS_IS_64BIT=ON"
   flavor_args:
+    gcc:
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.so"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/libopenblas.so"
     macos:
       - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
-      - "-DLAPACK_LIBRARIES=%{prefix}/lib/liblapack.dylib"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
     debug:
       - "-DBLAS_LIBRARIES=%{prefix}/lib/libblas.so"
       - "-DLAPACK_LIBRARIES=%{prefix}/lib/liblapack.so"

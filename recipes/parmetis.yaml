@@ -1,16 +1,19 @@
 name: parmetis
 version: 4.0.3
 summary: Parallel Graph Partitioning and Fill-reducing Matrix Ordering
-homepage: http://glaros.dtc.umn.edu/gkhome/views/metis
+homepage: https://github.com/KarypisLab/ParMETIS
 license: Apache-2.0
 
 source:
-  url: http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-%{version}.tar.gz
+  # Pinned to commit 8ee6a372 (2023-03-26) - no tagged releases available
+  url: https://github.com/KarypisLab/ParMETIS/archive/8ee6a372ca70.tar.gz
 
 requires:
   all:
     - cmake
-    - metis  # ParMETIS inherits LP64/ILP64 from METIS headers
+    - gklib
+    - metis
+    - openmpi
 
 features:
   fortran: false
@@ -18,19 +21,18 @@ features:
   openmp: true
   math: false
 
-patches:
-  all:
-    - parmetis_min_cmake_3.10.patch
-    - parmetis_use_installed_metis.patch
-
 configure:
   type: cmake
+  pre:
+    - "sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 3.10)/' %{srcdir}/CMakeLists.txt"
   args:
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DCMAKE_INSTALL_LIBDIR=lib"
     - "-DBUILD_SHARED_LIBS=ON"
     - "-DSHARED=ON"
     - "-DOPENMP=ON"
+    - "-DGKLIB_PATH=%{prefix}"
+    - "-DMETIS_PATH=%{prefix}"
   optimization:
     O_level: 2
 

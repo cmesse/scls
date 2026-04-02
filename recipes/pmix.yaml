@@ -4,6 +4,10 @@ summary: An extended/exascale implementation of the PMIx Standard
 homepage: https://github.com/openpmix/openpmix
 license: BSD
 
+# Not built for lbl (uses system pmix for Slurm compatibility)
+exclude_flavors:
+  - lbl
+
 source:
   url: https://github.com/pmix/pmix/releases/download/v%{version}/pmix-%{version}.tar.bz2
 

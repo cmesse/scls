@@ -7,16 +7,30 @@ license: BSD
 source:
   url: https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-%{version}.tar.bz2
 
+# Flavor-specific version overrides
+# OpenMPI 5.x requires PMIx >= 4.2.0, but the LBL HPC has system PMIx 4.1.3.
+# Use OpenMPI 4.1.6 for the lbl flavor to maintain Slurm compatibility.
+flavor_overrides:
+  lbl:
+    version: 4.1.6
+    source:
+      url: https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-%{version}.tar.bz2
+
 requires:
   all:
     - gmp
     - mpfr
     - mpc
+  gcc:
     - pmix
     - libevent
     - hwloc
+  lbl: []  # uses system pmix, hwloc, libevent
   macos:
     - gcc
+    - pmix
+    - libevent
+    - hwloc
 features:
   fortran: yes
   mpi: false
@@ -35,12 +49,19 @@ configure:
   args:
     - --enable-mpi-fortran
     - --enable-mpi1-compatibility
-    - --with-pmix=%{prefix}
-    - --with-hwloc=%{prefix}
-    - --with-hwloc-libdir=%{prefix}/lib
-    - --with-libevent=%{prefix}
-    - --with-libevent-libdir=%{prefix}/lib
   flavor_args:
+    gcc:
+      - --with-pmix=%{prefix}
+      - --with-hwloc=%{prefix}
+      - --with-hwloc-libdir=%{prefix}/lib
+      - --with-libevent=%{prefix}
+      - --with-libevent-libdir=%{prefix}/lib
+    lbl:
+      - --with-slurm
+      - --with-pmix=external
+      - --with-hwloc=external
+      - --with-libevent=external
+      - --with-ucx
     gcc-mkl-cuda:
       - --enable-mpi-ext=cuda
       - --with-cuda=%{cuda}

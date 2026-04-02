@@ -7,8 +7,27 @@ import sys
 import argparse
 
 
-def load_yaml_files(directory, flavor=None):
+def get_flavor_names(flavor_str):
+    """
+    Given a flavor name string, return a list of names to check (with inheritance).
+    Loads the flavor YAML to check for 'inherits' field.
+    """
+    if not flavor_str:
+        return []
+    names = [flavor_str]
+    flavor_path = os.path.join("flavors", f"{flavor_str}.yaml")
+    if os.path.exists(flavor_path):
+        with open(flavor_path, 'r') as f:
+            flavor_data = yaml.safe_load(f)
+            if isinstance(flavor_data, dict) and 'inherits' in flavor_data:
+                names.append(flavor_data['inherits'])
+    return names
+
+
+def load_yaml_files(directory, flavor=None, flavor_names=None):
     """Load all YAML files from the specified directory and extract package info."""
+    if flavor_names is None:
+        flavor_names = [flavor] if flavor else []
     packages = []
     for filepath in glob.glob(os.path.join(directory, "*.yaml")):
         try:
@@ -19,10 +38,14 @@ def load_yaml_files(directory, flavor=None):
                     continue
 
                 # Check if package should be built for this flavor
-                if flavor:
-                    # If 'flavors' key exists, check if our flavor is in the list
-                    if 'flavors' in data and flavor not in data['flavors']:
-                        print(f"Skipping {data['name']} - not built for flavor '{flavor}'")
+                if flavor_names:
+                    # Check exclusion first (takes precedence)
+                    if 'exclude_flavors' in data and any(n in data['exclude_flavors'] for n in flavor_names):
+                        print(f"Skipping {data['name']} - excluded for flavor '{flavor}'", file=sys.stderr)
+                        continue
+                    # If 'flavors' key exists, check if our flavor (or parent) is in the list
+                    if 'flavors' in data and not any(n in data['flavors'] for n in flavor_names):
+                        print(f"Skipping {data['name']} - not built for flavor '{flavor}'", file=sys.stderr)
                         continue
                     # If no 'flavors' key, package is built for all flavors (default behavior)
 
@@ -87,7 +110,7 @@ def load_yaml_files(directory, flavor=None):
     return packages
 
 
-def normalize_dependencies(requires, flavor=None):
+def normalize_dependencies(requires, flavor=None, flavor_names=None):
     """
     Normalize the requires field to a simple list based on flavor.
 
@@ -95,6 +118,8 @@ def normalize_dependencies(requires, flavor=None):
     - Simple list: ['pkg1', 'pkg2']
     - Flavor dict: {'all': ['pkg1'], 'macos': ['pkg2']}
     """
+    if flavor_names is None:
+        flavor_names = [flavor] if flavor else []
     if isinstance(requires, list):
         # Simple list format - applies to all flavors
         return requires
@@ -106,9 +131,11 @@ def normalize_dependencies(requires, flavor=None):
         if 'all' in requires:
             deps.extend(requires['all'])
 
-        # Then add flavor-specific dependencies if we have a flavor
-        if flavor and flavor in requires:
-            deps.extend(requires[flavor])
+        # Then add flavor-specific dependencies (with inheritance fallback)
+        for name in flavor_names:
+            if name in requires:
+                deps.extend(requires[name])
+                break
 
         # Remove duplicates while preserving order
         seen = set()
@@ -123,12 +150,12 @@ def normalize_dependencies(requires, flavor=None):
         return []
 
 
-def get_effective_dependencies(package, flavor=None):
+def get_effective_dependencies(package, flavor=None, flavor_names=None):
     """Get the effective list of dependencies for a package given a flavor."""
-    return normalize_dependencies(package['requires'], flavor)
+    return normalize_dependencies(package['requires'], flavor, flavor_names)
 
 
-def build_dependency_graph(packages, flavor=None):
+def build_dependency_graph(packages, flavor=None, flavor_names=None):
     """Build a dependency graph from the package list."""
     graph = defaultdict(set)
     in_degree = defaultdict(int)
@@ -143,7 +170,7 @@ def build_dependency_graph(packages, flavor=None):
         all_nodes.add(pkg_name)
 
         # Get effective dependencies for this flavor
-        effective_deps = get_effective_dependencies(pkg, flavor)
+        effective_deps = get_effective_dependencies(pkg, flavor, flavor_names)
 
         for dep in effective_deps:
             if dep in available_packages:
@@ -152,7 +179,8 @@ def build_dependency_graph(packages, flavor=None):
                 in_degree[pkg_name] += 1
             else:
                 print(
-                    f"Info: Dependency '{dep}' for package '{pkg_name}' not in build set for flavor '{flavor or 'all'}'")
+                    f"Info: Dependency '{dep}' for package '{pkg_name}' not in build set for flavor '{flavor or 'all'}'",
+                    file=sys.stderr)
 
     # Ensure all packages have an entry in in_degree (even if 0)
     for pkg in packages:
@@ -216,7 +244,7 @@ def get_build_order(ranks):
     return build_order
 
 
-def validate_build_order(build_order, packages, flavor=None):
+def validate_build_order(build_order, packages, flavor=None, flavor_names=None):
     """Validate that dependencies are built before dependent packages."""
     # Create a position map
     position = {pkg: idx for idx, (rank, pkg) in enumerate(build_order)}
@@ -230,7 +258,7 @@ def validate_build_order(build_order, packages, flavor=None):
             continue
 
         pkg = pkg_lookup[pkg_name]
-        deps = get_effective_dependencies(pkg, flavor)
+        deps = get_effective_dependencies(pkg, flavor, flavor_names)
 
         for dep in deps:
             if dep in position:  # Only check dependencies that are being built
@@ -241,7 +269,7 @@ def validate_build_order(build_order, packages, flavor=None):
         raise ValueError("Build order validation failed:\n  " + "\n  ".join(errors))
 
 
-def analyze_dependencies(packages, flavor=None):
+def analyze_dependencies(packages, flavor=None, flavor_names=None):
     """Analyze and report dependency statistics."""
     stats = {
         'total_packages': len(packages),
@@ -254,7 +282,7 @@ def analyze_dependencies(packages, flavor=None):
     available_packages = {pkg['name'] for pkg in packages}
 
     for pkg in packages:
-        deps = get_effective_dependencies(pkg, flavor)
+        deps = get_effective_dependencies(pkg, flavor, flavor_names)
         available_deps = [d for d in deps if d in available_packages]
 
         if available_deps:
@@ -268,10 +296,57 @@ def analyze_dependencies(packages, flavor=None):
     return stats
 
 
+def get_ordered_package_list(directory, flavor=None):
+    """Return a flat list of package names in build order for the given flavor.
+
+    Returns:
+        List of package name strings in dependency-safe build order.
+    """
+    flavor_names = get_flavor_names(flavor) if flavor else []
+    packages = load_yaml_files(directory, flavor, flavor_names)
+    if not packages:
+        return []
+
+    graph, in_degree, nodes = build_dependency_graph(packages, flavor, flavor_names)
+    ranks = topological_sort(graph, in_degree, nodes)
+    order = get_build_order(ranks)
+    return [name for _rank, name in order]
+
+
+def get_next_unbuilt_package(directory, flavor, prefix):
+    """Find the next package in build order that is not yet installed.
+
+    Args:
+        directory: Path to the recipes directory.
+        flavor: Flavor name string.
+        prefix: Installation prefix (Path) where the registry lives.
+
+    Returns:
+        Package name string, or None if all packages are installed.
+    """
+    from pathlib import Path as _Path
+
+    ordered = get_ordered_package_list(directory, flavor)
+    if not ordered:
+        return None
+
+    # Check registry for each package in order
+    registry_dir = _Path(prefix) / 'share' / 'scls' / 'registry'
+    for pkg_name in ordered:
+        registry_file = registry_dir / f'{pkg_name}.yaml'
+        if not registry_file.exists():
+            return pkg_name
+
+    return None
+
+
 def build_order(directory, flavor=None, show_stats=False):
     """Main function to generate build order from YAML files."""
+    # Resolve flavor names (with inheritance)
+    flavor_names = get_flavor_names(flavor) if flavor else []
+
     # Load YAML files with flavor filtering
-    packages = load_yaml_files(directory, flavor)
+    packages = load_yaml_files(directory, flavor, flavor_names)
     if not packages:
         print(f"No valid YAML files found in the directory{' for flavor ' + flavor if flavor else ''}.")
         return
@@ -279,7 +354,7 @@ def build_order(directory, flavor=None, show_stats=False):
     print(f"\nLoaded {len(packages)} packages{' for flavor: ' + flavor if flavor else ' (all flavors)'}")
 
     # Build dependency graph with proper flavor handling
-    graph, in_degree, nodes = build_dependency_graph(packages, flavor)
+    graph, in_degree, nodes = build_dependency_graph(packages, flavor, flavor_names)
 
     try:
         # Perform topological sort
@@ -289,7 +364,7 @@ def build_order(directory, flavor=None, show_stats=False):
         build_order_list = get_build_order(ranks)
 
         # Validate the build order
-        validate_build_order(build_order_list, packages, flavor)
+        validate_build_order(build_order_list, packages, flavor, flavor_names)
 
         # Print the build order
         print(f"\nBuild Order{' for flavor: ' + flavor if flavor else ' (all packages)'}:")
@@ -302,7 +377,7 @@ def build_order(directory, flavor=None, show_stats=False):
             # Show dependencies for this package
             pkg_obj = next((p for p in packages if p['name'] == package), None)
             if pkg_obj:
-                deps = get_effective_dependencies(pkg_obj, flavor)
+                deps = get_effective_dependencies(pkg_obj, flavor, flavor_names)
                 available_deps = [d for d in deps if d in nodes]
                 if available_deps:
                     print(f"{package} -> {', '.join(available_deps)}")
@@ -316,7 +391,7 @@ def build_order(directory, flavor=None, show_stats=False):
 
         # Show statistics if requested
         if show_stats:
-            stats = analyze_dependencies(packages, flavor)
+            stats = analyze_dependencies(packages, flavor, flavor_names)
             print("\nDependency Statistics:")
             print(f"  Packages with dependencies: {stats['packages_with_deps']}/{stats['total_packages']}")
             print(f"  Total dependency edges: {stats['total_dependencies']}")

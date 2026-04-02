@@ -11,6 +11,8 @@ requires:
   all:
     - cmake
     - metis
+  gcc:
+    - openblas
 
 features:
   fortran: true
@@ -34,6 +36,9 @@ configure:
   ilp64_args:
     - "-Denable_64bit_blas=ON"
   flavor_args:
+    gcc:
+      - "-DTPL_METIS_LIBRARIES=%{prefix}/lib/libmetis.so"
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libopenblas.so"
     macos:
       - "-DTPL_METIS_LIBRARIES=%{prefix}/lib/libmetis.dylib"
       - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
@@ -48,16 +53,6 @@ configure:
 
 build:
   parallel: true
-  post:
-    # Manually create shared libraries from object files if needed
-    - "if [ -d ./SRC/CMakeFiles/superlu.dir ] && [ ! -f ./SRC/libsuperlu.so ] && [ ! -f ./SRC/libsuperlu.dylib ]; then %{cc} %{ldflags} -shared -o ./SRC/libsuperlu.so ./SRC/CMakeFiles/superlu.dir/*.o 2>/dev/null || true; fi"
-    - "if [ -d ./FORTRAN/CMakeFiles/superlu_fortran.dir ] && [ ! -f ./FORTRAN/libsuperlu_fortran.so ] && [ ! -f ./FORTRAN/libsuperlu_fortran.dylib ]; then %{fc} %{ldflags} -shared -o ./FORTRAN/libsuperlu_fortran.so ./FORTRAN/CMakeFiles/superlu_fortran.dir/*.o 2>/dev/null || true; fi"
-
-install:
-  post:
-    # Install manually created shared libs if they exist
-    - "if [ -f ./SRC/libsuperlu.so ]; then install -m 755 ./SRC/libsuperlu.so %{buildroot}/%{prefix}/lib/; fi"
-    - "if [ -f ./FORTRAN/libsuperlu_fortran.so ]; then install -m 755 ./FORTRAN/libsuperlu_fortran.so %{buildroot}/%{prefix}/lib/; fi"
 
 test:
   commands:

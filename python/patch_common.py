@@ -328,7 +328,7 @@ def process_env_operations(env: Dict[str, str], env_ops: Dict[str, str]) -> Dict
     return env
 
 
-def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict, prefix: Path) -> Dict[str, str]:
+def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict, prefix: Path, srcdir: Path = None) -> Dict[str, str]:
     """
     Apply configure-specific environment variables from recipe
     Supports operations like +=, -=, and =
@@ -351,6 +351,8 @@ def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict,
                     processed_env = {}
                     for var, val in env_item.items():
                         val = str(val).replace('%{prefix}', str(prefix))
+                        if srcdir:
+                            val = val.replace('%{srcdir}', str(srcdir))
                         processed_env[var] = val
                     env = process_env_operations(env, processed_env)
         # Handle dict format: {"VAR": "value", "VAR2": "value2"}
@@ -359,6 +361,8 @@ def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict,
             processed_env = {}
             for var, val in env_config.items():
                 val = str(val).replace('%{prefix}', str(prefix))
+                if srcdir:
+                    val = val.replace('%{srcdir}', str(srcdir))
                 processed_env[var] = val
             env = process_env_operations(env, processed_env)
 
@@ -372,6 +376,8 @@ def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict,
             processed_env = {}
             for var, val in flavor_env.items():
                 val = str(val).replace('%{prefix}', str(prefix))
+                if srcdir:
+                    val = val.replace('%{srcdir}', str(srcdir))
                 processed_env[var] = val
             env = process_env_operations(env, processed_env)
         elif isinstance(flavor_env, list):
@@ -381,6 +387,8 @@ def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict,
                     processed_env = {}
                     for var, val in env_item.items():
                         val = str(val).replace('%{prefix}', str(prefix))
+                        if srcdir:
+                            val = val.replace('%{srcdir}', str(srcdir))
                         processed_env[var] = val
                     env = process_env_operations(env, processed_env)
 

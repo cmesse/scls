@@ -4,6 +4,10 @@ summary: Abstract asynchronous event notification library
 homepage: https://libevent.org/
 license: BSD and ISC
 
+# Not built for lbl (uses system libevent for Slurm compatibility)
+exclude_flavors:
+  - lbl
+
 source:
   url: https://github.com/libevent/libevent/releases/download/release-%{version}-stable/libevent-%{version}-stable.tar.gz
 

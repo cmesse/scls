@@ -30,7 +30,8 @@ from build_common import (
     get_subpackages_for_flavor,
     get_subpackage_dependencies,
     split_files_by_subpackage,
-    get_interface_args
+    get_interface_args,
+    resolve_flavor_key
 )
 
 from patch_common import (
@@ -66,6 +67,10 @@ class UnixBuilder:
                 if 'source' not in self.recipe:
                     self.recipe['source'] = {}
                 self.recipe['source'].update(platform_section['source'])
+
+        # Apply flavor-specific overrides (e.g., version, source URL)
+        from build_common import apply_flavor_overrides
+        self.recipe = apply_flavor_overrides(self.recipe, self.flavor)
 
         # Validate platform
         supported_platforms = ['macos', 'linux']
@@ -111,11 +116,13 @@ class UnixBuilder:
         else:
             # Linux and other Unix
             self.sdk = ""  # No SDK needed
-            machine = platform.machine()
-            if machine == 'aarch64':
-                self.host = "aarch64-unknown-linux-gnu"
-            else:
-                self.host = "x86_64-unknown-linux-gnu"
+            # Use gcc -dumpmachine to get the correct host triplet
+            try:
+                result = subprocess.run(['gcc', '-dumpmachine'], capture_output=True, text=True)
+                self.host = result.stdout.strip()
+            except Exception:
+                machine = platform.machine()
+                self.host = f"{machine}-unknown-linux-gnu"
             self.lib_ext = '.so'
             self.soname_flag = '-soname'
 
@@ -207,7 +214,7 @@ class UnixBuilder:
             )
 
             # Get ldflags from flavor
-            self.ldflags = self.flavor['flags'].get('ldflags', '')
+            self.ldflags = self.flavor['flags'].get('ldflags', '').replace('%{prefix}', str(self.prefix))
 
             # Add math flags to existing flags
             if self.math:
@@ -224,14 +231,15 @@ class UnixBuilder:
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             # Apply enhanced configure environment (supports +=, -=, etc.)
-            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
 
             # Apply platform-specific environment variables
             env = self.apply_platform_env(env)
 
-            # apply special clang hack
-            cmd = "for f in $(find . -name configure); do sed -i '' 's/--version -v -V -qversion/--version -v/g' $f; done"
-            run_command(['sh', '-c', cmd], source_dir, env, "pre-configure")
+            # apply special clang hack (macOS only - removes -qversion flag for clang compatibility)
+            if self.flavor.get('platform') == 'macos':
+                cmd = "for f in $(find . -name configure); do sed -i '' 's/--version -v -V -qversion/--version -v/g' $f; done"
+                run_command(['sh', '-c', cmd], source_dir, env, "pre-configure")
 
             # Run any pre-configure commands
             if 'configure' in self.recipe and 'pre' in self.recipe['configure']:
@@ -257,7 +265,7 @@ class UnixBuilder:
         elif configure_type == 'cmake':
 
             # Apply enhanced configure environment (supports +=, -=, etc.)
-            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
 
             # Create build directory
             build_dir = source_dir / 'build'
@@ -287,7 +295,7 @@ class UnixBuilder:
                 self.recipe, self.flavor, env['CC']
             )
 
-            self.ldflags = self.flavor['flags'].get('ldflags', '')
+            self.ldflags = self.flavor['flags'].get('ldflags', '').replace('%{prefix}', str(self.prefix))
 
             # Add math flags to existing flags
             if self.math :
@@ -304,7 +312,7 @@ class UnixBuilder:
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             # Apply enhanced configure environment (supports +=, -=, etc.)
-            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
 
             # Apply platform-specific environment variables
             env = self.apply_platform_env(env)
@@ -370,7 +378,7 @@ class UnixBuilder:
             )
 
             # Get ldflags from flavor
-            self.ldflags = self.flavor['flags'].get('ldflags', '')
+            self.ldflags = self.flavor['flags'].get('ldflags', '').replace('%{prefix}', str(self.prefix))
 
             # Add math flags to existing flags
             if self.math:
@@ -389,7 +397,7 @@ class UnixBuilder:
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             # Apply enhanced configure environment (supports +=, -=, etc.)
-            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
 
             # Apply platform-specific environment variables
             env = self.apply_platform_env(env)
@@ -414,9 +422,9 @@ class UnixBuilder:
 
             # Apply flavor-specific args
             if 'configure' in self.recipe and 'flavor_args' in self.recipe['configure']:
-                flavor_name = self.flavor.get('name', '')
-                if flavor_name in self.recipe['configure']['flavor_args']:
-                    args.extend(self.recipe['configure']['flavor_args'][flavor_name])
+                flavor_specific = resolve_flavor_key(self.flavor, self.recipe['configure']['flavor_args'])
+                if flavor_specific:
+                    args.extend(flavor_specific)
 
             # Run custom configure command
             cmd = self.check_args([configure_cmd] + args)
@@ -448,7 +456,7 @@ class UnixBuilder:
                 self.recipe, self.flavor, env['CC']
             )
 
-            self.ldflags = self.flavor['flags'].get('ldflags', '')
+            self.ldflags = self.flavor['flags'].get('ldflags', '').replace('%{prefix}', str(self.prefix))
 
             # Add math flags to existing flags
             if self.math:
@@ -489,7 +497,7 @@ class UnixBuilder:
                 self.recipe, self.flavor, env['CC']
             )
 
-            self.ldflags = self.flavor['flags'].get('ldflags', '')
+            self.ldflags = self.flavor['flags'].get('ldflags', '').replace('%{prefix}', str(self.prefix))
 
             # Add math flags to existing flags
             if self.math:
@@ -506,7 +514,7 @@ class UnixBuilder:
             env['PKG_CONFIG_PATH'] = pkg_config_path
 
             # Apply enhanced configure environment
-            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix)
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
 
             # *** CALL IT HERE ***
             self.process_custom_makefile(source_dir, env)
@@ -517,7 +525,8 @@ class UnixBuilder:
         return source_dir
 
     def check_args(self, cmd):
-        cmd = [s.replace('sed -i', 'gsed -i') for s in cmd]
+        if self.platform == 'macos':
+            cmd = [s.replace('sed -i', 'gsed -i') for s in cmd]
         cmd = [s.replace('%{prefix}', str(self.prefix)) for s in cmd]
         cmd = [s.replace('%{install_prefix}', str(self.install_prefix)) for s in cmd]
         cmd = [s.replace('%{sdk}', self.sdk) for s in cmd]
@@ -642,9 +651,9 @@ class UnixBuilder:
 
         # Add flavor-specific build args
         if 'build' in self.recipe and 'flavor_args' in self.recipe['build']:
-            flavor_name = self.flavor.get('name', 'macos')
-            if flavor_name in self.recipe['build']['flavor_args']:
-                make_cmd.extend(self.check_args(self.recipe['build']['flavor_args'][flavor_name]))
+            flavor_specific = resolve_flavor_key(self.flavor, self.recipe['build']['flavor_args'])
+            if flavor_specific:
+                make_cmd.extend(self.check_args(flavor_specific))
 
         # Add LP64/ILP64 interface-specific build args
         make_cmd.extend(get_interface_args(self.recipe, self.flavor, 'build'))
@@ -664,6 +673,19 @@ class UnixBuilder:
             return
 
         print("\n=== Running tests ===")
+
+        # Add prefix lib directory to library path so test executables
+        # can find shared libraries without requiring rpath in test binaries
+        # On macOS, use DYLD_FALLBACK_LIBRARY_PATH (not stripped by SIP)
+        lib_dir = str(self.prefix / "lib")
+        if self.platform == 'macos':
+            lib_var = 'DYLD_FALLBACK_LIBRARY_PATH'
+        else:
+            lib_var = 'LD_LIBRARY_PATH'
+        if lib_var in env:
+            env[lib_var] = f"{lib_dir}:{env[lib_var]}"
+        else:
+            env[lib_var] = lib_dir
 
         # Run any pre-test commands
         if 'pre' in self.recipe['test']:
@@ -720,10 +742,9 @@ class UnixBuilder:
                 install_cmd.extend(args)
             # Add flavor-specific install args
             if 'install' in self.recipe and 'flavor_args' in self.recipe['install']:
-                flavor_name = self.flavor.get('name', 'macos')
-                if flavor_name in self.recipe['install']['flavor_args']:
-                    flavor_args = self.check_args(self.recipe['install']['flavor_args'][flavor_name])
-                    install_cmd.extend(flavor_args)
+                flavor_specific = resolve_flavor_key(self.flavor, self.recipe['install']['flavor_args'])
+                if flavor_specific:
+                    install_cmd.extend(self.check_args(flavor_specific))
             run_command(install_cmd, build_dir, env, "install")
 
         # Run any post-install commands (with DESTDIR)
@@ -741,9 +762,9 @@ class UnixBuilder:
 
         # Run flavor-specific post-install commands
         if 'install' in self.recipe and 'flavor_post' in self.recipe['install']:
-            flavor_name = self.flavor.get('name', 'macos')
-            if flavor_name in self.recipe['install']['flavor_post']:
-                for cmd in self.recipe['install']['flavor_post'][flavor_name]:
+            flavor_post = resolve_flavor_key(self.flavor, self.recipe['install']['flavor_post'])
+            if flavor_post:
+                for cmd in flavor_post:
                     # Apply install-specific replacements FIRST (before check_args replaces %{prefix})
                     cmd = cmd.replace('%{buildroot}', str(destdir))
                     cmd = cmd.replace('%{final_prefix}', str(self.prefix))
@@ -791,9 +812,6 @@ class UnixBuilder:
             print(f"Installed {len(self.installed_files)} files")
         else:
             raise BuildError(f"No files found in {src_prefix}")
-
-        # Fix library symlinks after installation
-        self.fix_library_symlinks()
 
         # Run any final post-install commands (after files are in final location)
         self.run_final_post_install_commands()
@@ -1228,13 +1246,20 @@ class UnixBuilder:
             self.build(build_dir, env)
         else:
             # For test/install without build, find the build directory
-            build_dirs = list(self.work_dir.glob(f"{self.package}-*"))
+            # First try: if there's exactly one directory, use it (same logic as extract_source)
+            build_dirs = [d for d in self.work_dir.iterdir() if d.is_dir()] if self.work_dir.exists() else []
+            if not build_dirs:
+                raise BuildError("No build directory found. Run 'build' first.")
+            if len(build_dirs) > 1:
+                # Multiple dirs: try matching by package name (case-insensitive)
+                build_dirs = [d for d in build_dirs if d.name.lower().startswith(self.package.lower())]
             if not build_dirs:
                 raise BuildError("No build directory found. Run 'build' first.")
             build_dir = build_dirs[0]
+            self.source_dir = build_dir
             if (build_dir / 'build').exists():  # CMake build
                 build_dir = build_dir / 'build'
-            env = setup_environment(self.flavor, self.prefix, self.recipe)
+            env = setup_environment(self.flavor, self.prefix, self.source_dir)
 
         # Test
         if 'test' in commands:

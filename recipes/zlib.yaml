@@ -4,6 +4,10 @@ homepage: https://zlib.net
 license: zlib and Boost
 bootstrap: true  # Build with system compiler before scls gcc is available
 
+# Only build for these flavors
+flavors:
+  - macos
+
 # Platform-specific source and version
 linux:
   version: 1.3.1

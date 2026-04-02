@@ -1,5 +1,6 @@
 %{prefix}/include/mpc.h
-%{prefix}/lib/libmpc.dylib
-%{prefix}/lib/libmpc.3.dylib
-%{prefix}/share/info/mpc.info
+%{prefix}/lib/libmpc.so
+%{prefix}/lib/libmpc.so.*
+%{prefix}/lib/pkgconfig/mpc.pc
 %{prefix}/share/info/dir
+%{prefix}/share/info/mpc.info

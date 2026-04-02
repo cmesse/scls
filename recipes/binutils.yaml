@@ -1,0 +1,46 @@
+name: binutils
+version: 2.46.0
+summary: A collection of binary utilities
+homepage: https://www.gnu.org/software/binutils/
+license: GPL-3.0-or-later
+bootstrap: true
+
+source:
+  url: https://ftp.gnu.org/gnu/binutils/binutils-%{version}.tar.xz
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: autotools
+  defaults:
+    host_flags: false
+  args:
+    - --host=%{host}
+    - --build=%{host}
+    - --enable-ld=default
+    - --enable-plugins
+    - --enable-shared
+    - --disable-werror
+    - --enable-64-bit-bfd
+    - --enable-new-dtags
+    - --with-system-zlib
+    - --enable-default-hash-style=gnu
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+install:
+  args:
+    - tooldir=%{prefix}
+  post:
+    # GCC searches for ld/as/ar in <prefix>/<host>/bin/
+    # Create symlinks so our GCC can find binutils tools
+    - "mkdir -p %{prefix}/%{host}/bin"
+    - "for tool in ld ld.bfd ar as nm objcopy objdump ranlib readelf strip; do if [ -f %{prefix}/bin/$tool ]; then ln -sf %{prefix}/bin/$tool %{prefix}/%{host}/bin/$tool; fi; done"
+
+build:
+  parallel: true

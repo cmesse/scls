@@ -16,7 +16,7 @@ requires:
     - blas
     - lapack
   macos:
-    - lapack
+    []
 
 features:
   fortran: true

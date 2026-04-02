@@ -7,6 +7,11 @@ license: BSD-3-Clause
 source:
   url: https://github.com/Reference-LAPACK/lapack/archive/v%{version}/lapack-%{version}.tar.gz
 
+# Only build for debug flavor (reference BLAS/LAPACK)
+# gcc/lbl and macos use OpenBLAS which bundles LAPACK
+flavors:
+  - debug
+
 requires:
   all:
     - cmake

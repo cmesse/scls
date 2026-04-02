@@ -1,8 +1,76 @@
 #!/usr/bin/env bash
-if [ $(uname) = "Linux" ]; then
-    python3 python/rpm_builder.py --package $1 --flavor gcc-debug $2
-elif [ $(uname) = "Darwin" ]; then
-    /Users/christian/Applications/python/bin/python3 python/unix_builder.py --package $1 --flavor macos build install pkg $2
+SCLS_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Read flavor from flavor.conf (line 1: flavor name, line 2: optional python path)
+FLAVOR_CONF="$SCLS_DIR/flavor.conf"
+if [ ! -f "$FLAVOR_CONF" ]; then
+    echo "Error: No flavor.conf found in $SCLS_DIR"
+    echo "Create one with the flavor name on the first line, e.g.:"
+    echo "  echo 'lbl' > $FLAVOR_CONF"
+    exit 1
+fi
+FLAVOR="$(sed -n '1p' "$FLAVOR_CONF" | tr -d '[:space:]')"
+PYTHON="$(sed -n '2p' "$FLAVOR_CONF" | tr -d '[:space:]')"
+PYTHON="${PYTHON:-python3}"
+
+if [ -z "$FLAVOR" ]; then
+    echo "Error: flavor.conf is empty"
+    exit 1
+fi
+if [ ! -f "$SCLS_DIR/flavors/${FLAVOR}.yaml" ]; then
+    echo "Error: Flavor '${FLAVOR}' not found (no flavors/${FLAVOR}.yaml)"
+    exit 1
+fi
+
+# Determine if RPM mode applies
+USE_RPM=false
+if [ "$(uname)" = "Linux" ] && [ -f /etc/system-release ]; then
+    release=$(cat /etc/system-release)
+    if echo "$release" | grep -qiE '(Rocky|Red Hat|AlmaLinux|CentOS).* (9|10)\.'; then
+        USE_RPM=true
+    fi
+fi
+
+# Handle commands that don't need a package name
+case "$1" in
+    list)
+        $PYTHON python/unix_builder.py --flavor "$FLAVOR" --list
+        exit 0
+        ;;
+esac
+
+# Commands that require a package name
+if [ -z "$2" ]; then
+    echo "Usage: scls <command> <package>"
+    echo "       scls <command> next        (build/install next unbuilt package)"
+    echo "       scls list"
+    echo ""
+    echo "Active flavor: $FLAVOR"
+    exit 1
+fi
+
+PACKAGE="$2"
+
+# Resolve "next" to the next unbuilt package in build order
+if [ "$PACKAGE" = "next" ]; then
+    PACKAGE=$($PYTHON -c "
+import sys; sys.path.insert(0, '$SCLS_DIR/python')
+from build_order import get_next_unbuilt_package
+from build_common import load_flavor
+prefix = load_flavor('$FLAVOR')['prefix']
+pkg = get_next_unbuilt_package('$SCLS_DIR/recipes', '$FLAVOR', prefix)
+if pkg: print(pkg)
+else: sys.exit(1)
+" 2>/dev/null)
+    if [ $? -ne 0 ] || [ -z "$PACKAGE" ]; then
+        echo "All packages are already installed."
+        exit 0
+    fi
+    echo "Next package: $PACKAGE"
+fi
+
+if [ "$USE_RPM" = true ]; then
+    $PYTHON python/rpm_builder.py --package "$PACKAGE" --flavor "$FLAVOR" $1
 else
-    echo "Unknown operating system"
+    $PYTHON python/unix_builder.py --package "$PACKAGE" --flavor "$FLAVOR" $1
 fi

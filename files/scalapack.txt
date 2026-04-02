@@ -1,8 +1,7 @@
-%{prefix}/lib/libscalapack.dylib
-%{prefix}/lib/libscalapack.2.2.1.dylib
-%{prefix}/lib/libscalapack.2.2.dylib
-%{prefix}/lib/pkgconfig/scalapack.pc
 %{prefix}/lib/cmake/scalapack-2.2.1/scalapack-config-version.cmake
 %{prefix}/lib/cmake/scalapack-2.2.1/scalapack-config.cmake
 %{prefix}/lib/cmake/scalapack-2.2.1/scalapack-targets-release.cmake
 %{prefix}/lib/cmake/scalapack-2.2.1/scalapack-targets.cmake
+%{prefix}/lib/libscalapack.so
+%{prefix}/lib/libscalapack.so.*
+%{prefix}/lib/pkgconfig/scalapack.pc

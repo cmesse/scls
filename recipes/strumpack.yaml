@@ -22,7 +22,6 @@ requires:
     - butterflypack
   macos:
     - openblas
-    - lapack
     - scalapack
   debug:
     - blas

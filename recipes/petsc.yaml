@@ -1,5 +1,5 @@
 name: petsc
-version: 3.24.2
+version: 3.24.5
 
 summary: Portable Extensible Toolkit for Scientific Computation
 homepage: https://petsc.org/
@@ -32,11 +32,13 @@ requires:
     - netcdf
     - zfp
     # Infrastructure
-    - hwloc
     - googletest
+  gcc:
+    - hwloc
+  lbl: []  # uses system hwloc
   macos:
+    - hwloc
     - openblas
-    - lapack
     - scalapack
   debug:
     - blas
@@ -52,6 +54,9 @@ features:
 configure:
   type: custom
   command: ./configure
+  env:
+    # PETSc configure requires PETSC_DIR to be the absolute source directory path
+    - PETSC_DIR: "%{srcdir}"
   # PETSc has its own sophisticated configure - let it handle compiler detection
   # We just specify MPI compilers and optimization flags
   # Skip setting compiler env vars - PETSc uses command line args instead
@@ -80,7 +85,6 @@ configure:
     - "--with-gmp-dir=%{prefix}"
     - "--with-googletest-dir=%{prefix}"
     - "--with-hdf5-dir=%{prefix}"
-    - "--with-hwloc-dir=%{prefix}"
     - "--with-mpfr-dir=%{prefix}"
     # Partitioners
     - "--with-metis-include=%{prefix}/include"
@@ -105,8 +109,23 @@ configure:
     - "--with-64-bit-blas-indices=1"
   # Flavor-specific arguments
   flavor_args:
+    lbl:
+      - "--with-cuda=0"
+      - "--with-hwloc-dir=/usr"
+      - "--with-zlib-include=/usr/include"
+      - "--with-zlib-lib=/usr/lib64/libz.so"
+      - "--with-blaslapack-lib=%{prefix}/lib/libopenblas%{libext}"
+      - "--with-scalapack-include=%{prefix}/include"
+      - "--with-scalapack-lib=%{prefix}/lib/libscalapack%{libext}"
+      - "--with-mpi-include=%{prefix}/include"
+      - "--with-mpi-lib=%{prefix}/lib/libmpi%{libext}"
+      - "--with-mpiexec=%{prefix}/bin/mpiexec"
+      - "--CC_LINKER_FLAGS=%{ldflags} -lgfortran"
+      - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
+      - "--with-openmp=1"
     macos:
       - "--with-cuda=0"
+      - "--with-hwloc-dir=%{prefix}"
       - "--with-blas-lib=%{prefix}/lib/libopenblas%{libext}"
       - "--with-lapack-lib=%{prefix}/lib/liblapack%{libext}"
       - "--with-scalapack-include=%{prefix}/include"
@@ -192,6 +211,8 @@ build:
     - "PETSC_DIR=%{srcdir}"
   # Platform-specific PETSC_ARCH
   flavor_args:
+    lbl:
+      - "PETSC_ARCH=arch-linux-c-opt"
     macos:
       - "PETSC_ARCH=arch-darwin-c-opt"
     debug:
@@ -208,6 +229,8 @@ install:
     - "PETSC_DIR=%{srcdir}"
   # Platform-specific PETSC_ARCH for install
   flavor_args:
+    lbl:
+      - "PETSC_ARCH=arch-linux-c-opt"
     macos:
       - "PETSC_ARCH=arch-darwin-c-opt"
     debug:

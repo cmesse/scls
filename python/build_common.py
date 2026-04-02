@@ -114,12 +114,89 @@ def load_recipe(package_name: str, recipes_dir: Path = Path("recipes")) -> Dict:
     return load_yaml(recipe_path)
 
 
+def apply_flavor_overrides(recipe: Dict, flavor: Dict) -> Dict:
+    """
+    Apply flavor-specific overrides to a recipe.
+    Supports overriding version, source URL, and other fields per flavor.
+
+    The 'flavor_overrides' section in a recipe looks like:
+        flavor_overrides:
+          lbl:
+            version: 4.1.6
+            source:
+              url: https://example.com/package-%{version}.tar.gz
+    """
+    if 'flavor_overrides' not in recipe:
+        return recipe
+
+    overrides = resolve_flavor_key(flavor, recipe['flavor_overrides'])
+    if not overrides:
+        return recipe
+
+    print(f"Applying flavor overrides for {flavor.get('name', '')}")
+
+    # Override version
+    if 'version' in overrides:
+        old_version = str(recipe.get('version', ''))
+        recipe['version'] = str(overrides['version'])
+        print(f"  Version: {old_version} -> {recipe['version']}")
+
+    # Override source URL
+    if 'source' in overrides and 'url' in overrides['source']:
+        recipe['source'] = dict(recipe.get('source', {}))
+        recipe['source']['url'] = overrides['source']['url'].replace(
+            '%{version}', str(recipe['version']))
+        print(f"  Source URL: {recipe['source']['url']}")
+    elif 'version' in overrides and 'source' in recipe and 'url' in recipe['source']:
+        # Version changed but no explicit URL override — re-substitute %{version}
+        # Only works if the original URL template is still usable
+        pass  # URL was already substituted by load_yaml, can't re-substitute
+
+    return recipe
+
+
 def load_flavor(flavor_name: str, flavors_dir: Path = Path("flavors")) -> Dict:
     """Load a flavor configuration"""
     flavor_path = flavors_dir / f"{flavor_name}.yaml"
     if not flavor_path.exists():
         raise BuildError(f"Flavor not found: {flavor_path}")
     return load_yaml(flavor_path)
+
+
+def _flavor_names(flavor) -> list:
+    """
+    Internal helper: accepts either a flavor dict or a plain string.
+    Returns a list of names to check (with inheritance).
+    """
+    if isinstance(flavor, dict):
+        return get_flavor_names(flavor)
+    elif flavor:
+        return [flavor]
+    return []
+
+
+def get_flavor_names(flavor: Dict) -> list:
+    """
+    Return a list of flavor names to check, in priority order.
+    If the flavor has an 'inherits' field, the parent name is appended as fallback.
+    E.g., for flavor 'lbl' inheriting from 'gcc', returns ['lbl', 'gcc'].
+    """
+    names = [flavor.get('name', '')]
+    if 'inherits' in flavor:
+        names.append(flavor['inherits'])
+    return names
+
+
+def resolve_flavor_key(flavor: Dict, mapping: Dict):
+    """
+    Look up a flavor-specific entry in a mapping (e.g., flavor_args, flavor_env).
+    Checks the flavor name first, then falls back to the parent if 'inherits' is set.
+    Returns the value if found, or None.
+    """
+    for name in get_flavor_names(flavor):
+        if name in mapping:
+            return mapping[name]
+    return None
 
 
 def load_description(package_name: str, descriptions_dir: Path = Path("descriptions")) -> str:
@@ -235,18 +312,18 @@ def get_interface_args(recipe: Dict, flavor: Dict, section: str = 'configure') -
     # Get interface + flavor specific args (e.g., ilp64_flavor_args for MKL vendor)
     if interface == 'ilp64' and 'ilp64_flavor_args' in section_config:
         ilp64_flavor_args = section_config['ilp64_flavor_args']
-        if isinstance(ilp64_flavor_args, dict) and flavor_name in ilp64_flavor_args:
-            flavor_specific = ilp64_flavor_args[flavor_name]
-            if isinstance(flavor_specific, list):
+        if isinstance(ilp64_flavor_args, dict):
+            flavor_specific = resolve_flavor_key(flavor, ilp64_flavor_args)
+            if flavor_specific and isinstance(flavor_specific, list):
                 args.extend(flavor_specific)
-            print(f"Adding ILP64 flavor-specific {section} args for {flavor_name}: {flavor_specific}")
+                print(f"Adding ILP64 flavor-specific {section} args: {flavor_specific}")
     elif interface == 'lp64' and 'lp64_flavor_args' in section_config:
         lp64_flavor_args = section_config['lp64_flavor_args']
-        if isinstance(lp64_flavor_args, dict) and flavor_name in lp64_flavor_args:
-            flavor_specific = lp64_flavor_args[flavor_name]
-            if isinstance(flavor_specific, list):
+        if isinstance(lp64_flavor_args, dict):
+            flavor_specific = resolve_flavor_key(flavor, lp64_flavor_args)
+            if flavor_specific and isinstance(flavor_specific, list):
                 args.extend(flavor_specific)
-            print(f"Adding LP64 flavor-specific {section} args for {flavor_name}: {flavor_specific}")
+                print(f"Adding LP64 flavor-specific {section} args: {flavor_specific}")
 
     return args
 
@@ -338,15 +415,25 @@ def should_build_package(recipe: Dict, flavor: Dict) -> bool:
     Check if a package should be built for a given flavor.
     If no 'flavors' list in recipe, build for all flavors.
     If 'flavors' list exists, only build if flavor is in the list.
+    'exclude_flavors' takes precedence over 'flavors'.
     """
-    flavor_name = flavor.get('name', '')
+    names = get_flavor_names(flavor)
+
+    # Check exclusion first (takes precedence)
+    if 'exclude_flavors' in recipe:
+        for name in names:
+            if name in recipe['exclude_flavors']:
+                return False
 
     # No flavors specified = build for all
     if 'flavors' not in recipe:
         return True
 
-    # Check if current flavor is in the allowed list
-    return flavor_name in recipe['flavors']
+    # Check if current flavor or its parent is in the allowed list
+    for name in names:
+        if name in recipe['flavors']:
+            return True
+    return False
 
 
 def get_configure_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_prefix: Path) -> List[str]:
@@ -411,9 +498,9 @@ def get_configure_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, inst
 
     # Add flavor-specific args from recipe
     if 'configure' in recipe and 'flavor_args' in recipe['configure']:
-        flavor_name = flavor.get('name', '')
-        if flavor_name in recipe['configure']['flavor_args']:
-            for arg in recipe['configure']['flavor_args'][flavor_name]:
+        flavor_specific = resolve_flavor_key(flavor, recipe['configure']['flavor_args'])
+        if flavor_specific:
+            for arg in flavor_specific:
                 # Substitute variables in flavor args too
                 arg = arg.replace('%{prefix}', str(prefix))
                 arg = arg.replace('%{install_prefix}', str(install_prefix))
@@ -453,8 +540,10 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
         f"-DCMAKE_LIBRARY_PATH={prefix}/lib",
         f"-DCMAKE_INCLUDE_PATH={prefix}/include",
         # Pass linker flags so libraries in our prefix are found at link time
-        f"-DCMAKE_SHARED_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib",
-        f"-DCMAKE_EXE_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib",
+        # -rpath-link helps the linker resolve indirect shared library dependencies
+        # (e.g. libopenblas.so -> libgfortran.so) during try_compile checks
+        f"-DCMAKE_SHARED_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib -Wl,-rpath-link,{prefix}/lib",
+        f"-DCMAKE_EXE_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib -Wl,-rpath-link,{prefix}/lib",
     ]
 
     # Get defaults configuration if it exists
@@ -498,9 +587,9 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
 
     # Add flavor-specific args from recipe
     if 'configure' in recipe and 'flavor_args' in recipe['configure']:
-        flavor_name = flavor.get('name', '')
-        if flavor_name in recipe['configure']['flavor_args']:
-            for arg in recipe['configure']['flavor_args'][flavor_name]:
+        flavor_specific = resolve_flavor_key(flavor, recipe['configure']['flavor_args'])
+        if flavor_specific:
+            for arg in flavor_specific:
                 # Substitute variables in flavor args too
                 arg = arg.replace('%{prefix}', str(prefix))
                 arg = arg.replace('%{install_prefix}', str(install_prefix))
@@ -555,11 +644,9 @@ def setup_environment(flavor: Dict, prefix: Path, srcdir: Path, recipe: Dict = N
     env['PATH'] = f"{prefix}/bin:{env.get('PATH', '')}"
     env['PKG_CONFIG_PATH'] = f"{prefix}/lib/pkgconfig:{env.get('PKG_CONFIG_PATH', '')}"
 
-    # Library path setup
-    if flavor['platform'] == 'macos':
-        env['DYLD_LIBRARY_PATH'] = f"{prefix}/lib:{env.get('DYLD_LIBRARY_PATH', '')}"
-    else:
-        env['LD_LIBRARY_PATH'] = f"{prefix}/lib:{env.get('LD_LIBRARY_PATH', '')}"
+    # Library and include path setup
+    env['LIBRARY_PATH'] = f"{prefix}/lib:{env.get('LIBRARY_PATH', '')}"
+    env['CPATH'] = f"{prefix}/include:{env.get('CPATH', '')}"
 
     # Add recipe-specific environment variables (legacy support - FIXED)
     if recipe and 'configure' in recipe and 'env' in recipe['configure']:
@@ -585,8 +672,9 @@ def setup_environment(flavor: Dict, prefix: Path, srcdir: Path, recipe: Dict = N
 
         # Handle flavor-specific environment
         if 'flavor_env' in recipe['configure']:
-            if flavor_name in recipe['configure']['flavor_env']:
-                for key, value in recipe['configure']['flavor_env'][flavor_name].items():
+            flavor_env = resolve_flavor_key(flavor, recipe['configure']['flavor_env'])
+            if flavor_env:
+                for key, value in flavor_env.items():
                     value = str(value).replace('%{prefix}', str(prefix))
                     value = str(value).replace('%{srcdir}', str(srcdir))
                     env[key] = value
@@ -721,13 +809,13 @@ def get_package_cflags(prefix: Path, package_name: str) -> Optional[str]:
 # SCLS Registry Functions
 # =============================================================================
 
-def get_package_dependencies(recipe: Dict, flavor_name: str = None) -> List[str]:
+def get_package_dependencies(recipe: Dict, flavor_name = None) -> List[str]:
     """
     Get the list of dependencies for a package, including implicit gcc dependency.
 
     Args:
         recipe: The package recipe
-        flavor_name: Optional flavor name for flavor-specific dependencies
+        flavor_name: Flavor name (str) or flavor dict (with 'name' and optional 'inherits')
 
     Returns:
         List of dependency package names
@@ -739,6 +827,14 @@ def get_package_dependencies(recipe: Dict, flavor_name: str = None) -> List[str]
     if not is_bootstrap and recipe.get('name') != 'gcc':
         deps.append('gcc')
 
+    # Build list of flavor names to check (supports inheritance)
+    if isinstance(flavor_name, dict):
+        names_to_check = get_flavor_names(flavor_name)
+    elif flavor_name:
+        names_to_check = [flavor_name]
+    else:
+        names_to_check = []
+
     # Get explicit requires from recipe
     requires = recipe.get('requires', [])
 
@@ -748,9 +844,11 @@ def get_package_dependencies(recipe: Dict, flavor_name: str = None) -> List[str]
         # Add 'all' dependencies
         if 'all' in requires:
             deps.extend(requires['all'])
-        # Add flavor-specific dependencies
-        if flavor_name and flavor_name in requires:
-            deps.extend(requires[flavor_name])
+        # Add flavor-specific dependencies (with inheritance fallback)
+        for name in names_to_check:
+            if name in requires:
+                deps.extend(requires[name])
+                break
 
     # Remove duplicates while preserving order
     seen = set()
@@ -1301,7 +1399,7 @@ def get_subpackages_for_flavor(recipe: Dict, flavor_name: str) -> List[Dict]:
             subpkg_name = subpkg_config.get('name', '')
             allowed_flavors = subpkg_config.get('flavors', None)
 
-            if allowed_flavors is None or flavor_name in allowed_flavors:
+            if allowed_flavors is None or any(n in allowed_flavors for n in (_flavor_names(flavor_name))):
                 subpackages.append(subpkg_config)
     else:
         # Dictionary format: {'foo': {'summary': '...'}, ...}
@@ -1313,7 +1411,7 @@ def get_subpackages_for_flavor(recipe: Dict, flavor_name: str) -> List[Dict]:
                     'name': subpkg_name,
                     **subpkg_config
                 })
-            elif flavor_name in allowed_flavors:
+            elif any(n in allowed_flavors for n in (_flavor_names(flavor_name))):
                 subpackages.append({
                     'name': subpkg_name,
                     **subpkg_config
@@ -1342,9 +1440,11 @@ def get_subpackage_dependencies(subpkg_config: Dict, flavor_name: str) -> List[s
         # Add 'all' dependencies
         if 'all' in requires:
             deps.extend(requires['all'])
-        # Add flavor-specific dependencies
-        if flavor_name in requires:
-            deps.extend(requires[flavor_name])
+        # Add flavor-specific dependencies (with inheritance fallback)
+        for name in _flavor_names(flavor_name):
+            if name in requires:
+                deps.extend(requires[name])
+                break
 
     return deps
 

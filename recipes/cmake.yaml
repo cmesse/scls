@@ -1,5 +1,5 @@
 name: cmake
-version: 4.2.1
+version: 4.3.0
 summary: Cross-platform make system
 homepage: https://cmake.org/
 license: BSD-3-Clause
@@ -37,6 +37,9 @@ configure:
     - '--no-qt-gui'
     - '--parallel=%{nprocs}'
     - '--system-zlib'
+    - '--no-system-curl'
+    - '--'
+    - '-DCMAKE_USE_OPENSSL=OFF'
   optimization:
     O_level: 2
     strict_aliasing: true

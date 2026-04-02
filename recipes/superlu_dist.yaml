@@ -1,5 +1,5 @@
 name: superlu_dist
-version: 9.2.0
+version: 9.2.1
 summary: Distributed memory sparse direct solver
 homepage: https://github.com/xiaoyeli/superlu_dist
 license: BSD-3-Clause
@@ -12,9 +12,10 @@ requires:
     - cmake
     - openmpi
     - parmetis
+  gcc:
+    - openblas
   macos:
     - openblas
-    - lapack
   debug:
     - blas
     - lapack
@@ -48,6 +49,10 @@ configure:
   ilp64_args:
     - "-DXSDK_INDEX_SIZE=64"
   flavor_args:
+    gcc:
+      - "-DTPL_PARMETIS_LIBRARIES=%{prefix}/lib/libparmetis.so;%{prefix}/lib/libmetis.so"
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libopenblas.so"
+      - "-DTPL_LAPACK_LIBRARIES=%{prefix}/lib/liblapack.so;%{prefix}/lib/libopenblas.so"
     macos:
       - "-DTPL_PARMETIS_LIBRARIES=%{prefix}/lib/libparmetis.dylib;%{prefix}/lib/libmetis.dylib"
       - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libopenblas.dylib"

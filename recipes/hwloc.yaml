@@ -4,6 +4,10 @@ summary: Portable Hardware Locality
 homepage: https://www-lb.open-mpi.org/software/hwloc/
 license: BSD
 
+# Not built for lbl (uses system hwloc for Slurm compatibility)
+exclude_flavors:
+  - lbl
+
 source:
   url: https://download.open-mpi.org/release/hwloc/v2.12/hwloc-%{version}.tar.bz2
 

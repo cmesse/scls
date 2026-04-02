@@ -5,6 +5,10 @@ homepage: https://www.gnu.org/software/m4/
 license: GPLv3+
 bootstrap: true  # Build with system compiler before scls gcc is available
 
+# Only build for these flavors
+flavors:
+  - macos
+
 source:
   url: https://ftp.gnu.org/gnu/m4/m4-%{version}.tar.xz
 

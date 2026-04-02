@@ -1,5 +1,5 @@
 name: suitesparse
-version: 7.12.1
+version: 7.12.2
 summary: A collection of sparse matrix libraries
 homepage: http://faculty.cse.tamu.edu/davis/suitesparse.html
 license: LGPL-2.1-or-later AND BSD-3-Clause AND GPL-2.0-or-later
@@ -13,9 +13,10 @@ requires:
     - gmp
     - mpfr
     - metis
+  gcc:
+    - openblas
   macos:
     - openblas
-    - lapack
   debug:
     - blas
     - lapack
@@ -44,6 +45,11 @@ configure:
   # For non-MKL flavors: set directly in flavor_args
   # For MKL flavors: set via lp64_flavor_args/ilp64_flavor_args (vendor differs by interface)
   flavor_args:
+    gcc:
+      - "-DBLA_VENDOR=OpenBLAS"
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas%{libext}"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/liblapack%{libext}"
+      - "-DSUITESPARSE_USE_CUDA=OFF"
     macos:
       - "-DBLA_VENDOR=OpenBLAS"
       - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas%{libext}"

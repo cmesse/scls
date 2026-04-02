@@ -22,14 +22,15 @@ extra_sources:
 # Build for all flavors (no restriction)
 
 requires:
-  all:
+  gcc:
+    - binutils
+  macos:
     - autoconf
     - automake
     - bison
-    - m4
     - make
     - sed
-  macos:
+    - m4
     - zlib
 
 features:
@@ -56,15 +57,29 @@ configure:
     - --enable-languages=c,c++,fortran,lto
     - --with-system-zlib
     - --enable-shared
-    - --disable-static
     - --enable-threads=posix
     - --enable-__cxa_atexit
     - --enable-plugin
     - --disable-nls
+    - --disable-static
     - --disable-multilib
     - --without-isl
 
   flavor_args:
+    gcc:
+      - --enable-gnu-unique-object
+      - --enable-linker-build-id
+      - --with-gcc-major-version-only
+      - --with-linker-hash-style=gnu
+      - --enable-initfini-array
+      - --disable-libmpx
+      - --disable-libunwind-exceptions
+      - --enable-gnu-indirect-function
+      - --enable-cet
+      - --with-tune=generic
+      - --with-arch=x86-64-v3
+      - --enable-offload-targets=nvptx-none
+      - --without-cuda-driver
     macos:
       - --with-native-system-header-dir=/usr/include
       - --with-sysroot=%{sdk}

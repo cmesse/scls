@@ -1,17 +1,16 @@
 name: metis
-version: 5.1.0
+version: 5.2.1
 summary: Serial Graph Partitioning and Fill-reducing Matrix Ordering
 homepage: http://glaros.dtc.umn.edu/gkhome/views/metis
 license: Apache-2.0
 
 source:
-  url: http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-%{version}.tar.gz
+  url: https://github.com/KarypisLab/METIS/archive/refs/tags/v%{version}.tar.gz
 
 patches:
   all:
     - metis_min_cmake_3.10.patch
     - metis-libmetis.patch
-    - metis-GKlib.patch
   # 64-bit index support for ILP64 flavors
   ilp64:
     - metis-width-datatype.patch
@@ -19,6 +18,7 @@ patches:
 requires:
   all:
     - cmake
+    - gklib
 
 features:
   fortran: false
@@ -28,12 +28,20 @@ features:
 
 configure:
   type: cmake
+  pre:
+    # METIS expects build/xinclude with a generated metis.h (normally done by 'make config')
+    - "mkdir -p build/xinclude"
+    - "echo '#define IDXTYPEWIDTH 32' > build/xinclude/metis.h"
+    - "echo '#define REALTYPEWIDTH 64' >> build/xinclude/metis.h"
+    - "cat include/metis.h >> build/xinclude/metis.h"
+    - "cp include/CMakeLists.txt build/xinclude/"
   args:
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DCMAKE_INSTALL_LIBDIR=lib"
     - "-DBUILD_SHARED_LIBS=ON"
     - "-DSHARED=ON"
     - "-DOPENMP=ON"
+    - "-DGKLIB_PATH=%{prefix}"
 
   optimization:
     O_level: 2

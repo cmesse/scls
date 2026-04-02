@@ -1,10 +1,9 @@
-%{prefix}/bin/ndmetis
 %{prefix}/bin/cmpfillin
+%{prefix}/bin/gpmetis
+%{prefix}/bin/graphchk
 %{prefix}/bin/m2gmetis
 %{prefix}/bin/mpmetis
-%{prefix}/bin/graphchk
-%{prefix}/bin/gpmetis
+%{prefix}/bin/ndmetis
 %{prefix}/include/metis.h
-%{prefix}/lib/libmetis.0.dylib
-%{prefix}/lib/libmetis.dylib
-%{prefix}/share/scls/registry/metis.yaml
+%{prefix}/lib/libmetis.so
+%{prefix}/lib/libmetis.so.*

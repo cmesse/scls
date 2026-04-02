@@ -1,5 +1,5 @@
 name: scotch
-version: 7.0.10
+version: 7.0.11
 summary: Graph, mesh and hypergraph partitioning library
 homepage: https://www.labri.fr/perso/pelegrin/scotch/
 license: CeCILL-C
@@ -32,7 +32,7 @@ configure:
     - "-DCMAKE_INSTALL_LIBDIR=lib"
     - "-DBUILD_SHARED_LIBS=ON"
     - "-DBUILD_LIBESMUMPS=ON"
-    - "-DBUILD_LIBSCOTCHMETIS=OFF"
+    - "-DBUILD_LIBSCOTCHMETIS=ON"
     - "-DBUILD_PTSCOTCH=ON"
     - "-DINSTALL_METIS_HEADERS=OFF"
     - "-DTHREADS=OFF"

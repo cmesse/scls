@@ -1,7 +1,7 @@
-%{prefix}/bin/pometis
-%{prefix}/bin/mtest
-%{prefix}/bin/parmetis
-%{prefix}/bin/ptest
+%{prefix}/bin/pm_dglpart
+%{prefix}/bin/pm_mtest
+%{prefix}/bin/pm_parmetis
+%{prefix}/bin/pm_pometis
+%{prefix}/bin/pm_ptest
 %{prefix}/include/parmetis.h
-%{prefix}/lib/libparmetis.dylib
-%{prefix}/share/scls/registry/parmetis.yaml
+%{prefix}/lib/libparmetis.so

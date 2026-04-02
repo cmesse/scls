@@ -1,5 +1,5 @@
 name: mumps
-version: 5.8.1
+version: 5.8.2
 summary: A MUltifrontal Massively Parallel sparse direct Solver
 homepage: https://mumps-solver.org
 license: CeCILL-C
@@ -20,7 +20,6 @@ requires:
     - scotch
   macos:
     - openblas
-    - lapack
     - scalapack
   debug:
     - blas

@@ -16,9 +16,10 @@ requires:
   all:
     - cmake
     - testsweeper
+  gcc:
+    - openblas
   macos:
     - openblas
-    - lapack
   debug:
     - lapack
 
@@ -36,11 +37,18 @@ configure:
     - "-DBUILD_SHARED_LIBS=ON"
     - "-Dbuild_tests=ON"
   flavor_args:
+    gcc:
+      - '-Dblas="OpenBLAS"'
+      - '-Dlapack="generic"'
+      - "-Dgpu_backend=none"
+      - '-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.so'
+      - '-DLAPACK_LIBRARIES=%{prefix}/lib/libopenblas.so'
     macos:
       - '-Dblas="OpenBLAS"'
       - '-Dlapack="generic"'
       - "-Dgpu_backend=none"
-      - '-DLAPACK_LIBRARIES=-llapack'
+      - '-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.dylib'
+      - '-DLAPACK_LIBRARIES=%{prefix}/lib/libopenblas.dylib'
     debug:
       - '-Dblas="generic"'
       - '-Dlapack="generic"'

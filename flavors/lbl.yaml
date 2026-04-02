@@ -1,0 +1,33 @@
+# Linux GCC + reference BLAS/LAPACK flavor configuration
+name: lbl
+inherits: gcc
+platform: linux
+description: "LBL HPC build with GCC compilers and OpenBLAS"
+prefix: /global/home/groups-sw/ac_magnet/scls
+
+# RPM package dependencies
+rpm_build_requires:
+  - gcc
+  - gcc-c++
+  - gcc-gfortran
+  - rpm-build
+
+bootstrap_packages:
+  - cmake
+
+# Default compilers (our custom GCC in prefix/bin - used for most packages)
+compilers:
+  cc: gcc
+  cxx: g++
+  fc: gfortran
+
+flags:
+  cflags: "-march=x86-64-v3 -fPIC -fno-fast-math"
+  cxxflags: "-march=x86-64-v3 -fPIC -fno-fast-math"
+  fflags: "-march=x86-64-v3 -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
+  ldflags: "-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib"
+
+math:
+  linalg: openblas
+  threading: openmp
+  interface: lp64  # 32-bit integers

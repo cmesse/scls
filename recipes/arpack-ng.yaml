@@ -7,6 +7,9 @@ license: BSD
 source:
   url: https://github.com/opencollab/arpack-ng/archive/%{version}/arpack-ng-%{version}.tar.gz
 
+requires:
+  - openmpi
+
 features:
   fortran: true
   mpi: true

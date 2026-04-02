@@ -35,6 +35,9 @@ configure:
     - "-Dlapackpp_DIR=%{prefix}"
   # LP64/ILP64: SLATE inherits integer interface from blaspp/lapackpp
   flavor_args:
+    gcc:
+      - "-Dgpu_backend=none"
+      - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so;%{prefix}/lib/liblapack.so;%{prefix}/lib/libopenblas.so"
     macos:
       - "-Dgpu_backend=none"
       - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.dylib;%{prefix}/lib/liblapack.dylib;%{prefix}/lib/libopenblas.dylib"

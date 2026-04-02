@@ -31,6 +31,7 @@ from build_common import (
     load_recipe, load_flavor, get_registry_entry, get_all_registry_entries,
     check_package_in_registry, get_reverse_dependencies, BuildError
 )
+from build_order import get_next_unbuilt_package
 
 
 # =============================================================================
@@ -104,6 +105,26 @@ def get_package_format(config: Dict) -> str:
 
 
 # =============================================================================
+# "next" package resolution
+# =============================================================================
+
+def resolve_next_package(flavor: str) -> Optional[str]:
+    """Resolve 'next' to the next unbuilt package in build order."""
+    try:
+        flavor_config = load_flavor(flavor)
+        prefix = Path(flavor_config['prefix'])
+    except Exception as e:
+        print(f"Error loading flavor '{flavor}': {e}", file=sys.stderr)
+        return None
+
+    recipes_dir = str(SCRIPT_DIR.parent / 'recipes')
+    pkg = get_next_unbuilt_package(recipes_dir, flavor, prefix)
+    if pkg is None:
+        print("All packages are already installed.")
+    return pkg
+
+
+# =============================================================================
 # Command Implementations
 # =============================================================================
 
@@ -112,6 +133,12 @@ def cmd_build(args, config: Dict) -> int:
     package = args.package
     flavor = args.flavor or config['flavor']
     pkg_format = get_package_format(config)
+
+    if package == 'next':
+        package = resolve_next_package(flavor)
+        if package is None:
+            return 0
+        print(f"Next package to build: {package}")
 
     print(f"Building {package} with flavor '{flavor}' (format: {pkg_format})")
 
@@ -156,6 +183,13 @@ def cmd_install(args, config: Dict) -> int:
     package = args.package
     flavor = args.flavor or config['flavor']
     pkg_format = get_package_format(config)
+
+    if package == 'next':
+        package = resolve_next_package(flavor)
+        if package is None:
+            return 0
+        print(f"Next package to install: {package}")
+        args.package = package
 
     print(f"Installing {package} (flavor: {flavor}, format: {pkg_format})")
 
@@ -453,6 +487,8 @@ def main():
         epilog="""
 Examples:
   scls build openblas          Build OpenBLAS from source
+  scls build next              Build next unbuilt package in dependency order
+  scls install next            Build and install next unbuilt package
   scls install petsc           Build and install PETSc
   scls install petsc -f        Force reinstall PETSc
   scls remove slepc            Uninstall SLEPc
