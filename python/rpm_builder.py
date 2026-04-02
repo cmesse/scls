@@ -24,7 +24,8 @@ from build_common import (
     get_all_registry_entries,
     get_subpackages_for_flavor,
     get_subpackage_dependencies,
-    get_interface_args
+    get_interface_args,
+    resolve_flavor_key
 )
 from patch_common import (
     copy_patches_to_sources,
@@ -331,8 +332,9 @@ class RPMBuilder:
                     pre_commands.append(cmd)
 
             # Flavor-specific pre commands
-            if 'flavor_pre' in self.recipe['configure'] and flavor_name in self.recipe['configure']['flavor_pre']:
-                for cmd in self.recipe['configure']['flavor_pre'][flavor_name]:
+            flavor_pre = resolve_flavor_key(self.flavor, self.recipe['configure'].get('flavor_pre', {}))
+            if flavor_pre:
+                for cmd in flavor_pre:
                     pre_commands.append(cmd)
 
             # Platform-specific pre commands (linux for RPM builder)
@@ -346,8 +348,9 @@ class RPMBuilder:
                     post_commands.append(cmd)
 
             # Flavor-specific post commands
-            if 'flavor_post' in self.recipe['configure'] and flavor_name in self.recipe['configure']['flavor_post']:
-                for cmd in self.recipe['configure']['flavor_post'][flavor_name]:
+            flavor_post = resolve_flavor_key(self.flavor, self.recipe['configure'].get('flavor_post', {}))
+            if flavor_post:
+                for cmd in flavor_post:
                     post_commands.append(cmd)
 
         return pre_commands, post_commands
@@ -449,8 +452,9 @@ class RPMBuilder:
                     pre_commands.append(self.check_args([cmd])[0])
 
             # Flavor-specific pre commands
-            if 'flavor_pre' in self.recipe['install'] and flavor_name in self.recipe['install']['flavor_pre']:
-                for cmd in self.recipe['install']['flavor_pre'][flavor_name]:
+            flavor_pre = resolve_flavor_key(self.flavor, self.recipe['install'].get('flavor_pre', {}))
+            if flavor_pre:
+                for cmd in flavor_pre:
                     pre_commands.append(self.check_args([cmd])[0])
 
             # General post commands
@@ -460,8 +464,9 @@ class RPMBuilder:
                     post_commands.append(self.check_args([cmd])[0])
 
             # Flavor-specific post commands
-            if 'flavor_post' in self.recipe['install'] and flavor_name in self.recipe['install']['flavor_post']:
-                for cmd in self.recipe['install']['flavor_post'][flavor_name]:
+            flavor_post = resolve_flavor_key(self.flavor, self.recipe['install'].get('flavor_post', {}))
+            if flavor_post:
+                for cmd in flavor_post:
                     post_commands.append(self.check_args([cmd])[0])
 
             # Platform-specific post commands (linux for RPM builder)
@@ -572,10 +577,9 @@ class RPMBuilder:
 
         # Add flavor-specific args from recipe
         if 'configure' in self.recipe and 'flavor_args' in self.recipe['configure']:
-            flavor_name = self.flavor.get('name', '')
-            if flavor_name in self.recipe['configure']['flavor_args']:
-                for arg in self.recipe['configure']['flavor_args'][flavor_name]:
-                    args.append(arg)
+            flavor_specific = resolve_flavor_key(self.flavor, self.recipe['configure']['flavor_args'])
+            if flavor_specific:
+                args.extend(flavor_specific)
 
         # Add interface-specific arguments (LP64/ILP64)
         args.extend(get_interface_args(self.recipe, self.flavor))
@@ -596,10 +600,9 @@ class RPMBuilder:
 
         # Add flavor-specific args from recipe
         if 'configure' in self.recipe and 'flavor_args' in self.recipe['configure']:
-            flavor_name = self.flavor.get('name', '')
-            if flavor_name in self.recipe['configure']['flavor_args']:
-                for arg in self.recipe['configure']['flavor_args'][flavor_name]:
-                    args.append(arg)
+            flavor_specific = resolve_flavor_key(self.flavor, self.recipe['configure']['flavor_args'])
+            if flavor_specific:
+                args.extend(flavor_specific)
 
         # Add interface-specific arguments (LP64/ILP64)
         args.extend(get_interface_args(self.recipe, self.flavor))
@@ -1019,9 +1022,9 @@ SCLS_EOF
 
         # Add flavor-specific build args
         if 'build' in self.recipe and 'flavor_args' in self.recipe['build']:
-            flavor_name = self.flavor.get('name', '')
-            if flavor_name in self.recipe['build']['flavor_args']:
-                args.extend(self.check_args(self.recipe['build']['flavor_args'][flavor_name]))
+            flavor_specific = resolve_flavor_key(self.flavor, self.recipe['build']['flavor_args'])
+            if flavor_specific:
+                args.extend(self.check_args(flavor_specific))
 
         # Add LP64/ILP64 interface-specific build args
         args.extend(get_interface_args(self.recipe, self.flavor, 'build'))
@@ -1038,9 +1041,9 @@ SCLS_EOF
 
         # Add flavor-specific install args
         if 'install' in self.recipe and 'flavor_args' in self.recipe['install']:
-            flavor_name = self.flavor.get('name', '')
-            if flavor_name in self.recipe['install']['flavor_args']:
-                args.extend(self.check_args(self.recipe['install']['flavor_args'][flavor_name]))
+            flavor_specific = resolve_flavor_key(self.flavor, self.recipe['install']['flavor_args'])
+            if flavor_specific:
+                args.extend(self.check_args(flavor_specific))
 
         # Add LP64/ILP64 interface-specific install args
         args.extend(get_interface_args(self.recipe, self.flavor, 'install'))
@@ -1062,8 +1065,9 @@ SCLS_EOF
         if 'rpm_build_requires' in self.recipe:
             if isinstance(self.recipe['rpm_build_requires'], dict):
                 # Flavor-specific format
-                if flavor_name in self.recipe['rpm_build_requires']:
-                    build_requires.extend(self.recipe['rpm_build_requires'][flavor_name])
+                flavor_specific = resolve_flavor_key(self.flavor, self.recipe['rpm_build_requires'])
+                if flavor_specific:
+                    build_requires.extend(flavor_specific)
                 # Also add 'all' flavors requirements if present
                 if 'all' in self.recipe['rpm_build_requires']:
                     build_requires.extend(self.recipe['rpm_build_requires']['all'])
@@ -1075,8 +1079,9 @@ SCLS_EOF
         if 'rpm_requires' in self.recipe:
             if isinstance(self.recipe['rpm_requires'], dict):
                 # Flavor-specific format
-                if flavor_name in self.recipe['rpm_requires']:
-                    requires.extend(self.recipe['rpm_requires'][flavor_name])
+                flavor_specific = resolve_flavor_key(self.flavor, self.recipe['rpm_requires'])
+                if flavor_specific:
+                    requires.extend(flavor_specific)
                 # Also add 'all' flavors requirements if present
                 if 'all' in self.recipe['rpm_requires']:
                     requires.extend(self.recipe['rpm_requires']['all'])
@@ -1106,8 +1111,9 @@ SCLS_EOF
             # Handle flavor-sensitive requires
             if isinstance(recipe_requires, dict):
                 # Flavor-specific format
-                if flavor_name in recipe_requires:
-                    for req in recipe_requires[flavor_name]:
+                flavor_specific = resolve_flavor_key(self.flavor, recipe_requires)
+                if flavor_specific:
+                    for req in flavor_specific:
                         scls_req = f"scls-{self.flavor_name}-{req}"
                         build_requires.append(scls_req)
                         requires.append(scls_req)

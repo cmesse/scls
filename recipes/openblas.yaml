@@ -35,6 +35,7 @@ build:
     - "NO_LAPACKE=0"
     - "NO_CBLAS=0"
     - "DYNAMIC_ARCH=1"
+    - "NO_STATIC=1"
   flavor_args:
     macos:
       - "BINARY=64"
