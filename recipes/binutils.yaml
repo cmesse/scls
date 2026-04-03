@@ -5,6 +5,9 @@ homepage: https://www.gnu.org/software/binutils/
 license: GPL-3.0-or-later
 bootstrap: true
 
+flavors:
+  - lbl
+
 source:
   url: https://ftp.gnu.org/gnu/binutils/binutils-%{version}.tar.xz
 

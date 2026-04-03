@@ -6,8 +6,8 @@
 %define scls_name {{ scls_name }}
 
 {% if flavor.nvidia %}
-%define cuda {{ cuda_path }}
-%define gpu {{ gpu_target }}
+%define cuda {{ cuda }}
+%define gpu {{ nv_gpu_target }}
 {% endif %}
 
 Name:           %{scls_name}
@@ -53,7 +53,7 @@ Requires:       {{ req }}
 
 {% endfor %}
 %prep
-%setup -q -n {{ package_name }}-{{ version }}
+%setup -q -n {{ source_directory }}
 {% for patch in patches %}
 {% if patch.strip == 1 %}
 %patch{{ patch.number }} -p1

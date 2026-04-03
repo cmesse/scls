@@ -6,7 +6,7 @@ license: LGPLv3+ or GPLv2+
 # Note: GMP is built in-tree during GCC compilation, then rebuilt standalone with GCC
 
 source:
-  url: https://gmplib.org/download/gmp/gmp-%{version}.tar.xz
+  url: https://ftp.gnu.org/gnu/gmp/gmp-%{version}.tar.xz
 
 requires:
   macos:

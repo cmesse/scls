@@ -1108,6 +1108,17 @@ class UnixBuilder:
             self.installed_files.append(full_dest)
             print(f"  Installed: {full_dest}")
 
+        # On Linux, lib is a symlink to lib64 (Linux From Scratch convention)
+        # macOS uses lib directly with no lib64 split
+        import platform
+        if platform.system() == 'Linux':
+            lib64_dir = self.prefix / 'lib64'
+            lib_link = self.prefix / 'lib'
+            lib64_dir.mkdir(parents=True, exist_ok=True)
+            if not lib_link.exists():
+                lib_link.symlink_to('lib64')
+                print(f"  Created symlink: lib -> lib64")
+
         print(f"\nInstalled {len(self.installed_files)} files")
 
         # Write registry entry
@@ -1156,6 +1167,13 @@ class UnixBuilder:
         print(f"\n{'=' * 60}")
         print(f"Building {self.package} {self.recipe['version']} for {self.flavor_name}")
         print(f"{'=' * 60}\n")
+
+        # Warn about GPL-3 licensed packages (project targets BSD-3 compatibility)
+        pkg_license = self.recipe.get('license', '')
+        if 'GPL-3' in pkg_license:
+            print(f"WARNING: {self.package} is licensed under {pkg_license}")
+            print("         GPL-3 libraries must NOT be distributed as part of this stack.")
+            print("         Building locally for development use only.\n")
 
         # Check all dependencies before starting
         self.check_dependencies()
@@ -1679,7 +1697,8 @@ def list_installed_packages(flavor_name: str = 'macos') -> None:
         entry = entries[name]
         version = entry.get('version', '?')
         has_pc = 'yes' if entry.get('has_pc_file', False) else 'no'
-        deps = ', '.join(entry.get('dependencies', [])) or '-'
+        deps_list = entry.get('dependencies') or []
+        deps = ', '.join(str(d) for d in deps_list) or '-'
         print(f"{name:<20} {version:<12} {has_pc:<8} {deps}")
 
     print(f"\nTotal: {len(entries)} package(s)")

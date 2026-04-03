@@ -449,30 +449,42 @@ class RPMBuilder:
             if 'pre' in self.recipe['install']:
                 for cmd in self.recipe['install']['pre']:
                     # Apply check_args for %{host}, %{prefix}, etc.
-                    pre_commands.append(self.check_args([cmd])[0])
+                    # Rewrite prefix to BUILDROOT for RPM %install section
+                    expanded = self.check_args([cmd])[0]
+                    expanded = expanded.replace(str(self.prefix), '%{buildroot}%{prefix}')
+                    pre_commands.append(expanded)
 
             # Flavor-specific pre commands
             flavor_pre = resolve_flavor_key(self.flavor, self.recipe['install'].get('flavor_pre', {}))
             if flavor_pre:
                 for cmd in flavor_pre:
-                    pre_commands.append(self.check_args([cmd])[0])
+                    expanded = self.check_args([cmd])[0]
+                    expanded = expanded.replace(str(self.prefix), '%{buildroot}%{prefix}')
+                    pre_commands.append(expanded)
 
             # General post commands
             if 'post' in self.recipe['install']:
                 for cmd in self.recipe['install']['post']:
                     # Apply check_args for %{host}, %{prefix}, etc.
-                    post_commands.append(self.check_args([cmd])[0])
+                    # Rewrite prefix to BUILDROOT for RPM %install section
+                    expanded = self.check_args([cmd])[0]
+                    expanded = expanded.replace(str(self.prefix), '%{buildroot}%{prefix}')
+                    post_commands.append(expanded)
 
             # Flavor-specific post commands
             flavor_post = resolve_flavor_key(self.flavor, self.recipe['install'].get('flavor_post', {}))
             if flavor_post:
                 for cmd in flavor_post:
-                    post_commands.append(self.check_args([cmd])[0])
+                    expanded = self.check_args([cmd])[0]
+                    expanded = expanded.replace(str(self.prefix), '%{buildroot}%{prefix}')
+                    post_commands.append(expanded)
 
             # Platform-specific post commands (linux for RPM builder)
             if 'platform_post' in self.recipe['install'] and self.platform in self.recipe['install']['platform_post']:
                 for cmd in self.recipe['install']['platform_post'][self.platform]:
-                    post_commands.append(self.check_args([cmd])[0])
+                    expanded = self.check_args([cmd])[0]
+                    expanded = expanded.replace(str(self.prefix), '%{buildroot}%{prefix}')
+                    post_commands.append(expanded)
 
         return pre_commands, post_commands
 
@@ -686,6 +698,9 @@ class RPMBuilder:
         # Build the %install section commands
         install_commands = [
             f"mkdir -p %{{buildroot}}%{{prefix}}/share/scls/registry",
+            # lib is a symlink to lib64 (Linux From Scratch convention)
+            f"mkdir -p %{{buildroot}}%{{prefix}}/lib64",
+            f"ln -sf lib64 %{{buildroot}}%{{prefix}}/lib",
         ]
 
         # For each template, we need to include the rendered content in the SPEC
@@ -738,6 +753,10 @@ class RPMBuilder:
             install_commands.append(f"chmod {file_mode} {full_dest}")
 
             files_list.append(f"%{{prefix}}/{dest_path}")
+
+        # Add lib/lib64 symlink (x86_64 only)
+        files_list.append(f"%dir %{{prefix}}/lib64")
+        files_list.append(f"%{{prefix}}/lib")
 
         # Add registry file
         files_list.append(f"%{{prefix}}/share/scls/registry/{self.package}.yaml")
@@ -880,6 +899,10 @@ SCLS_EOF
         # Get Intel OneAPI setup
         intel_oneapi_setup = self.get_intel_oneapi_setup()
 
+        # Sync derived flag attributes used by get_cmake_args_with_paths()
+        self.fcflags = self.fflags
+        self.ldflags = add_rpath_for_libdirs(self.flavor['flags'].get('ldflags', ''), 'linux')
+
         # Get cmake args if needed
         cmake_args = []
         if configure_type == 'cmake':
@@ -903,6 +926,7 @@ SCLS_EOF
             'package_name': self.package,
             'scls_name': self.scls_name,
             'version': self.recipe['version'],
+            'source_directory': self.recipe.get('source', {}).get('directory', f"{self.package}-{self.recipe['version']}").replace('%{version}', self.recipe['version']),
             'release': self.get_release_string(),
             'description': formatted_description,
             'changelog': changelog,
@@ -952,7 +976,7 @@ SCLS_EOF
             'path_setup': self.get_path_setup(),
             'library_symlink_fixes': self.get_library_symlink_fixes(),
             'extra_source_info': self.extra_source_info,  # For recipe-referenced sources
-            'package_dependencies': get_package_dependencies(self.recipe, self.flavor_name),
+            'package_dependencies': get_package_dependencies(self.recipe, self.flavor),
             'subpackages': self.get_subpackages_for_spec()
         }
 
@@ -997,7 +1021,7 @@ SCLS_EOF
                 arg = arg.replace('%{cuda}', self.cuda_path)
             # Replace MKL path variables
             if '%{mklroot}' in arg:
-                arg = arg.replace('%{mklroot}', self.mklroot)
+                arg = arg.replace('%{mklroot}', self.mkl_root)
 
             arg = arg.replace('%{cflags}', self.cflags)
             arg = arg.replace('%{cxxflags}', self.cxxflags)
@@ -1260,7 +1284,7 @@ SCLS_EOF
                     )
 
         # Copy patches using improved patching system
-        copy_patches_to_sources(self.recipe, Path("patches"), self.sources_dir, self.package)
+        copy_patches_to_sources(self.recipe, Path("patches"), self.sources_dir, self.package, self.flavor)
 
     def build_rpm(self, spec_file: Path) -> None:
         """Run rpmbuild to create the RPM"""
@@ -1269,21 +1293,17 @@ SCLS_EOF
         if spec_file.resolve() != dest_spec.resolve():
             shutil.copy2(spec_file, dest_spec)
 
-        # Run rpmbuild
-        cmd = ['rpmbuild', '-ba', str(dest_spec)]
+        # Run rpmbuild with explicit topdir so it uses our local rpmbuild/ tree
+        cmd = ['rpmbuild', '--define', f'_topdir {self.rpm_base}', '-ba', str(dest_spec)]
 
         print(f"\n=== Running rpmbuild ===")
         print(f"Command: {' '.join(cmd)}")
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd)
             if result.returncode != 0:
-                print("rpmbuild failed!")
-                print("STDOUT:", result.stdout)
-                print("STDERR:", result.stderr)
                 raise BuildError(f"rpmbuild failed with return code {result.returncode}")
 
-            print(result.stdout)
             print("\nRPM build successful!")
 
             # Find the generated RPMs
@@ -1382,12 +1402,22 @@ SCLS_EOF
                 skipped_macos.append(rel_path)
                 continue
 
+            # Skip info pages (depend on texinfo and are not needed in the stack)
+            if rel_path.startswith('share/info/'):
+                continue
+
             # Convert .dylib to .so* pattern
             if '.dylib' in rel_path:
-                # libfoo.1.2.3.dylib -> libfoo.so*
-                # libfoo.dylib -> libfoo.so*
-                rel_path = re.sub(r'\.[\d.]*\.dylib$', '.so*', rel_path)
-                rel_path = re.sub(r'\.dylib$', '.so*', rel_path)
+                # Skip versioned dylibs (e.g., libfoo-2.1.7.dylib, libfoo.5.dylib)
+                # The unversioned entry (libfoo.dylib) generates the glob patterns
+                if re.search(r'[-.][\d.]+\.dylib$', rel_path):
+                    continue
+                # libfoo.dylib -> libfoo.so* AND libfoo-*.so*
+                # The second pattern catches versioned sonames (e.g., libfoo-2.1.so.7)
+                base = re.sub(r'\.dylib$', '', rel_path)
+                rpm_files.append(f"%{{prefix}}/{base}.so*")
+                rpm_files.append(f"%{{prefix}}/{base}-*.so*")
+                continue
 
             # Replace platform triplets with wildcard
             if platform_triplet_pattern.search(rel_path):
@@ -1446,8 +1476,10 @@ SCLS_EOF
                 seen.add(f)
                 unique_files.append(f)
 
-        # Add the registry file
-        unique_files.append(f"%{{prefix}}/share/scls/registry/{self.package}.yaml")
+        # Add the registry file (if not already present from the file list)
+        registry_entry = f"%{{prefix}}/share/scls/registry/{self.package}.yaml"
+        if registry_entry not in seen:
+            unique_files.append(registry_entry)
 
         return unique_files
 
@@ -1456,6 +1488,13 @@ SCLS_EOF
         print(f"\n{'=' * 60}")
         print(f"Building {self.package} {self.recipe['version']} for {self.flavor_name}")
         print(f"{'=' * 60}\n")
+
+        # Warn about GPL-3 licensed packages (project targets BSD-3 compatibility)
+        pkg_license = self.recipe.get('license', '')
+        if 'GPL-3' in pkg_license:
+            print(f"WARNING: {self.package} is licensed under {pkg_license}")
+            print("         GPL-3 libraries must NOT be distributed as part of this stack.")
+            print("         Building locally for development use only.\n")
 
         # Setup rpmbuild directory
         self.setup_rpmbuild()
@@ -1474,9 +1513,35 @@ SCLS_EOF
         # Build RPM
         self.build_rpm(spec_file)
 
+        # Write a local registry entry so build-order tracking knows this package
+        # is done. The real registry entry is inside the RPM and gets installed
+        # to the prefix when the RPM is installed.
+        local_registry = self.project_root / "rpmbuild" / "registry"
+        local_registry.mkdir(parents=True, exist_ok=True)
+        marker = local_registry / f"{self.package}.yaml"
+        marker.write_text(f"name: {self.package}\nversion: {self.recipe['version']}\n")
+
         print(f"\n{'=' * 60}")
         print("Build completed successfully!")
         print(f"{'=' * 60}\n")
+
+    def install_rpm(self) -> None:
+        """Install the most recently built RPMs for this package (excludes SRPMs)"""
+        rpm_files = sorted(
+            (self.rpm_base / "RPMS").rglob(f"{self.scls_name}*.rpm"),
+            key=lambda p: p.stat().st_mtime, reverse=True
+        )
+        if not rpm_files:
+            raise BuildError(f"No built RPMs found for {self.scls_name} in {self.rpm_base / 'RPMS'}")
+
+        print(f"\nInstalling RPMs:")
+        for rpm in rpm_files:
+            print(f"  {rpm}")
+
+        cmd = ['sudo', 'dnf', 'install', '-y'] + [str(r) for r in rpm_files]
+        result = subprocess.run(cmd)
+        if result.returncode != 0:
+            raise BuildError(f"RPM installation failed with return code {result.returncode}")
 
     def get_library_symlink_fixes(self) -> List[str]:
         """Get shell commands to fix library symlinks in RPM %post section"""
@@ -1509,7 +1574,7 @@ SCLS_EOF
         Returns:
             List of subpackage dicts with name, summary, requires, and files
         """
-        subpackages = get_subpackages_for_flavor(self.recipe, self.flavor_name)
+        subpackages = get_subpackages_for_flavor(self.recipe, self.flavor)
 
         if not subpackages:
             return []
@@ -1519,7 +1584,7 @@ SCLS_EOF
             subpkg_name = subpkg['name']
 
             # Get dependencies for this subpackage
-            deps = get_subpackage_dependencies(subpkg, self.flavor_name)
+            deps = get_subpackage_dependencies(subpkg, self.flavor)
 
             # Convert dependency names to SCLS RPM package names
             rpm_requires = []
@@ -1611,6 +1676,8 @@ def main():
     parser.add_argument('--flavor', '-f', help='Flavor name')
     parser.add_argument('--spec-only', action='store_true',
                         help='Only generate SPEC file, do not build RPM')
+    parser.add_argument('--install', action='store_true',
+                        help='Install the last built RPM for this package')
     parser.add_argument('--list', '-l', action='store_true',
                         help='List installed packages')
     parser.add_argument('--verbose', '-v', action='store_true',
@@ -1643,6 +1710,8 @@ def main():
             print(f"\nSPEC file generated: {spec_file}")
             print("To build RPM, run:")
             print(f"  rpmbuild -ba {builder.specs_dir}/{spec_file.name}")
+        elif args.install:
+            builder.install_rpm()
         else:
             builder.run()
 

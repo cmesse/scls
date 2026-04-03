@@ -1,0 +1,159 @@
+# SCLS
+
+SCLS, the Scientific Core Libraries Stack, is an opinionated build and packaging system for scientific computing libraries.
+
+The project exists to solve a specific problem: getting a consistent, usable stack of numerical libraries built and installed across real machines, not idealized ones. That includes modern Linux systems with RPM packaging, older or awkward Linux environments where native packaging is not an option, and macOS on both Intel and Apple Silicon.
+
+## What SCLS Is For
+
+SCLS builds libraries that are meant to work together as a coherent stack: BLAS/LAPACK, MPI-enabled math libraries, sparse solvers, graph partitioners, I/O libraries, and their dependencies.
+
+The goal is not to expose every possible build option. The goal is to produce a stack that is:
+
+- consistent
+- reproducible
+- installable
+- usable by downstream scientific software without constant manual repair
+
+On systems where RPM integration makes sense, SCLS aims to produce packages that can be installed with a normal package manager workflow such as `dnf`. On systems where that is not realistic, SCLS still aims to build and install the same stack directly with Unix-style prefix installs.
+
+## Core Philosophy
+
+SCLS is deliberately opinionated.
+
+This is not a general-purpose meta-build framework. It makes choices so the resulting stack remains coherent:
+
+- GCC is the default toolchain because it is open, reliable, and has strong Fortran support.
+- MKL and OpenBLAS are treated as backend choices, not as an invitation to rebuild everything ad hoc.
+- LP64 is the default integer model; ILP64 is supported when it is actually needed.
+- OpenMPI is the default MPI implementation.
+- Shared libraries are the normal target.
+- Numerical correctness matters more than aggressive flag games; this project is not interested in `-ffast-math`.
+
+The bias is toward a curated stack rather than an infinitely configurable one. If the requirement is "I need exactly seventeen custom feature toggles for one package," this is the wrong tool. If the requirement is "I need PETSc, HDF5, OpenBLAS, NetCDF, MUMPS, and friends to build and coexist sanely," this is exactly the kind of tool that helps.
+
+## Why Not Just Use System Packages?
+
+Sometimes you should.
+
+But in scientific and HPC environments, system packages often stop being enough:
+
+- the distro is too old
+- the available versions do not line up well
+- the ABI story is inconsistent across dependencies
+- the machine is locked down
+- the platform is unusual
+- the package set is incomplete
+
+SCLS exists for the cases where you still need a real stack, and you want one build model across Linux and macOS rather than a pile of unrelated one-off installs.
+
+## Build and Install Modes
+
+SCLS supports multiple delivery paths built from the same recipe and flavor model.
+
+### 1. RPM-based Linux builds
+
+On RPM-oriented Linux systems, SCLS can generate SPEC files and build RPMs. This is the preferred route when the target system supports it, because it gives you normal package-manager installation and removal semantics.
+
+### 2. Generic Unix-style installs
+
+SCLS also supports a direct Unix builder for environments where native packaging is not realistic or not desirable. This is useful for:
+
+- older enterprise Linux systems
+- HPC systems with limited admin control
+- distributions outside the RPM path
+- "Linux From Scratch"-style deployment into a controlled prefix
+
+### 3. Native macOS builds
+
+SCLS supports direct builds on macOS as well. That includes older Intel Macs and should also extend to Apple Silicon through the same general recipe and flavor machinery.
+
+## How the Repository Works
+
+The project is built around three core concepts.
+
+### Recipes
+
+[`recipes/`](recipes) contains package definitions. Recipes describe version, sources, dependencies, build system behavior, tests, patches, and feature requirements.
+
+### Flavors
+
+[`flavors/`](flavors) contains platform and toolchain choices. A flavor defines the target platform, compilers, optimization flags, math backend, MPI implementation, and install prefix.
+
+### Builders
+
+[`python/`](python) contains the code that turns recipes and flavors into actual builds:
+
+- [`python/rpm_builder.py`](python/rpm_builder.py): RPM-oriented Linux packaging
+- [`python/unix_builder.py`](python/unix_builder.py): direct Unix-style builds and installs
+- [`python/build_common.py`](python/build_common.py): shared build logic
+- [`python/build_order.py`](python/build_order.py): dependency ordering
+- [`python/patch_common.py`](python/patch_common.py): patch selection and application
+- [`python/math_common.py`](python/math_common.py): math-library-related configuration
+
+## Repository Layout
+
+- [`recipes/`](recipes): package definitions
+- [`flavors/`](flavors): compiler/platform/math configurations
+- [`patches/`](patches): package patches
+- [`templates/`](templates): SPEC and related templates
+- [`python/`](python): builder implementation
+- [`files/`](files): tracked install manifests
+- [`changelogs/`](changelogs): RPM changelog sources
+- [`rpmbuild/`](rpmbuild): local RPM build tree
+- [`work/`](work): downloaded sources and build artifacts
+
+## Quick Start
+
+Generate an RPM SPEC file:
+
+```bash
+python python/rpm_builder.py --package <package> --flavor <flavor> --spec-only
+```
+
+Build an RPM:
+
+```bash
+python python/rpm_builder.py --package <package> --flavor <flavor>
+```
+
+Build with the generic Unix builder:
+
+```bash
+python python/unix_builder.py --package <package> --flavor <flavor> build install
+```
+
+Build for macOS:
+
+```bash
+python python/unix_builder.py --package <package> --flavor macos build install pkg
+```
+
+Determine the next package in build order:
+
+```bash
+python python/build_order.py recipes --flavor <flavor>
+```
+
+## Operational Notes
+
+- RPM builds use the project-local [`rpmbuild/`](rpmbuild) tree.
+- Sources are cached under [`work/`](work).
+- Patches are stored under [`patches/<package>/`](patches).
+- File manifests live under [`files/`](files).
+- Package metadata for installed stacks is tracked in the SCLS registry under the chosen prefix.
+
+## Documentation for Agents
+
+- [`CLAUDE.md`](CLAUDE.md) contains repository guidance for Claude Code.
+- [`CODEX.md`](CODEX.md) points Codex-style agents at the same repository guidance.
+
+## License
+
+SCLS is licensed under the Lawrence Berkeley National Laboratory BSD variant, SPDX identifier `BSD-3-Clause-LBNL`. See [`LICENSE`](LICENSE).
+
+## Status
+
+SCLS is a pragmatic working project, not a polished framework. The implementation is opinionated because the problem is opinionated: scientific libraries either fit together as a stack or they do not.
+
+That tradeoff is intentional.

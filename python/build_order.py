@@ -309,6 +309,17 @@ def get_ordered_package_list(directory, flavor=None):
 
     graph, in_degree, nodes = build_dependency_graph(packages, flavor, flavor_names)
     ranks = topological_sort(graph, in_degree, nodes)
+
+    # Force 'environment' to build before everything else (Group 0)
+    if 'environment' in ranks:
+        offset = ranks['environment']
+        if offset == 0:
+            for pkg in ranks:
+                if pkg != 'environment':
+                    ranks[pkg] += 1
+        else:
+            ranks['environment'] = 0
+
     order = get_build_order(ranks)
     return [name for _rank, name in order]
 
@@ -331,10 +342,44 @@ def get_next_unbuilt_package(directory, flavor, prefix):
         return None
 
     # Check registry for each package in order
+    # Look in both the installed prefix registry and the local RPM build registry
     registry_dir = _Path(prefix) / 'share' / 'scls' / 'registry'
+    local_registry_dir = _Path(directory).parent / 'rpmbuild' / 'registry'
     for pkg_name in ordered:
-        registry_file = registry_dir / f'{pkg_name}.yaml'
-        if not registry_file.exists():
+        installed = (registry_dir / f'{pkg_name}.yaml').exists()
+        built = (local_registry_dir / f'{pkg_name}.yaml').exists()
+        if not installed and not built:
+            return pkg_name
+
+    return None
+
+
+def get_next_uninstalled_package(directory, flavor, prefix):
+    """Find the next package that has been built but not yet installed.
+
+    Checks for packages that have a local RPM build registry marker
+    but no installed registry entry at the prefix.
+
+    Args:
+        directory: Path to the recipes directory.
+        flavor: Flavor name string.
+        prefix: Installation prefix (Path) where the registry lives.
+
+    Returns:
+        Package name string, or None if all built packages are installed.
+    """
+    from pathlib import Path as _Path
+
+    ordered = get_ordered_package_list(directory, flavor)
+    if not ordered:
+        return None
+
+    registry_dir = _Path(prefix) / 'share' / 'scls' / 'registry'
+    local_registry_dir = _Path(directory).parent / 'rpmbuild' / 'registry'
+    for pkg_name in ordered:
+        installed = (registry_dir / f'{pkg_name}.yaml').exists()
+        built = (local_registry_dir / f'{pkg_name}.yaml').exists()
+        if built and not installed:
             return pkg_name
 
     return None
@@ -359,6 +404,18 @@ def build_order(directory, flavor=None, show_stats=False):
     try:
         # Perform topological sort
         ranks = topological_sort(graph, in_degree, nodes)
+
+        # Force 'environment' to build before everything else (Group 0)
+        if 'environment' in ranks:
+            offset = ranks['environment']
+            if offset == 0:
+                # Already rank 0, shift all other rank-0 packages up by 1
+                for pkg in ranks:
+                    if pkg != 'environment':
+                        ranks[pkg] += 1
+            else:
+                # Move environment to rank 0 (others are already above)
+                ranks['environment'] = 0
 
         # Get build order
         build_order_list = get_build_order(ranks)

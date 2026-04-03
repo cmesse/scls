@@ -37,6 +37,10 @@ case "$1" in
         $PYTHON python/unix_builder.py --flavor "$FLAVOR" --list
         exit 0
         ;;
+    order)
+        $PYTHON python/build_order.py "$SCLS_DIR/recipes" --flavor "$FLAVOR"
+        exit 0
+        ;;
 esac
 
 # Commands that require a package name
@@ -51,9 +55,26 @@ fi
 
 PACKAGE="$2"
 
-# Resolve "next" to the next unbuilt package in build order
+# Resolve "next" to the appropriate next package
 if [ "$PACKAGE" = "next" ]; then
-    PACKAGE=$($PYTHON -c "
+    if [ "$1" = "install" ] && [ "$USE_RPM" = true ]; then
+        # For "install next": find the next built-but-not-installed package
+        PACKAGE=$($PYTHON -c "
+import sys; sys.path.insert(0, '$SCLS_DIR/python')
+from build_order import get_next_uninstalled_package
+from build_common import load_flavor
+prefix = load_flavor('$FLAVOR')['prefix']
+pkg = get_next_uninstalled_package('$SCLS_DIR/recipes', '$FLAVOR', prefix)
+if pkg: print(pkg)
+else: sys.exit(1)
+" 2>/dev/null)
+        if [ $? -ne 0 ] || [ -z "$PACKAGE" ]; then
+            echo "All built packages are already installed."
+            exit 0
+        fi
+    else
+        # For "build next" and others: find the next unbuilt package
+        PACKAGE=$($PYTHON -c "
 import sys; sys.path.insert(0, '$SCLS_DIR/python')
 from build_order import get_next_unbuilt_package
 from build_common import load_flavor
@@ -62,15 +83,24 @@ pkg = get_next_unbuilt_package('$SCLS_DIR/recipes', '$FLAVOR', prefix)
 if pkg: print(pkg)
 else: sys.exit(1)
 " 2>/dev/null)
-    if [ $? -ne 0 ] || [ -z "$PACKAGE" ]; then
-        echo "All packages are already installed."
-        exit 0
+        if [ $? -ne 0 ] || [ -z "$PACKAGE" ]; then
+            echo "All packages are already built."
+            exit 0
+        fi
     fi
     echo "Next package: $PACKAGE"
 fi
 
 if [ "$USE_RPM" = true ]; then
-    $PYTHON python/rpm_builder.py --package "$PACKAGE" --flavor "$FLAVOR" $1
+    # Translate subcommands into rpm_builder.py flags
+    RPM_EXTRA_ARGS=""
+    case "$1" in
+        build)   ;;  # default behavior: full build
+        spec)    RPM_EXTRA_ARGS="--spec-only" ;;
+        install) RPM_EXTRA_ARGS="--install" ;;
+        *)       RPM_EXTRA_ARGS="$1" ;;
+    esac
+    $PYTHON python/rpm_builder.py --package "$PACKAGE" --flavor "$FLAVOR" $RPM_EXTRA_ARGS
 else
     $PYTHON python/unix_builder.py --package "$PACKAGE" --flavor "$FLAVOR" $1
 fi
