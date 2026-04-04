@@ -6,7 +6,6 @@ license: BSD-3-Clause
 
 source:
   url: https://github.com/OpenMathLib/OpenBLAS/archive/v%{version}/OpenBLAS-%{version}.tar.gz
-  directory: OpenBLAS-%{version}
 
 patches:
   # Drop extra 'p' from threaded library name
@@ -69,6 +68,7 @@ install:
       - "cd %{prefix}/lib && ln -sf libopenblas.dylib liblapacke.dylib || true"
 
 test:
+  inherit_build_args: true
   commands:
     - "make tests"
 

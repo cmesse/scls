@@ -14,6 +14,8 @@ patches:
   # 64-bit index support for ILP64 flavors
   ilp64:
     - metis-width-datatype.patch
+  # Note: metis-GKlib.patch removed — GKlib is no longer bundled in METIS 5.2.1,
+  # it is built as a separate package
 
 requires:
   all:

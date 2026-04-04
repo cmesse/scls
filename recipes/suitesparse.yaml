@@ -29,9 +29,14 @@ features:
 
 configure:
   type: cmake
+  pre:
+    - "LD_LIBRARY_PATH=%{prefix}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}; export LD_LIBRARY_PATH"
+  post:
+    - "unset LD_LIBRARY_PATH"
   args:
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DCMAKE_BUILD_RPATH=%{prefix}/lib"
     - "-DBUILD_SHARED_LIBS=ON"
     - "-DBUILD_STATIC_LIBS=OFF"
     - "-DBLA_STATIC=OFF"

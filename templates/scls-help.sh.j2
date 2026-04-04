@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# SCLS help subcommand
+SCLS="$(cd "$(dirname "$0")/../../.." && pwd)"
+
+echo "Usage: scls <command> [arguments]"
+echo ""
+echo "Commands:"
+echo "  list             List installed packages"
+echo "  info <package>   Show details for an installed package"
+echo "  env              Show SCLS environment variables"
+echo "  prefix           Print the SCLS installation prefix"
+echo "  flavor           Print the active flavor"
+echo "  license          Display the project license"
+echo "  deactivate       Show how to deactivate the SCLS environment"
+echo "  help             Show this help message"
+echo ""
+echo "Documentation: $SCLS/share/doc/scls/"

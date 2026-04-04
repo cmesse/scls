@@ -1,6 +1,6 @@
 # SCLS
 
-SCLS, the Scientific Core Libraries Stack, is an opinionated build and packaging system for scientific computing libraries.
+SCLS, the Scientific Core Library Stack, is an opinionated build and packaging system for scientific computing libraries.
 
 The project exists to solve a specific problem: getting a consistent, usable stack of numerical libraries built and installed across real machines, not idealized ones. That includes modern Linux systems with RPM packaging, older or awkward Linux environments where native packaging is not an option, and macOS on both Intel and Apple Silicon.
 

@@ -1,0 +1,44 @@
+{% raw %}#!/usr/bin/env bash
+# SCLS list subcommand — list installed packages
+SCLS="$(cd "$(dirname "$0")/../../.." && pwd)"
+REGISTRY="$SCLS/share/scls/registry"
+
+if [[ ! -d "$REGISTRY" ]]; then
+    echo "No packages installed."
+    exit 0
+fi
+
+# Collect entries: name version license
+entries=()
+for f in "$REGISTRY"/*.yaml; do
+    [[ -f "$f" ]] || continue
+    name="" version="" license=""
+    while IFS= read -r line; do
+        case "$line" in
+            name:*)    name="${line#name: }" ;;
+            version:*) version="${line#version: }" ;;
+            license:*) license="${line#license: }" ;;
+        esac
+    done < "$f"
+    # Strip surrounding quotes
+    name="${name%\"}" ; name="${name#\"}"
+    version="${version%\"}" ; version="${version#\"}"
+    version="${version%\'}" ; version="${version#\'}"
+    license="${license%\"}" ; license="${license#\"}"
+    [[ -n "$name" ]] && entries+=("$name|$version|$license")
+done
+
+if [[ ${#entries[@]} -eq 0 ]]; then
+    echo "No packages installed."
+    exit 0
+fi
+
+# Sort and print as a table
+printf "%-24s %-16s %s\n" "Package" "Version" "License"
+printf "%-24s %-16s %s\n" "-------" "-------" "-------"
+printf '%s\n' "${entries[@]}" | sort | while IFS='|' read -r name version license; do
+    printf "%-24s %-16s %s\n" "$name" "$version" "$license"
+done
+echo ""
+echo "${#entries[@]} packages installed."
+{% endraw %}

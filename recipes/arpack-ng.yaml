@@ -46,4 +46,5 @@ build:
   parallel: true
 
 test:
-  commands: 'make test'
+  commands:
+    - "cd build && ctest --output-on-failure"

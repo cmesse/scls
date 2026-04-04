@@ -155,11 +155,31 @@ def get_all_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("p
         discovered_patches = discover_patches_in_directory(package_name, patches_dir)
         patches.extend(discovered_patches)
     else:
-        # If recipe has patches, only auto-discover additional ones not already specified
+        # If recipe has patches, only auto-discover additional ones not mentioned
+        # anywhere in the recipe (including flavor/interface-specific sections)
         discovered_patches = discover_patches_in_directory(package_name, patches_dir)
-        recipe_patch_files = {p['file'] for p in recipe_patches}
 
-        additional_patches = [p for p in discovered_patches if p['file'] not in recipe_patch_files]
+        # Collect ALL patch filenames from the recipe, not just the resolved ones
+        all_recipe_patch_files = set()
+        patch_config = recipe.get('patches', {})
+        if isinstance(patch_config, dict):
+            for key, entries in patch_config.items():
+                if isinstance(entries, list):
+                    for entry in entries:
+                        if isinstance(entry, str):
+                            all_recipe_patch_files.add(entry)
+                        elif isinstance(entry, dict) and 'file' in entry:
+                            all_recipe_patch_files.add(entry['file'])
+        elif isinstance(patch_config, list):
+            for entry in patch_config:
+                if isinstance(entry, str):
+                    all_recipe_patch_files.add(entry)
+                elif isinstance(entry, dict) and 'file' in entry:
+                    all_recipe_patch_files.add(entry['file'])
+        # Also include the already-resolved patches
+        all_recipe_patch_files.update(p['file'] for p in recipe_patches)
+
+        additional_patches = [p for p in discovered_patches if p['file'] not in all_recipe_patch_files]
         if additional_patches:
             print(f"Found {len(additional_patches)} additional patches not specified in recipe:")
             for patch in additional_patches:

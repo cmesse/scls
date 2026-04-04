@@ -1,0 +1,107 @@
+{% raw %}#!/usr/bin/env bash
+# SCLS info subcommand — show details for one installed package
+SCLS="$(cd "$(dirname "$0")/../../.." && pwd)"
+REGISTRY="$SCLS/share/scls/registry"
+
+if [[ -z "$1" ]]; then
+    echo "Usage: scls info <package>"
+    exit 1
+fi
+
+pkg="$1"
+regfile="$REGISTRY/$pkg.yaml"
+
+if [[ ! -f "$regfile" ]]; then
+    echo "Package '$pkg' is not installed."
+    exit 1
+fi
+
+# Parse the registry YAML (shallow, top-level keys only)
+name="" version="" license="" summary=""
+cflags="" ldflags="" dependencies="" has_pc_file=""
+feat_fortran="" feat_openmp="" feat_mpi="" feat_math=""
+in_features=false
+
+while IFS= read -r line; do
+    # Detect sections
+    if [[ "$line" == "features:" ]]; then
+        in_features=true
+        continue
+    fi
+    # Lines starting without space end a section
+    if [[ "$line" =~ ^[a-z] ]]; then
+        in_features=false
+    fi
+
+    if $in_features; then
+        case "$line" in
+            *fortran:*) feat_fortran="${line##*: }" ;;
+            *openmp:*)  feat_openmp="${line##*: }" ;;
+            *mpi:*)     feat_mpi="${line##*: }" ;;
+            *math:*)    feat_math="${line##*: }" ;;
+        esac
+    else
+        case "$line" in
+            name:*)         name="${line#name: }" ;;
+            version:*)      version="${line#version: }" ;;
+            license:*)      license="${line#license: }" ;;
+            summary:*)      summary="${line#summary: }" ;;
+            cflags:*)       cflags="${line#cflags: }" ;;
+            ldflags:*)      ldflags="${line#ldflags: }" ;;
+            has_pc_file:*)  has_pc_file="${line#has_pc_file: }" ;;
+        esac
+    fi
+done < "$regfile"
+
+# Strip quotes from values
+for var in name version license summary cflags ldflags; do
+    val="${!var}"
+    val="${val%\"}" ; val="${val#\"}"
+    val="${val%\'}" ; val="${val#\'}"
+    printf -v "$var" '%s' "$val"
+done
+
+# Read dependencies list (lines starting with "- " after "dependencies:")
+deps=()
+in_deps=false
+while IFS= read -r line; do
+    if [[ "$line" == "dependencies:" ]]; then
+        in_deps=true
+        continue
+    fi
+    if $in_deps; then
+        if [[ "$line" =~ ^[[:space:]]*-[[:space:]]+(.+) ]]; then
+            deps+=("${BASH_REMATCH[1]}")
+        elif [[ "$line" =~ ^[a-z] ]]; then
+            break
+        fi
+    fi
+done < "$regfile"
+
+# Display
+echo "$name $version"
+[[ -n "$summary" ]] && echo "  $summary"
+echo ""
+[[ -n "$license" ]] && echo "  License:      $license"
+
+if [[ ${#deps[@]} -gt 0 ]]; then
+    echo "  Dependencies: ${deps[*]}"
+else
+    echo "  Dependencies: none"
+fi
+
+# Features
+features=()
+[[ "$feat_fortran" == "true" ]] && features+=("fortran")
+[[ "$feat_openmp" == "true" ]]  && features+=("openmp")
+[[ "$feat_mpi" == "true" ]]     && features+=("mpi")
+[[ "$feat_math" == "true" ]]    && features+=("math")
+if [[ ${#features[@]} -gt 0 ]]; then
+    echo "  Features:     ${features[*]}"
+fi
+
+[[ "$has_pc_file" == "true" ]] && echo "  pkg-config:   yes"
+echo ""
+[[ -n "$cflags" ]]  && echo "  CFLAGS:  $cflags"
+[[ -n "$ldflags" ]] && echo "  LDFLAGS: $ldflags"
+{% endraw %}

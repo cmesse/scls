@@ -16,7 +16,8 @@ from typing import Dict, List
 
 from build_common import (
     BuildError, load_recipe, load_flavor, load_description,
-    get_optimization_flags, download_source, should_build_package,
+    get_optimization_flags, download_source, detect_source_directory,
+    should_build_package,
     get_configure_args, get_cmake_args,
     check_package_installed,
     get_package_dependencies,
@@ -299,7 +300,12 @@ class RPMBuilder:
             return 'make'
 
     def get_test_commands(self) -> List[str]:
-        """Get test commands with parallel make substitution if appropriate"""
+        """Get test commands with parallel make substitution if appropriate.
+
+        If test.inherit_build_args is true, build args are appended to make
+        invocations so that packages like OpenBLAS which expect consistent
+        flags across make targets work correctly.
+        """
         if 'test' not in self.recipe:
             return []
 
@@ -309,12 +315,21 @@ class RPMBuilder:
         # Check if parallel testing is enabled (default: True)
         parallel_tests = test_config.get('parallel', True)
 
+        # If inherit_build_args, collect the build args string
+        inherit_args = test_config.get('inherit_build_args', False)
+        build_args_str = ''
+        if inherit_args:
+            build_args_str = ' '.join(self.get_build_args())
+
         # Process commands
         processed_commands = []
         for cmd in commands:
-            if parallel_tests and cmd.strip().startswith('make '):
-                # Replace "make " with "make %{?_smp_mflags} "
-                cmd = cmd.replace('make ', 'make %{?_smp_mflags} ', 1)
+            if cmd.strip().startswith('make '):
+                if inherit_args and build_args_str:
+                    # Insert build args after "make "
+                    cmd = cmd.replace('make ', f'make {build_args_str} ', 1)
+                if parallel_tests:
+                    cmd = cmd.replace('make ', 'make %{?_smp_mflags} ', 1)
             processed_commands.append(cmd)
 
         return processed_commands
@@ -329,13 +344,13 @@ class RPMBuilder:
             # General pre commands
             if 'pre' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['pre']:
-                    pre_commands.append(cmd)
+                    pre_commands.append(self.check_args([cmd])[0])
 
             # Flavor-specific pre commands
             flavor_pre = resolve_flavor_key(self.flavor, self.recipe['configure'].get('flavor_pre', {}))
             if flavor_pre:
                 for cmd in flavor_pre:
-                    pre_commands.append(cmd)
+                    pre_commands.append(self.check_args([cmd])[0])
 
             # Platform-specific pre commands (linux for RPM builder)
             if 'platform_pre' in self.recipe['configure'] and self.platform in self.recipe['configure']['platform_pre']:
@@ -345,13 +360,13 @@ class RPMBuilder:
             # General post commands
             if 'post' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['post']:
-                    post_commands.append(cmd)
+                    post_commands.append(self.check_args([cmd])[0])
 
             # Flavor-specific post commands
             flavor_post = resolve_flavor_key(self.flavor, self.recipe['configure'].get('flavor_post', {}))
             if flavor_post:
                 for cmd in flavor_post:
-                    post_commands.append(cmd)
+                    post_commands.append(self.check_args([cmd])[0])
 
         return pre_commands, post_commands
 
@@ -754,6 +769,35 @@ class RPMBuilder:
 
             files_list.append(f"%{{prefix}}/{dest_path}")
 
+        # Copy plain files (no template rendering)
+        files_config = self.recipe.get('install', {}).get('files', [])
+        repo_root = Path(__file__).parent.parent
+
+        for file_config in files_config:
+            src_path = repo_root / file_config['src']
+            dest_path = file_config['dest']
+            file_mode = file_config.get('mode', '0644')
+
+            if not src_path.exists():
+                print(f"  Warning: source file not found: {src_path}")
+                continue
+
+            with open(src_path, 'r') as f:
+                content = f.read()
+
+            full_dest = f"%{{buildroot}}%{{prefix}}/{dest_path}"
+            parent_dir = str(Path(dest_path).parent)
+            if parent_dir != '.':
+                install_commands.append(f"mkdir -p %{{buildroot}}%{{prefix}}/{parent_dir}")
+
+            escaped_content = content.replace('%', '%%')
+            install_commands.append(f"cat > {full_dest} << 'SCLS_EOF'")
+            install_commands.append(escaped_content)
+            install_commands.append("SCLS_EOF")
+            install_commands.append(f"chmod {file_mode} {full_dest}")
+
+            files_list.append(f"%{{prefix}}/{dest_path}")
+
         # Add lib/lib64 symlink (x86_64 only)
         files_list.append(f"%dir %{{prefix}}/lib64")
         files_list.append(f"%{{prefix}}/lib")
@@ -788,6 +832,8 @@ mkdir -p %{{buildroot}}%{{prefix}}/share/scls/registry
 cat > %{{buildroot}}%{{prefix}}/share/scls/registry/{self.package}.yaml << 'SCLS_EOF'
 name: {self.package}
 version: "{self.recipe['version']}"
+license: {self.recipe.get('license', '')}
+summary: {self.recipe.get('summary', '')}
 dependencies: []
 cflags: ""
 ldflags: ""
@@ -813,6 +859,36 @@ SCLS_EOF
 
         print(f"Generated SPEC file: {spec_file}")
         return spec_file
+
+    def _resolve_source_directory(self) -> str:
+        """Resolve the top-level source directory name for the spec file.
+
+        Priority:
+        1. Explicit source.directory in the recipe (manual override)
+        2. Auto-detect by peeking inside the downloaded tarball
+        3. Fall back to {name}-{version}
+        """
+        version = self.recipe['version']
+
+        # 1. Explicit override in recipe
+        explicit = self.recipe.get('source', {}).get('directory')
+        if explicit:
+            return explicit.replace('%{version}', version)
+
+        # 2. Auto-detect from tarball
+        source_url = self.recipe['source'].get('source0', self.recipe['source']['url'])
+        source_url = source_url.replace('%{version}', version)
+        tarball_name = source_url.split('/')[-1]
+        tarball_path = self.sources_dir / tarball_name
+        if tarball_path.exists():
+            detected = detect_source_directory(tarball_path)
+            if detected:
+                if detected != f"{self.package}-{version}":
+                    print(f"Auto-detected source directory: {detected}")
+                return detected
+
+        # 3. Default convention
+        return f"{self.package}-{version}"
 
     def generate_spec(self) -> Path:
         """Generate RPM SPEC file from template"""
@@ -926,12 +1002,13 @@ SCLS_EOF
             'package_name': self.package,
             'scls_name': self.scls_name,
             'version': self.recipe['version'],
-            'source_directory': self.recipe.get('source', {}).get('directory', f"{self.package}-{self.recipe['version']}").replace('%{version}', self.recipe['version']),
+            'source_directory': self._resolve_source_directory(),
             'release': self.get_release_string(),
             'description': formatted_description,
             'changelog': changelog,
             'homepage': self.recipe.get('homepage', ''),
             'license': self.recipe.get('license', ''),
+            'summary': self.recipe.get('summary', ''),
             'source_url': self.recipe['source']['url'],
             'build_requires': build_requires,
             'requires': requires,
@@ -972,6 +1049,7 @@ SCLS_EOF
             'self.math_flags': self.math_flags,
             'math_ldflags': self.math_ldflags,
             'features': self.recipe.get('features', {}),
+            'rpm_files_auto': self.recipe.get('rpm_files_auto', False),
             'skip_compiler_env': self.recipe.get('configure', {}).get('skip_compiler_env', False),
             'path_setup': self.get_path_setup(),
             'library_symlink_fixes': self.get_library_symlink_fixes(),
@@ -1032,6 +1110,7 @@ SCLS_EOF
             # Replace CUDA architectures
             cuda_archs = self.flavor.get('nvidia', {}).get('architectures', '')
             arg = arg.replace('%{cuda_architectures}', cuda_archs)
+            arg = arg.replace('%{libext}', self.lib_ext)
             processed_args.append(arg)
 
         return processed_args
@@ -1149,13 +1228,12 @@ SCLS_EOF
                         requires.append(scls_req)
             elif isinstance(recipe_requires, list):
                 # Simple list format (applies to all flavors)
+                # Build tools that are only needed at build time, not runtime
+                build_only_tools = {'cmake', 'autoconf', 'automake', 'libtool', 'pkg-config'}
                 for req in recipe_requires:
-                    # For packages we build, add scls- prefix
-                    if req in ['cmake', 'autoconf', 'automake', 'libtool', 'pkg-config']:
-                        build_requires.append(req)  # Use system versions for build tools
-                    else:
-                        scls_req = f"scls-{self.flavor_name}-{req}"
-                        build_requires.append(scls_req)
+                    scls_req = f"scls-{self.flavor_name}-{req}"
+                    build_requires.append(scls_req)
+                    if req not in build_only_tools:
                         requires.append(scls_req)
 
         # Math library requirements based on flavor
@@ -1175,12 +1253,11 @@ SCLS_EOF
                     requires.append('scalapack')
                     build_requires.append('scalapack-devel')
 
-        # MPI requirements
+        # MPI requirements — use our own SCLS-built MPI, not the system package
         if features.get('mpi', False):
-            mpi_impl = self.flavor.get('mpi', 'openmpi')
-            if mpi_impl == 'openmpi':
-                requires.extend(['openmpi', 'openmpi-devel'])
-                build_requires.extend(['openmpi-devel'])
+            scls_mpi = f"scls-{self.flavor_name}-openmpi"
+            requires.append(scls_mpi)
+            build_requires.append(scls_mpi)
 
         # Remove duplicates while preserving order
         build_requires = list(dict.fromkeys(build_requires))
@@ -1342,8 +1419,8 @@ SCLS_EOF
         with open(file_list_path, 'r') as f:
             files = [line.strip() for line in f if line.strip() and not line.startswith('#')]
 
-        # Platform triplet pattern (e.g., x86_64-apple-darwin24.6.0, aarch64-apple-darwin23.0.0)
-        platform_triplet_pattern = re.compile(r'(x86_64|aarch64|arm64)-apple-darwin[\d.]+')
+        # Platform triplet pattern (e.g., x86_64-apple-darwin24.6.0, x86_64-redhat-linux, aarch64-unknown-linux-gnu)
+        platform_triplet_pattern = re.compile(r'(x86_64|aarch64|arm64)-(apple-darwin[\d.]+|redhat-linux|unknown-linux-gnu|pc-linux-gnu)')
 
         # Directories that are package-specific and safe to collapse
         # (i.e., entirely owned by this package)
@@ -1370,6 +1447,8 @@ SCLS_EOF
 
         rpm_files = []
         skipped_macos = []
+        has_dash_versioned_dylibs = set()  # bases like 'lib/libfoo' that have libfoo-N.M.dylib
+        dylib_bases = []  # bases processed from unversioned .dylib entries
 
         # Get flavor short name from prefix (e.g., /opt/scls/gcc -> gcc)
         # This is used to strip duplicate flavor prefixes from macOS file lists
@@ -1408,15 +1487,18 @@ SCLS_EOF
 
             # Convert .dylib to .so* pattern
             if '.dylib' in rel_path:
-                # Skip versioned dylibs (e.g., libfoo-2.1.7.dylib, libfoo.5.dylib)
-                # The unversioned entry (libfoo.dylib) generates the glob patterns
-                if re.search(r'[-.][\d.]+\.dylib$', rel_path):
+                # Track versioned-dash dylibs (e.g., libfoo-2.1.7.dylib)
+                # so the unversioned entry knows to emit a dash-glob pattern
+                if re.search(r'-[\d.]+\.dylib$', rel_path):
+                    has_dash_versioned_dylibs.add(re.sub(r'-[\d.]+\.dylib$', '', rel_path))
                     continue
-                # libfoo.dylib -> libfoo.so* AND libfoo-*.so*
-                # The second pattern catches versioned sonames (e.g., libfoo-2.1.so.7)
+                # Skip dot-versioned dylibs (e.g., libfoo.5.dylib)
+                if re.search(r'\.[\d.]+\.dylib$', rel_path):
+                    continue
+                # libfoo.dylib -> libfoo.so*
                 base = re.sub(r'\.dylib$', '', rel_path)
                 rpm_files.append(f"%{{prefix}}/{base}.so*")
-                rpm_files.append(f"%{{prefix}}/{base}-*.so*")
+                dylib_bases.append(base)
                 continue
 
             # Replace platform triplets with wildcard
@@ -1458,6 +1540,11 @@ SCLS_EOF
                 if ' ' in final_path and not final_path.startswith('"'):
                     final_path = f'"{final_path}"'
                 rpm_files.append(final_path)
+
+        # Add libfoo-*.so* only for libraries that actually have dash-versioned dylibs
+        for base in dylib_bases:
+            if base in has_dash_versioned_dylibs:
+                rpm_files.append(f"%{{prefix}}/{base}-*.so*")
 
         # Add collapsed directories
         # In RPM, listing a directory path (without %dir) includes it recursively

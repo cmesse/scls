@@ -24,6 +24,7 @@ configure:
     - "-DCMAKE_INSTALL_LIBDIR=lib"
     - "-DBUILD_SHARED_LIBS=ON"
     - "-DZFP_ENABLE_PIC=ON"
+    - "-DBUILD_TESTING=ON"
   flavor_args:
     macos:
       - "-DZFP_WITH_CUDA=OFF"
@@ -43,7 +44,7 @@ build:
 
 test:
   commands:
-    - "make test"
+    - "cd build && LD_LIBRARY_PATH=$PWD/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH} ctest --output-on-failure"
 
 registry:
   cflags: "-I%{prefix}/include"

@@ -56,7 +56,7 @@ build:
 
 test:
   commands:
-    - "make test"
+    - "cd build && ctest --output-on-failure"
 
 registry:
   cflags: "-I%{prefix}/include"

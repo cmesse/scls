@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-SCLS (Scientific Computing Library Stack) is a Python-based build system for creating optimized scientific computing packages. It manages compilation and packaging of scientific software with different optimization flavors (e.g., gcc, lbl, intel-oneapi, macos) for both Linux (RPM) and macOS systems.
+SCLS (Scientific Core Library Stack) is a Python-based build system for creating optimized scientific computing packages. It manages compilation and packaging of scientific software with different optimization flavors (e.g., gcc, lbl, intel-oneapi, macos) for both Linux (RPM) and macOS systems.
 
 Read [`README.md`](README.md) first for the project philosophy, supported build modes, and the intended user-facing model. Use this file for repository-specific implementation guidance.
 

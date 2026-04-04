@@ -350,6 +350,33 @@ def download_source(url: str, dest_dir: Path, package_name: str, version: str) -
         raise BuildError(f"Failed to download source: {e}")
 
 
+def detect_source_directory(tarball: Path) -> Optional[str]:
+    """Peek inside a tarball to discover the top-level directory name.
+
+    Returns the directory name if there is exactly one top-level directory,
+    or None if the archive structure is ambiguous (e.g. loose files at root).
+    """
+    try:
+        with tarfile.open(tarball, 'r:*') as tar:
+            # Collect unique top-level path components
+            top_dirs = set()
+            for member in tar.getmembers():
+                top = member.name.split('/')[0]
+                top_dirs.add(top)
+                # Early exit: if we find more than one, still check if
+                # all members share a common prefix directory
+                if len(top_dirs) > 1:
+                    break
+            if len(top_dirs) == 1:
+                name = top_dirs.pop()
+                # Verify it's actually a directory (not a single loose file)
+                if name and name != '.':
+                    return name
+    except (tarfile.TarError, OSError) as e:
+        print(f"Warning: could not inspect tarball {tarball}: {e}")
+    return None
+
+
 def extract_source(tarball: Path, work_dir: Path, package_name: str, version: str) -> Path:
     """Extract source tarball and return the extracted directory"""
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -956,6 +983,8 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None) ->
     registry_entry = {
         'name': package_name,
         'version': version,
+        'license': recipe.get('license', ''),
+        'summary': recipe.get('summary', ''),
         'dependencies': [],
         'cflags': '',
         'ldflags': '',

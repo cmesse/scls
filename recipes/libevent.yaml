@@ -10,7 +10,6 @@ exclude_flavors:
 
 source:
   url: https://github.com/libevent/libevent/releases/download/release-%{version}-stable/libevent-%{version}-stable.tar.gz
-  directory: libevent-%{version}-stable
 
 patches:
   - file: libevent_fix_python_shebang.patch

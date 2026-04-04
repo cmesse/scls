@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# SCLS flavor subcommand — print the active flavor
+SCLS="$(cd "$(dirname "$0")/../../.." && pwd)"
+
+config="$SCLS/share/scls/config.yaml"
+if [[ -f "$config" ]]; then
+    flavor=$(grep '^flavor:' "$config" | cut -d' ' -f2)
+    echo "${flavor:-unknown}"
+else
+    echo "unknown (no config.yaml found)"
+    exit 1
+fi

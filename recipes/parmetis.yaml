@@ -23,8 +23,6 @@ features:
 
 configure:
   type: cmake
-  pre:
-    - "sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 3.10)/' %{srcdir}/CMakeLists.txt"
   args:
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DCMAKE_INSTALL_LIBDIR=lib"

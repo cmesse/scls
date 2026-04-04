@@ -692,9 +692,25 @@ class UnixBuilder:
             for cmd in self.recipe['test']['pre']:
                 run_command(cmd.split(), build_dir, env, "pre-test")
 
+        # Collect build args string if test.inherit_build_args is set
+        build_args_str = ''
+        if self.recipe['test'].get('inherit_build_args', False):
+            build_args = []
+            if 'build' in self.recipe and 'args' in self.recipe['build']:
+                build_args.extend(self.check_args(self.recipe['build']['args']))
+            if 'build' in self.recipe and 'flavor_args' in self.recipe['build']:
+                flavor_specific = resolve_flavor_key(self.flavor, self.recipe['build']['flavor_args'])
+                if flavor_specific:
+                    build_args.extend(self.check_args(flavor_specific))
+            build_args.extend(get_interface_args(self.recipe, self.flavor, 'build'))
+            build_args_str = ' '.join(build_args)
+
         # Run test commands
         if 'commands' in self.recipe['test']:
             for cmd in self.recipe['test']['commands']:
+                # Inject build args into make invocations if inherited
+                if build_args_str and cmd.strip().startswith('make '):
+                    cmd = cmd.replace('make ', f'make {build_args_str} ', 1)
                 # Handle shell features like pipes and redirects
                 run_command(['sh', '-c', cmd], build_dir, env, "test")
 
@@ -1103,6 +1119,29 @@ class UnixBuilder:
                 f.write(rendered)
 
             # Set file mode
+            os.chmod(full_dest, int(file_mode, 8))
+
+            self.installed_files.append(full_dest)
+            print(f"  Installed: {full_dest}")
+
+        # Copy plain files (no template rendering)
+        files_config = self.recipe.get('install', {}).get('files', [])
+        repo_root = Path(__file__).parent.parent
+
+        for file_config in files_config:
+            src_path = repo_root / file_config['src']
+            dest_path = file_config['dest']
+            file_mode = file_config.get('mode', '0644')
+
+            if not src_path.exists():
+                print(f"  Warning: source file not found: {src_path}")
+                continue
+
+            full_dest = self.prefix / dest_path
+            full_dest.parent.mkdir(parents=True, exist_ok=True)
+
+            import shutil
+            shutil.copy2(str(src_path), str(full_dest))
             os.chmod(full_dest, int(file_mode, 8))
 
             self.installed_files.append(full_dest)

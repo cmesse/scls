@@ -1,9 +1,10 @@
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -8,23 +8,53 @@
- # included from metis/libmetis/.
- execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${METIS_PATH} metis)
- 
+@@ -1,14 +1,8 @@
+ cmake_minimum_required(VERSION 3.10)
+ project(ParMETIS C)
+
+-
 -# Search for MPI.
 -# GK commented this out as it seems to be creating problems
 -# include(FindMPI)
@@ -11,78 +12,33 @@
 -#   message(FATAL_ERROR "mpi is not found")
 -# endif()
 -# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MPI_COMPILE_FLAGS}")
-+set(METIS_PATH "${CMAKE_CURRENT_SOURCE_DIR}/metis" CACHE PATH "path to METIS headers")
-+set(GKLIB_PATH "${METIS_PATH}/GKlib" CACHE PATH "path to GKlib headers")
- 
-+# Find installed METIS library
-+find_library(METIS_LIBRARY metis HINTS ${CMAKE_PREFIX_PATH}/lib)
-+if(NOT METIS_LIBRARY)
-+  message(FATAL_ERROR "Could not find installed libmetis. Set CMAKE_PREFIX_PATH.")
-+endif()
-+message(STATUS "Found METIS library: ${METIS_LIBRARY}")
-+
-+# Setup compiler flags (simplified from GKlibSystem.cmake)
-+include(CheckFunctionExists)
-+include(CheckIncludeFile)
-+
-+set(GKlib_COPTIONS "-D_FILE_OFFSET_BITS=64 -std=c99 -fno-strict-aliasing -fPIC -DNDEBUG -DNDEBUG2")
-+set(GKlib_COPTIONS "${GKlib_COPTIONS} -Wall -pedantic -Wno-unused-variable -Wno-unknown-pragmas")
-+
-+# Check for features
-+check_include_file(execinfo.h HAVE_EXECINFO_H)
-+if(HAVE_EXECINFO_H)
-+  set(GKlib_COPTIONS "${GKlib_COPTIONS} -DHAVE_EXECINFO_H")
-+endif()
-+
-+check_function_exists(getline HAVE_GETLINE)
-+if(HAVE_GETLINE)
-+  set(GKlib_COPTIONS "${GKlib_COPTIONS} -DHAVE_GETLINE")
-+endif()
-+
-+# OpenMP support
-+option(OPENMP "enable OpenMP support" OFF)
-+if(OPENMP)
-+  find_package(OpenMP)
-+  if(OpenMP_FOUND)
-+    set(GKlib_COPTIONS "${GKlib_COPTIONS} -D__OPENMP__ ${OpenMP_C_FLAGS}")
-+  endif()
-+endif()
-+
-+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${GKlib_COPTIONS}")
-+
++# Find MPI (required for parallel partitioning)
++find_package(MPI REQUIRED)
+
+
  # Prepare libraries.
-+option(SHARED "build shared library" ON)
- if(SHARED)
-   set(ParMETIS_LIBRARY_TYPE SHARED)
- else()
+@@ -18,7 +12,10 @@
    set(ParMETIS_LIBRARY_TYPE STATIC)
  endif()
- 
--include(${GKLIB_PATH}/GKlibSystem.cmake)
--
+
+-include(./conf/gkbuild.cmake)
++# Set minimal GKlib-compatible flags without -march=native or -Werror
++# (our build system manages optimization flags via CFLAGS)
++set(GK_COPTIONS "-DLINUX -D_FILE_OFFSET_BITS=64 -std=c99 -fno-strict-aliasing -fPIC -DNDEBUG -DNDEBUG2")
++set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${GK_COPTIONS}")
+
  # List of paths that the compiler will search for header files.
  # i.e., the -I equivalent
- include_directories(include)
-@@ -32,8 +62,7 @@
- include_directories(${GKLIB_PATH})
- include_directories(${METIS_PATH}/include)
- 
--# List of directories that cmake will look for CMakeLists.txt
--add_subdirectory(${METIS_PATH}/libmetis ${CMAKE_BINARY_DIR}/libmetis)
-+# Build ParMETIS components (not METIS - we link against installed version)
- add_subdirectory(include)
- add_subdirectory(libparmetis)
- add_subdirectory(programs)
 --- a/libparmetis/CMakeLists.txt
 +++ b/libparmetis/CMakeLists.txt
-@@ -4,8 +4,8 @@
- file(GLOB parmetis_sources *.c)
+@@ -7,9 +7,7 @@
  # Create libparmetis
  add_library(parmetis ${ParMETIS_LIBRARY_TYPE} ${parmetis_sources})
--# Link with metis and MPI libraries.
--target_link_libraries(parmetis metis ${MPI_LIBRARIES})
-+# Link with installed metis and MPI libraries.
-+target_link_libraries(parmetis ${METIS_LIBRARY} ${MPI_LIBRARIES})
- set_target_properties(parmetis PROPERTIES LINK_FLAGS "${MPI_LINK_FLAGS}")
- 
+
+-if(SHARED)
+-  target_link_libraries(parmetis metis GKlib)
+-endif()
++target_link_libraries(parmetis metis GKlib ${MPI_C_LIBRARIES})
+  
  install(TARGETS parmetis
+   LIBRARY DESTINATION lib

@@ -538,3 +538,11 @@
 %{prefix}/include/hwloc/plugins.h
 %{prefix}/include/hwloc/autogen/config.h
 %{prefix}/share/scls/registry/hwloc.yaml
+# Linux-specific files (not present on macOS)
+%{prefix}/bin/x86_64-redhat-linux-hwloc-gather-topology
+%{prefix}/sbin/x86_64-redhat-linux-hwloc-dump-hwdata
+%{prefix}/include/hwloc/glibc-sched.h
+%{prefix}/include/hwloc/linux-libnuma.h
+%{prefix}/include/hwloc/linux.h
+%{prefix}/share/man/man1/x86_64-redhat-linux-hwloc-dump-hwdata.1
+%{prefix}/share/man/man1/x86_64-redhat-linux-hwloc-gather-topology.1

@@ -13,7 +13,7 @@
 Name:           %{scls_name}
 Version:        {{ version }}
 Release:        {{ release }}%{?dist}
-Summary:        {{ description | truncate(70) }}
+Summary:        {{ summary or (description | replace('\n', ' ') | truncate(70)) }}
 
 License:        {{ license }}
 URL:            {{ homepage }}
@@ -130,6 +130,12 @@ export {{ env_var.name }}="{{ env_var.value }}"
 {{ make_command }}
 
 {% elif configure_type == 'cmake' %}
+{% if configure_pre_commands %}
+# Pre-configure commands
+{% for cmd in configure_pre_commands %}
+{{ cmd }}
+{% endfor %}
+{% endif %}
 mkdir -p build && cd build
 cmake .. \
 {% for arg in cmake_args %}
@@ -137,6 +143,12 @@ cmake .. \
 
 {% endfor %}
 
+{% if configure_post_commands %}
+# Post-configure commands
+{% for cmd in configure_post_commands %}
+{{ cmd }}
+{% endfor %}
+{% endif %}
 {{ make_command }}
 
 {% elif configure_type == 'custom' %}
@@ -178,6 +190,13 @@ make PREFIX=%{prefix}{% for arg in build_args %} {{ arg }}{% endfor %}
 {{ path_setup }}
 # Ensure test executables can find shared libraries in prefix
 export LD_LIBRARY_PATH={{ prefix }}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+{% if not skip_compiler_env %}
+export CFLAGS="{{ cflags }}"
+export CXXFLAGS="{{ cxxflags }}"
+export FFLAGS="{{ fflags }}"
+export FCFLAGS="{{ fcflags }}"
+export LDFLAGS="{{ ldflags }}"
+{% endif %}
 
 {% for cmd in test_commands %}
 {{ cmd }}
@@ -225,6 +244,8 @@ mkdir -p %{buildroot}%{prefix}/share/scls/registry
 cat > %{buildroot}%{prefix}/share/scls/registry/{{ package_name }}.yaml << 'EOF'
 name: {{ package_name }}
 version: {{ version }}
+license: {{ license }}
+summary: {{ summary }}
 dependencies:
 {% for dep in package_dependencies %}
   - {{ dep }}
@@ -238,6 +259,16 @@ features:
   math: {{ 'true' if features.math else 'false' }}
 has_pc_file: false
 EOF
+
+{% if rpm_files_auto %}
+# Auto-generate file list from BUILDROOT
+# List all files (not directories) under the prefix
+find %{buildroot}%{prefix} -type f -o -type l | sed 's|^%{buildroot}||' > filelist.txt
+# Add directories that are package-specific (not shared with other SCLS packages)
+# lib/openmpi, lib/pmix, etc. — directories with .so plugins
+find %{buildroot}%{prefix}/lib -mindepth 1 -maxdepth 1 -type d | sed 's|^%{buildroot}||' >> filelist.txt 2>/dev/null || true
+find %{buildroot}%{prefix}/share -mindepth 1 -maxdepth 1 -type d -not -name scls -not -name man -not -name doc | sed 's|^%{buildroot}||' >> filelist.txt 2>/dev/null || true
+{% endif %}
 
 %post
 {% for cmd in library_symlink_fixes %}
@@ -257,10 +288,14 @@ fi
 # Remove SCLS registry entry on uninstall
 rm -f %{prefix}/share/scls/registry/{{ package_name }}.yaml 2>/dev/null || true
 
+{% if rpm_files_auto %}
+%files -f filelist.txt
+{% else %}
 %files
 {% for file in files %}
 {{ file }}
 {% endfor %}
+{% endif %}
 
 {% for subpkg in subpackages %}
 %files -n {{ subpkg.rpm_name }}

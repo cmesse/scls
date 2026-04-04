@@ -4,6 +4,10 @@ summary: A powerful implementation of MPI/SHMEM
 homepage: https://www.open-mpi.org
 license: BSD
 
+# OpenMPI installs hundreds of platform-dependent files (MCA modules, OSHMEM,
+# etc.) that vary across versions and OS. Auto-generate %files from BUILDROOT.
+rpm_files_auto: true
+
 source:
   url: https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-%{version}.tar.bz2
 

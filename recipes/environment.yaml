@@ -17,6 +17,11 @@ build:
 
 # Installation creates the activation scripts and config from templates
 install:
+  files:
+    - src: README.md
+      dest: share/doc/scls/README.md
+    - src: LICENSE
+      dest: share/doc/scls/LICENSE
   templates:
     - src: scls-config.yaml.j2
       dest: share/scls/config.yaml
@@ -25,4 +30,32 @@ install:
       mode: "0755"
     - src: scls-deactivate.sh.j2
       dest: share/scls/deactivate.sh
+      mode: "0755"
+    # Runtime scls command and subcommands
+    - src: scls-bin.sh.j2
+      dest: bin/scls
+      mode: "0755"
+    - src: scls-help.sh.j2
+      dest: share/scls/scripts/scls-help
+      mode: "0755"
+    - src: scls-list.sh.j2
+      dest: share/scls/scripts/scls-list
+      mode: "0755"
+    - src: scls-info.sh.j2
+      dest: share/scls/scripts/scls-info
+      mode: "0755"
+    - src: scls-env.sh.j2
+      dest: share/scls/scripts/scls-env
+      mode: "0755"
+    - src: scls-prefix.sh.j2
+      dest: share/scls/scripts/scls-prefix
+      mode: "0755"
+    - src: scls-flavor.sh.j2
+      dest: share/scls/scripts/scls-flavor
+      mode: "0755"
+    - src: scls-license.sh.j2
+      dest: share/scls/scripts/scls-license
+      mode: "0755"
+    - src: scls-deactivate-cmd.sh.j2
+      dest: share/scls/scripts/scls-deactivate
       mode: "0755"

@@ -31,10 +31,15 @@ features:
 
 configure:
   type: cmake
+  pre:
+    - "LD_LIBRARY_PATH=%{prefix}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}; export LD_LIBRARY_PATH"
+  post:
+    - "unset LD_LIBRARY_PATH"
   args:
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DCMAKE_INSTALL_LIBDIR=lib"
     - "-DBUILD_SHARED_LIBS=ON"
+    - "-DCMAKE_BUILD_RPATH=%{prefix}/lib"
     - "-Dbuild_tests=ON"
   flavor_args:
     gcc:
@@ -78,7 +83,7 @@ build:
 
 test:
   commands:
-    - "make check"
+    - "cd build && LD_LIBRARY_PATH=%{prefix}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH} ctest --output-on-failure"
 
 registry:
   cflags: "-I%{prefix}/include"

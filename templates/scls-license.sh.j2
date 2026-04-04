@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# SCLS license subcommand — display the project license
+SCLS="$(cd "$(dirname "$0")/../../.." && pwd)"
+
+license="$SCLS/share/doc/scls/LICENSE"
+if [[ -f "$license" ]]; then
+    cat "$license"
+else
+    echo "License file not found at $license"
+    exit 1
+fi

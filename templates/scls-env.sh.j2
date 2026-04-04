@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# SCLS env subcommand — show SCLS-relevant environment variables
+
+# Known SCLS variables
+scls_vars=(
+    SCLS
+    SCLS_FLAVOR
+    PETSC_DIR
+    PETSC_ARCH
+    SLEPC_DIR
+    MPI_HOME
+    PRTE_MCA_hwloc_default_binding_policy
+    HYDRA_BINDING
+)
+
+echo "SCLS Environment Variables"
+echo ""
+
+found=false
+for var in "${scls_vars[@]}"; do
+    if [[ -n "${!var+x}" ]]; then
+        printf "  %-44s %s\n" "$var" "${!var}"
+        found=true
+    fi
+done
+
+if ! $found; then
+    echo "  (no SCLS variables set — is the environment activated?)"
+fi
+
+# Show relevant PATH entries
+echo ""
+echo "SCLS paths in PATH:"
+IFS=':' read -ra paths <<< "$PATH"
+scls_in_path=false
+for p in "${paths[@]}"; do
+    if [[ "$p" == *scls* || "$p" == *SCLS* ]]; then
+        echo "  $p"
+        scls_in_path=true
+    fi
+done
+$scls_in_path || echo "  (none)"
+
+echo ""
+echo "SCLS paths in PKG_CONFIG_PATH:"
+IFS=':' read -ra paths <<< "$PKG_CONFIG_PATH"
+scls_in_pkg=false
+for p in "${paths[@]}"; do
+    if [[ "$p" == *scls* || "$p" == *SCLS* ]]; then
+        echo "  $p"
+        scls_in_pkg=true
+    fi
+done
+$scls_in_pkg || echo "  (none)"
