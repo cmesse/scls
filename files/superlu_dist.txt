@@ -33,13 +33,11 @@
 %{prefix}/include/superlu_defs.h
 %{prefix}/include/superlu_dist_config.fh
 %{prefix}/include/superlu_dist_config.h
-%{prefix}/include/superlu_enum_consts.h
 %{prefix}/include/superlu_mod.mod
 %{prefix}/include/superlu_sdefs.h
 %{prefix}/include/superlu_upacked.h
 %{prefix}/include/superlu_zdefs.h
 %{prefix}/include/superlupara_mod.mod
-%{prefix}/include/supermatrix.h
 %{prefix}/include/u_panels_impl.hpp
 %{prefix}/include/util_dist.h
 %{prefix}/include/xlupanels_GPU.cuh

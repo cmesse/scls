@@ -109,6 +109,20 @@ configure:
     - "--with-64-bit-blas-indices=1"
   # Flavor-specific arguments
   flavor_args:
+    gcc:
+      - "--with-cuda=0"
+      - "--with-hwloc-dir=%{prefix}"
+      - "--with-zlib-include=/usr/include"
+      - "--with-zlib-lib=/usr/lib64/libz.so"
+      - "--with-blaslapack-lib=%{prefix}/lib/libopenblas%{libext}"
+      - "--with-scalapack-include=%{prefix}/include"
+      - "--with-scalapack-lib=%{prefix}/lib/libscalapack%{libext}"
+      - "--with-mpi-include=%{prefix}/include"
+      - "--with-mpi-lib=%{prefix}/lib/libmpi%{libext}"
+      - "--with-mpiexec=%{prefix}/bin/mpiexec"
+      - "--CC_LINKER_FLAGS=%{ldflags} -lgfortran"
+      - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
+      - "--with-openmp=1"
     lbl:
       - "--with-cuda=0"
       - "--with-hwloc-dir=/usr"
@@ -252,11 +266,11 @@ subpackages:
     requires:
       - petsc
     files:
-      - "%{prefix}/share/petsc/CMakeLists.txt"
-      - "%{prefix}/share/petsc/Makefile*"
-      - "%{prefix}/share/petsc/datafiles"
-      - "%{prefix}/share/petsc/examples"
-      - "%{prefix}/share/petsc/xml"
+      - "share/petsc/CMakeLists.txt"
+      - "share/petsc/Makefile*"
+      - "share/petsc/datafiles"
+      - "share/petsc/examples"
+      - "share/petsc/xml"
 
 registry:
   cflags: "-I%{prefix}/include"

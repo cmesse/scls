@@ -18,6 +18,9 @@ Summary:        {{ summary or (description | replace('\n', ' ') | truncate(70)) 
 License:        {{ license }}
 URL:            {{ homepage }}
 Source0:        {{ source_url }}
+{% for tsrc in test_sources %}
+Source{{ loop.index }}:        {{ tsrc.url }}
+{% endfor %}
 {% for patch in patches %}
 Patch{{ patch.number }}:         {{ patch.file }}
 {% endfor %}
@@ -139,7 +142,7 @@ export {{ env_var.name }}="{{ env_var.value }}"
 mkdir -p build && cd build
 cmake .. \
 {% for arg in cmake_args %}
-    {{ arg }}{% if not loop.last %} \{% endif %}
+    {% if ';' in arg %}'{{ arg }}'{% else %}{{ arg }}{% endif %}{% if not loop.last %} \{% endif %}
 
 {% endfor %}
 
@@ -190,6 +193,12 @@ make PREFIX=%{prefix}{% for arg in build_args %} {{ arg }}{% endfor %}
 {{ path_setup }}
 # Ensure test executables can find shared libraries in prefix
 export LD_LIBRARY_PATH={{ prefix }}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+{% if test_sources %}
+# Extract test data into the build/test directory
+{% for tsrc in test_sources %}
+tar -xf %{SOURCE{{ loop.index }}} -C build/test/
+{% endfor %}
+{% endif %}
 {% if not skip_compiler_env %}
 export CFLAGS="{{ cflags }}"
 export CXXFLAGS="{{ cxxflags }}"
@@ -263,11 +272,11 @@ EOF
 {% if rpm_files_auto %}
 # Auto-generate file list from BUILDROOT
 # List all files (not directories) under the prefix
-find %{buildroot}%{prefix} -type f -o -type l | sed 's|^%{buildroot}||' > filelist.txt
+find %{buildroot}%{prefix} -type f -o -type l | sed 's|^%{buildroot}||' > %{_builddir}/filelist.txt
 # Add directories that are package-specific (not shared with other SCLS packages)
 # lib/openmpi, lib/pmix, etc. — directories with .so plugins
-find %{buildroot}%{prefix}/lib -mindepth 1 -maxdepth 1 -type d | sed 's|^%{buildroot}||' >> filelist.txt 2>/dev/null || true
-find %{buildroot}%{prefix}/share -mindepth 1 -maxdepth 1 -type d -not -name scls -not -name man -not -name doc | sed 's|^%{buildroot}||' >> filelist.txt 2>/dev/null || true
+find %{buildroot}%{prefix}/lib -mindepth 1 -maxdepth 1 -type d | sed 's|^%{buildroot}||' >> %{_builddir}/filelist.txt 2>/dev/null || true
+find %{buildroot}%{prefix}/share -mindepth 1 -maxdepth 1 -type d -not -name scls -not -name man -not -name doc | sed 's|^%{buildroot}||' >> %{_builddir}/filelist.txt 2>/dev/null || true
 {% endif %}
 
 %post
@@ -289,7 +298,7 @@ fi
 rm -f %{prefix}/share/scls/registry/{{ package_name }}.yaml 2>/dev/null || true
 
 {% if rpm_files_auto %}
-%files -f filelist.txt
+%files -f %{_builddir}/filelist.txt
 {% else %}
 %files
 {% for file in files %}

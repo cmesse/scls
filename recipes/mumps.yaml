@@ -38,18 +38,24 @@ configure:
   template: mumps/Makefile.inc.j2
   optimization:
     O_level: 3
+  env:
+    # MUMPS calls MPI routines with mismatched argument types (REAL/INTEGER);
+    # GCC 10+ rejects this without -fallow-argument-mismatch
+    FFLAGS: "+=-fallow-argument-mismatch"
+    FCFLAGS: "+=-fallow-argument-mismatch"
 
 build:
   parallel: true
   pre:
     # Build PORD library first (separate from main MUMPS build for shared libs)
-    - "cd PORD/lib && for f in *.c; do %{mpicc} %{cflags} -fopenmp -I../include -c $f; done"
+    # Each command runs in a subshell so cd does not leak into the next line
+    - "(cd PORD/lib && for f in *.c; do %{mpicc} %{cflags} -fopenmp -I../include -c $f; done)"
   # LP64/ILP64 PORD integer defines
   lp64_pre:
-    - "cd PORD/lib && %{mpicc} -shared -o ../../lib/libpord%{libext} *.o"
+    - "(cd PORD/lib && %{mpicc} -shared -o ../../lib/libpord%{libext} *.o)"
   ilp64_pre:
-    - "cd PORD/lib && rm -f *.o && for f in *.c; do %{mpicc} %{cflags} -fopenmp -DPORD_INTSIZE64 -I../include -c $f; done"
-    - "cd PORD/lib && %{mpicc} -shared -o ../../lib/libpord%{libext} *.o"
+    - "(cd PORD/lib && rm -f *.o && for f in *.c; do %{mpicc} %{cflags} -fopenmp -DPORD_INTSIZE64 -I../include -c $f; done)"
+    - "(cd PORD/lib && %{mpicc} -shared -o ../../lib/libpord%{libext} *.o)"
   dir: src
 
 install:

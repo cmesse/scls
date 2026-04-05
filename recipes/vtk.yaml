@@ -1,0 +1,61 @@
+name: vtk
+version: 9.6.1
+summary: A high-level 3D visualization library
+homepage: https://vtk.org/
+license: BSD-3-Clause
+
+source:
+  url: https://vtk.org/files/release/9.6/VTK-%{version}.tar.gz
+
+requires:
+  all:
+    - cmake
+
+features:
+  fortran: false
+  mpi: false
+  openmp: true
+  math: false
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DVTK_BUILD_DOCUMENTATION=OFF"
+    - "-DVTK_BUILD_EXAMPLES=OFF"
+    - "-DVTK_BUILD_SCALED_SOA_ARRAYS=OFF"
+    - "-DVTK_BUILD_SPHINX_DOCUMENTATION=OFF"
+    - "-DVTK_BUILD_TESTING=OFF"
+    - "-DVTK_SMP_IMPLEMENTATION_TYPE=OpenMP"
+    - "-DVTK_USE_MPI=OFF"
+    - "-DVTK_WRAP_JAVA=OFF"
+    - "-DVTK_WRAP_PYTHON=OFF"
+  flavor_args:
+    gcc:
+      - "-DVTK_USE_CUDA=OFF"
+    lbl:
+      - "-DVTK_USE_CUDA=OFF"
+    macos:
+      - "-DVTK_USE_CUDA=OFF"
+    debug:
+      - "-DVTK_USE_CUDA=OFF"
+    cuda:
+      - "-DVTK_USE_CUDA=ON"
+      - "-DCMAKE_CUDA_ARCHITECTURES=%{cuda_architectures}"
+  optimization:
+    O_level: 2
+
+build:
+  parallel: true
+
+rpm_build_requires:
+  - libXcursor-devel
+  - libXext-devel
+
+rpm_files_auto: true
+
+registry:
+  cflags: "-I%{prefix}/include/vtk-9.6"
+  ldflags: "-L%{prefix}/lib -lvtkCommonCore -lvtkCommonDataModel -lvtkIOCore"

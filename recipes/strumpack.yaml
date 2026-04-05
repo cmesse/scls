@@ -42,7 +42,7 @@ configure:
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DCMAKE_INSTALL_LIBDIR=lib"
     - "-DBUILD_SHARED_LIBS=ON"
-    - "-DBUILD_TESTING=OFF"
+    - "-DBUILD_TESTING=ON"
     - "-DSTRUMPACK_USE_MPI=ON"
     - "-DSTRUMPACK_USE_HIP=OFF"
     - "-DSTRUMPACK_USE_SYCL=OFF"
@@ -79,6 +79,22 @@ configure:
 build:
   parallel: true
   in_source: false
+
+test:
+  sources:
+    - url: https://suitesparse-collection-website.herokuapp.com/MM/TOKAMAK/utm300.tar.gz
+    - url: https://suitesparse-collection-website.herokuapp.com/MM/Pothen/mesh3e1.tar.gz
+    - url: https://suitesparse-collection-website.herokuapp.com/MM/Oberwolfach/t2dal.tar.gz
+    - url: https://suitesparse-collection-website.herokuapp.com/MM/HB/bcsstk28.tar.gz
+    - url: https://suitesparse-collection-website.herokuapp.com/MM/DRIVCAV/cavity16.tar.gz
+    - url: https://suitesparse-collection-website.herokuapp.com/MM/HB/bcsstm08.tar.gz
+    - url: https://suitesparse-collection-website.herokuapp.com/MM/HB/sherman4.tar.gz
+    - url: https://suitesparse-collection-website.herokuapp.com/MM/Bai/rdb968.tar.gz
+    - url: https://suitesparse-collection-website.herokuapp.com/MM/CPM/cz10228.tar.gz
+    - url: https://suitesparse-collection-website.herokuapp.com/MM/TKK/cbuckle.tar.gz
+    - url: https://suitesparse-collection-website.herokuapp.com/MM/HB/gemat11.tar.gz
+  commands:
+    - "export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe && cd build && ctest --output-on-failure -E '(SPARSE_HODLR_mpi_1|SPARSE_mpi_16)'"
 
 registry:
   cflags: "-I%{prefix}/include"

@@ -6,6 +6,11 @@ from collections import defaultdict, deque
 import sys
 import argparse
 
+# Sentinel package name for the flavor meta-package (e.g. scls-gcc).
+# Appended as the last entry in the build order so that "scls build next"
+# creates the meta-RPM once every real package has been built.
+FLAVOR_META = '_meta'
+
 
 def get_flavor_names(flavor_str):
     """
@@ -321,7 +326,14 @@ def get_ordered_package_list(directory, flavor=None):
             ranks['environment'] = 0
 
     order = get_build_order(ranks)
-    return [name for _rank, name in order]
+    ordered = [name for _rank, name in order]
+
+    # Append the flavor meta-package as the very last entry so it depends
+    # on everything and gets built only after all real packages are done.
+    if flavor:
+        ordered.append(FLAVOR_META)
+
+    return ordered
 
 
 def get_next_unbuilt_package(directory, flavor, prefix):
@@ -352,6 +364,16 @@ def get_next_unbuilt_package(directory, flavor, prefix):
             return pkg_name
 
     return None
+
+
+def get_flavor_package_list(directory, flavor):
+    """Return the list of real package names (excluding _meta) for a flavor.
+
+    This is used by the meta-package builder to determine which packages
+    should be listed as Requires.
+    """
+    ordered = get_ordered_package_list(directory, flavor)
+    return [p for p in ordered if p != FLAVOR_META]
 
 
 def get_next_uninstalled_package(directory, flavor, prefix):
@@ -443,8 +465,16 @@ def build_order(directory, flavor=None, show_stats=False):
             else:
                 print(f"{package}")
 
-        print(f"\nTotal packages: {len(nodes)}")
-        print(f"Build groups: {max(ranks.values()) + 1}")
+        # Show flavor meta-package as the final entry
+        if flavor:
+            max_group = max(ranks.values()) + 1
+            print(f"\n--- Group {max_group + 1} (final) ---")
+            print(f"scls-{flavor} (flavor meta-package)")
+
+        print(f"\nTotal packages: {len(nodes)}" +
+              (f" + 1 meta-package" if flavor else ""))
+        print(f"Build groups: {max(ranks.values()) + 1}" +
+              (f" + 1 (meta)" if flavor else ""))
 
         # Show statistics if requested
         if show_stats:

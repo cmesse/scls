@@ -88,7 +88,11 @@ else: sys.exit(1)
             exit 0
         fi
     fi
-    echo "Next package: $PACKAGE"
+    if [ "$PACKAGE" = "_meta" ]; then
+        echo "Next package: scls-${FLAVOR} (flavor meta-package)"
+    else
+        echo "Next package: $PACKAGE"
+    fi
 fi
 
 if [ "$USE_RPM" = true ]; then

@@ -1,35 +1,32 @@
-# Linux GCC + reference BLAS/LAPACK flavor configuration
+# Linux GCC debug flavor — for use with valgrind, sanitizers, and gdb
 name: gcc-debug
+inherits: gcc
 platform: linux
-description: "Developer build with GCC compilers and reference BLAS/LAPACK"
+description: "Debug build with GCC compilers and reference BLAS/LAPACK"
 prefix: /opt/scls/gcc-debug
 
-# RPM package dependencies (for bootstrap packages only - we build our own GCC)
+# RPM package dependencies
 rpm_build_requires:
   - gcc
   - gcc-c++
   - gcc-gfortran
+  - rpm-build
 
-# Default compilers (our custom GCC in prefix/bin - used for most packages)
+bootstrap_packages:
+  - cmake
+
 compilers:
   cc: gcc
   cxx: g++
   fc: gfortran
 
-# Bootstrap compilers (system GCC - used for core packages before our GCC is available)
-# Packages with "bootstrap: true" in their recipe will use these compilers
-bootstrap_compilers:
-  cc: /usr/bin/gcc
-  cxx: /usr/bin/g++
-  fc: /usr/bin/gfortran
-
 flags:
-  cflags: "-g -march=x86-64-v3 -fPIC -fno-fast-math"
-  cxxflags: "-g -march=x86-64-v3 -fPIC -fno-fast-math"
-  fflags: "-g -march=x86-64-v3 -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
+  cflags: "-Og -g -fPIC -fno-fast-math"
+  cxxflags: "-Og -g -fPIC -fno-fast-math"
+  fflags: "-Og -g -fPIC -fno-fast-math -fno-unsafe-math-optimizations"
   ldflags: "-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib"
 
 math:
   linalg: lapack
   threading: openmp
-  interface: lp64  # 32-bit integers
+  interface: lp64

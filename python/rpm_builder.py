@@ -693,6 +693,108 @@ class RPMBuilder:
                         'url': ref_url
                     }
 
+    def _render_custom_makefile(self) -> str:
+        """Render a Jinja2 Makefile.inc template for custom_makefile packages (e.g. MUMPS)."""
+        template_name = self.recipe.get('configure', {}).get('template')
+        if not template_name:
+            raise BuildError("custom_makefile type requires 'template' field in configure section")
+
+        template = self.jinja_env.get_template(template_name)
+
+        # Build context mirroring unix_builder.get_makefile_context
+        compilers = self.flavor.get('compilers', {})
+        cc = compilers.get('cc', 'gcc')
+
+        # Optimization flags
+        cflags, cxxflags, fcflags = get_optimization_flags(
+            self.recipe, self.flavor, cc
+        )
+
+        oflags = '-O2'
+        if 'configure' in self.recipe and 'optimization' in self.recipe['configure']:
+            o_level = self.recipe['configure']['optimization'].get('O_level', 2)
+            oflags = f'-O{o_level}'
+
+        math_config = self.flavor.get('math', {})
+        math_linalg = math_config.get('linalg', 'reference')
+        interface = math_config.get('interface', 'lp64')
+
+        # Version components
+        version = str(self.recipe.get('version', '0.0.0'))
+        version_parts = version.split('.')
+
+        context = {
+            'recipe': self.recipe,
+            'flavor': self.flavor,
+            'package_name': self.package,
+            'version': version,
+            'version_major': version_parts[0] if len(version_parts) > 0 else '0',
+            'version_minor': version_parts[1] if len(version_parts) > 1 else '0',
+            'version_patch': version_parts[2] if len(version_parts) > 2 else '0',
+            'features': self.recipe.get('features', {}),
+            'prefix': str(self.prefix),
+            'install_prefix': str(self.install_prefix),
+            'cc': cc,
+            'cxx': compilers.get('cxx', 'g++'),
+            'fc': compilers.get('fc', 'gfortran'),
+            'cflags': cflags,
+            'cxxflags': cxxflags,
+            'fcflags': fcflags,
+            'ldflags': add_rpath_for_libdirs(self.flavor['flags'].get('ldflags', ''), 'linux'),
+            'oflags': oflags,
+            'ar': 'ar',
+            'interface': interface,
+            'shared_libs': True,
+            'lib_ext': self.lib_ext,
+            'platform': 'linux',
+            'host': self.host,
+            'nprocs': str(self.nprocs),
+            'index_size': self.recipe.get('features', {}).get('index_size', 32),
+        }
+
+        # MPI compilers
+        if self.mpi:
+            context.update({
+                'mpicc': 'mpicc',
+                'mpicxx': 'mpicxx',
+                'mpifort': 'mpifort',
+            })
+
+        # Compiler family — detect from the flavor name / compiler binary.
+        # Note: 'icc' is a substring of 'mpicc', so check flavor name instead.
+        if 'intel' in self.flavor_name:
+            context['compiler_family'] = 'intel'
+        else:
+            context['compiler_family'] = 'gnu'
+
+        # Math libraries
+        if math_linalg == 'mkl':
+            context['math_provider'] = 'mkl'
+            mkl_iface = 'ilp64' if interface == 'ilp64' else 'lp64'
+            context['mkl_linker_flags'] = f'-lmkl_intel_{mkl_iface} -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+            context['mkl_mpi_linker_flags'] = f'-lmkl_scalapack_{mkl_iface} -lmkl_intel_{mkl_iface} -lmkl_gnu_thread -lmkl_core -lmkl_blacs_openmpi_{mkl_iface} -lgomp -lpthread -lm -ldl'
+        else:
+            context['math_provider'] = 'lapack'
+            context['mkl_linker_flags'] = ''
+            context['mkl_mpi_linker_flags'] = ''
+            context['blas_libs'] = '-lopenblas'
+            context['lapack_libs'] = '-llapack'
+            if self.recipe.get('features', {}).get('math') == 'parallel':
+                context['scalapack_libs'] = '-lscalapack -llapack -lopenblas'
+                context['math_libs'] = '-lscalapack -llapack -lopenblas'
+            else:
+                context['math_libs'] = '-llapack -lopenblas'
+
+        # OpenMP
+        if self.recipe.get('features', {}).get('openmp', False):
+            context['openmp_flag'] = '-fopenmp'
+            context['openmp_libs'] = '-lgomp'
+        else:
+            context['openmp_flag'] = ''
+            context['openmp_libs'] = ''
+
+        return template.render(**context)
+
     def is_generated_package(self) -> bool:
         """Check if this is a generated package (no external source)."""
         source = self.recipe.get('source', {})
@@ -972,6 +1074,16 @@ SCLS_EOF
         install_commands = self.get_install_commands()
         build_pre_commands, build_post_commands = self.get_build_pre_post_commands()
 
+        # Handle custom_makefile: render the Makefile.inc template and inject it
+        # as a pre-build heredoc, then treat as 'none' (plain make)
+        if configure_type == 'custom_makefile':
+            makefile_content = self._render_custom_makefile()
+            # Escape RPM macros in the rendered content
+            escaped = makefile_content.replace('%', '%%')
+            makefile_heredoc = f"cat > Makefile.inc << 'SCLS_MAKEFILE_EOF'\n{escaped}\nSCLS_MAKEFILE_EOF"
+            build_pre_commands.insert(0, makefile_heredoc)
+            configure_type = 'none'
+
         # Get Intel OneAPI setup
         intel_oneapi_setup = self.get_intel_oneapi_setup()
 
@@ -1039,6 +1151,7 @@ SCLS_EOF
             'configure_env_vars': configure_env_vars,
             'patches': self.get_patches(),
             'test_commands': self.get_test_commands(),
+            'test_sources': self.recipe.get('test', {}).get('sources', []),
             'pre_build_setup': intel_oneapi_setup,  # UPDATED: Intel OneAPI setup
             'cuda': self.cuda_path,
             'cuda_architectures': self.flavor.get('nvidia', {}).get('architectures', ''),
@@ -1286,6 +1399,8 @@ SCLS_EOF
             else:
                 # Replace %{prefix} with RPM macro
                 val = val.replace('%{prefix}', '%{prefix}')
+                # Replace %{srcdir} with $PWD (RPM %build runs from source dir)
+                val = val.replace('%{srcdir}', '$PWD')
                 return {'name': var, 'value': val, 'operation': 'set'}
 
         # Handle both dict and list formats
@@ -1359,6 +1474,10 @@ SCLS_EOF
                         extra_url, self.sources_dir,
                         extra.get('extract_to', 'extra'), '0'
                     )
+
+        # Download test sources (e.g. matrix data for STRUMPACK tests)
+        for tsrc in self.recipe.get('test', {}).get('sources', []):
+            download_source(tsrc['url'], self.sources_dir, self.package, 'test')
 
         # Copy patches using improved patching system
         copy_patches_to_sources(self.recipe, Path("patches"), self.sources_dir, self.package, self.flavor)
@@ -1757,6 +1876,100 @@ def list_installed_packages(flavor_name: str) -> None:
     print(f"\nTotal: {len(entries)} package(s)")
 
 
+def build_flavor_meta_package(flavor: str, spec_only: bool = False) -> None:
+    """Build the flavor meta-package (e.g. scls-gcc) that depends on all
+    packages in the flavor.  Installing it via dnf pulls in the entire stack.
+    """
+    from build_order import get_flavor_package_list, FLAVOR_META
+
+    flavor_config = load_flavor(flavor)
+    prefix = Path(flavor_config['prefix'])
+    project_root = Path(__file__).parent.parent
+    recipes_dir = project_root / 'recipes'
+    rpm_base = project_root / 'rpmbuild'
+    specs_dir = rpm_base / 'SPECS'
+    specs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Collect all real packages for this flavor
+    packages = get_flavor_package_list(str(recipes_dir), flavor)
+    if not packages:
+        raise BuildError(f"No packages found for flavor {flavor}")
+
+    scls_name = f"scls-{flavor}"
+    requires = [f"scls-{flavor}-{pkg}" for pkg in packages]
+
+    description = flavor_config.get('description',
+                                    f'SCLS {flavor} flavor — complete installation')
+
+    # Use the environment recipe version as the meta-package version
+    env_recipe = load_recipe('environment')
+    version = env_recipe.get('version', '1.0')
+
+    changelog_date = datetime.now().strftime('%a %b %d %Y')
+
+    spec_content = f"""\
+# Flavor meta-package for {scls_name}
+# Installing this RPM pulls in every package in the {flavor} flavor.
+
+Name:           {scls_name}
+Version:        {version}
+Release:        1%{{?dist}}
+Summary:        {description}
+License:        BSD-3-Clause-LBNL
+BuildArch:      noarch
+
+# All packages in the flavor
+{"".join(f"Requires:       {r}{chr(10)}" for r in requires)}
+AutoReqProv:    no
+
+%description
+{description}
+
+This is a meta-package that depends on every package in the SCLS {flavor}
+flavor. Installing it will pull in the complete scientific computing stack.
+
+%install
+mkdir -p %{{buildroot}}{prefix}/share/scls/registry
+cat > %{{buildroot}}{prefix}/share/scls/registry/{FLAVOR_META}.yaml << 'SCLS_EOF'
+name: {FLAVOR_META}
+version: "{version}"
+summary: {description}
+dependencies: []
+SCLS_EOF
+
+%files
+{prefix}/share/scls/registry/{FLAVOR_META}.yaml
+
+%changelog
+* {changelog_date} SCLS Builder <scls@lbl.gov> - {version}-1
+- Flavor meta-package for {flavor}
+"""
+
+    spec_file = specs_dir / f"{scls_name}.spec"
+    with open(spec_file, 'w') as f:
+        f.write(spec_content)
+    print(f"Generated SPEC file: {spec_file}")
+
+    if spec_only:
+        return
+
+    # Build the RPM
+    cmd = ['rpmbuild', '--define', f'_topdir {rpm_base}', '-ba', str(spec_file)]
+    print(f"\n=== Building flavor meta-package {scls_name} ===")
+    print(f"Command: {' '.join(cmd)}")
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        raise BuildError(f"rpmbuild failed with return code {result.returncode}")
+
+    print(f"\nFlavor meta-package {scls_name} built successfully!")
+
+    # Write local registry marker
+    local_registry = project_root / 'rpmbuild' / 'registry'
+    local_registry.mkdir(parents=True, exist_ok=True)
+    marker = local_registry / f"{FLAVOR_META}.yaml"
+    marker.write_text(f"name: {FLAVOR_META}\nversion: {version}\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description='Generate RPM SPEC files for SCLS packages')
     parser.add_argument('--package', '-p', help='Package name')
@@ -1786,6 +1999,27 @@ def main():
         parser.error("--flavor/-f is required when not using --list")
 
     try:
+        # Flavor meta-package (_meta) is handled separately — no recipe needed
+        from build_order import FLAVOR_META
+        if args.package == FLAVOR_META:
+            if args.install:
+                # Install the meta-package RPM
+                rpm_base = Path(__file__).parent.parent / 'rpmbuild'
+                scls_name = f"scls-{args.flavor}"
+                rpm_files = sorted(
+                    (rpm_base / "RPMS").rglob(f"{scls_name}*.rpm"),
+                    key=lambda p: p.stat().st_mtime, reverse=True
+                )
+                if not rpm_files:
+                    raise BuildError(f"No built RPMs found for {scls_name}")
+                cmd = ['sudo', 'dnf', 'install', '-y'] + [str(r) for r in rpm_files]
+                result = subprocess.run(cmd)
+                if result.returncode != 0:
+                    raise BuildError(f"RPM installation failed with return code {result.returncode}")
+            else:
+                build_flavor_meta_package(args.flavor, spec_only=args.spec_only)
+            return
+
         builder = RPMBuilder(args.package, args.flavor)
 
         if args.spec_only:

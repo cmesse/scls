@@ -93,10 +93,9 @@ build:
   parallel: true
   in_source: false
 
-# Tests disabled for now - can be enabled later
-# test:
-#   commands:
-#     - "make test"
+test:
+  commands:
+    - "cd build && ctest --output-on-failure"
 
 registry:
   cflags: "-I%{prefix}/include/suitesparse"
