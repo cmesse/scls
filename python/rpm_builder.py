@@ -1849,6 +1849,8 @@ def create_example_changelog():
 
 def list_installed_packages(flavor_name: str) -> None:
     """List all installed packages from the registry."""
+    from build_order import FLAVOR_META
+
     try:
         flavor = load_flavor(flavor_name)
         prefix = Path(flavor['prefix'])
@@ -1862,18 +1864,30 @@ def list_installed_packages(flavor_name: str) -> None:
         print(f"No packages installed in {prefix}")
         return
 
-    print(f"\nInstalled packages in {prefix}:")
-    print(f"{'Package':<20} {'Version':<12} {'Has .pc':<8} {'Dependencies'}")
-    print("-" * 80)
+    # Hide internal packages from the listing
+    hidden = {'environment', FLAVOR_META}
 
+    # Banner
+    description = flavor.get('description', '')
+    print("")
+    print("     \u259C")
+    print(f" \u259B\u2598\u259B\u2598\u2590 \u259B\u2598    Scientific Core Library Stack 2026 [{flavor_name}]")
+    print(f" \u2584\u258C\u2599\u2596\u2590\u2596\u2584\u258C    {description}")
+    print("")
+    print(f"{'Package':<25}{'Version':<17}{'License'}")
+    print(f"{'-------':<25}{'-------':<17}{'-------'}")
+
+    count = 0
     for name in sorted(entries.keys()):
+        if name in hidden:
+            continue
         entry = entries[name]
         version = entry.get('version', '?')
-        has_pc = 'yes' if entry.get('has_pc_file', False) else 'no'
-        deps = ', '.join(entry.get('dependencies', [])) or '-'
-        print(f"{name:<20} {version:<12} {has_pc:<8} {deps}")
+        pkg_license = entry.get('license', '')
+        print(f"{name:<25}{version:<17}{pkg_license}")
+        count += 1
 
-    print(f"\nTotal: {len(entries)} package(s)")
+    print(f"\n{count} packages installed.")
 
 
 def build_flavor_meta_package(flavor: str, spec_only: bool = False) -> None:

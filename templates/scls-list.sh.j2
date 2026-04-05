@@ -2,10 +2,24 @@
 # SCLS list subcommand — list installed packages
 SCLS="$(cd "$(dirname "$0")/../../.." && pwd)"
 REGISTRY="$SCLS/share/scls/registry"
+CONFIG="$SCLS/share/scls/config.yaml"
 
 if [[ ! -d "$REGISTRY" ]]; then
     echo "No packages installed."
     exit 0
+fi
+
+# Read flavor from config
+SCLS_FLAVOR=""
+SCLS_DESC=""
+if [[ -f "$CONFIG" ]]; then
+    while IFS= read -r line; do
+        case "$line" in
+            flavor:*)      SCLS_FLAVOR="${line#flavor: }" ;;
+            description:*) SCLS_DESC="${line#description: }" ;;
+        esac
+    done < "$CONFIG"
+    SCLS_DESC="${SCLS_DESC%\"}" ; SCLS_DESC="${SCLS_DESC#\"}"
 fi
 
 # Collect entries: name version license
@@ -25,6 +39,20 @@ for f in "$REGISTRY"/*.yaml; do
     version="${version%\"}" ; version="${version#\"}"
     version="${version%\'}" ; version="${version#\'}"
     license="${license%\"}" ; license="${license#\"}"
+    # Shorten overly long combined license strings for display
+    if [[ "$license" == *" AND "* ]]; then
+        short=""
+        for part in $license; do
+            [[ "$part" == "AND" ]] && continue
+            # Extract license family (e.g. LGPL from LGPL-2.1-or-later)
+            family="${part%%-[0-9]*}"
+            [[ -n "$short" ]] && short="$short/"
+            short="$short$family"
+        done
+        license="Mixed ($short)"
+    fi
+    # Hide internal packages
+    [[ "$name" == "environment" || "$name" == "_meta" ]] && continue
     [[ -n "$name" ]] && entries+=("$name|$version|$license")
 done
 
@@ -33,11 +61,18 @@ if [[ ${#entries[@]} -eq 0 ]]; then
     exit 0
 fi
 
+# Banner
+echo ""
+echo "     ▜"
+echo " ▛▘▛▘▐ ▛▘    Scientific Core Library Stack 2026 [${SCLS_FLAVOR:-unknown}]"
+echo " ▄▌▙▖▐▖▄▌    ${SCLS_DESC}"
+echo ""
+
 # Sort and print as a table
-printf "%-24s %-16s %s\n" "Package" "Version" "License"
-printf "%-24s %-16s %s\n" "-------" "-------" "-------"
+printf "%-25s %-17s %s\n" "Package" "Version" "License"
+printf "%-25s %-17s %s\n" "-------" "-------" "-------"
 printf '%s\n' "${entries[@]}" | sort | while IFS='|' read -r name version license; do
-    printf "%-24s %-16s %s\n" "$name" "$version" "$license"
+    printf "%-25s %-17s %s\n" "$name" "$version" "$license"
 done
 echo ""
 echo "${#entries[@]} packages installed."
