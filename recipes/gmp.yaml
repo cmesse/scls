@@ -34,9 +34,7 @@ configure:
     - --with-pic
   # Flavor-specific configure arguments
   flavor_args:
-    gcc-debug:
-      - --enable-fat
-    clang-debug:
+    debug:
       - --enable-fat
     gcc-mkl:
       - --enable-fat

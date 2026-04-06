@@ -708,6 +708,8 @@ class UnixBuilder:
         # Run test commands
         if 'commands' in self.recipe['test']:
             for cmd in self.recipe['test']['commands']:
+                # Expand recipe placeholders (%{prefix}, %{srcdir}, etc.)
+                cmd = self.check_args([cmd])[0]
                 # Inject build args into make invocations if inherited
                 if build_args_str and cmd.strip().startswith('make '):
                     cmd = cmd.replace('make ', f'make {build_args_str} ', 1)
@@ -717,6 +719,7 @@ class UnixBuilder:
         # Run any post-test commands
         if 'post' in self.recipe['test']:
             for cmd in self.recipe['test']['post']:
+                cmd = self.check_args([cmd])[0]
                 run_command(['sh', '-c', cmd], build_dir, env, "post-test")
 
     def install(self, build_dir: Path, env: Dict[str, str]) -> None:

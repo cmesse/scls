@@ -50,6 +50,7 @@ Summary:        {{ subpkg.summary }}
 {% for req in subpkg.requires %}
 Requires:       {{ req }}
 {% endfor %}
+AutoReqProv:    no
 
 %description -n {{ subpkg.rpm_name }}
 {{ subpkg.description }}
@@ -142,7 +143,7 @@ export {{ env_var.name }}="{{ env_var.value }}"
 mkdir -p build && cd build
 cmake .. \
 {% for arg in cmake_args %}
-    {% if ';' in arg %}'{{ arg }}'{% else %}{{ arg }}{% endif %}{% if not loop.last %} \{% endif %}
+    {% if ';' in arg or ' ' in arg %}'{{ arg }}'{% else %}{{ arg }}{% endif %}{% if not loop.last %} \{% endif %}
 
 {% endfor %}
 
@@ -195,11 +196,23 @@ make PREFIX=%{prefix}{% for arg in build_args %} {{ arg }}{% endfor %}
 export LD_LIBRARY_PATH={{ prefix }}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 {% if test_sources %}
 # Extract test data into the build/test directory
+mkdir -p build/test
 {% for tsrc in test_sources %}
 tar -xf %{SOURCE{{ loop.index }}} -C build/test/
 {% endfor %}
 {% endif %}
 {% if not skip_compiler_env %}
+{% if features.mpi %}
+export CC=mpicc
+export CXX=mpicxx
+export FC=mpifort
+export F77=mpifort
+{% else %}
+export CC={{ flavor.compilers.cc }}
+export CXX={{ flavor.compilers.cxx }}
+export FC={{ flavor.compilers.fc }}
+export F77={{ flavor.compilers.fc }}
+{% endif %}
 export CFLAGS="{{ cflags }}"
 export CXXFLAGS="{{ cxxflags }}"
 export FFLAGS="{{ fflags }}"
@@ -208,6 +221,9 @@ export LDFLAGS="{{ ldflags }}"
 {% endif %}
 
 {% for cmd in test_commands %}
+{{ cmd }}
+{% endfor %}
+{% for cmd in test_post_commands %}
 {{ cmd }}
 {% endfor %}
 {% endif %}

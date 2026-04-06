@@ -18,8 +18,6 @@ patches:
   - file: libevent-build-add-doxygen-to-all.patch
   - file: libevent-Revert-Fix-checking-return-value-of-the-evdns_base_r.patch
   - file: libevent-ssl-test-use-sha256.patch
-  - file: libevent-openssl-compat.patch
-  - file: libevent-test_regress.patch
 
 requires:
   macos:

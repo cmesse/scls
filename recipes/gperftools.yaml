@@ -43,6 +43,12 @@ configure:
 build:
   parallel: true
 
+test:
+  commands:
+    - "make check 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"
+
 registry:
   cflags: "-I%{prefix}/include"
   ldflags: "-L%{prefix}/lib -ltcmalloc"

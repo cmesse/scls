@@ -7,6 +7,11 @@ license: BSD-3-Clause
 source:
   url: https://github.com/OpenMathLib/OpenBLAS/archive/v%{version}/OpenBLAS-%{version}.tar.gz
 
+# Debug flavor uses reference BLAS/LAPACK, MKL flavors use Intel MKL
+exclude_flavors:
+  - debug
+  - mkl
+
 patches:
   # Drop extra 'p' from threaded library name
   - file: openblas-0.2.5-libname.patch

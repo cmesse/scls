@@ -179,11 +179,20 @@ def get_flavor_names(flavor: Dict) -> list:
     """
     Return a list of flavor names to check, in priority order.
     If the flavor has an 'inherits' field, the parent name is appended as fallback.
-    E.g., for flavor 'lbl' inheriting from 'gcc', returns ['lbl', 'gcc'].
+    Hyphen-separated components are also added so that generic recipe keys
+    like 'mkl', 'cuda', or 'debug' match concrete flavors like 'gcc-mkl',
+    'gcc-mkl-cuda', or 'gcc-debug'.
+    E.g., for flavor 'gcc-mkl-cuda' inheriting from 'gcc-mkl', returns
+    ['gcc-mkl-cuda', 'gcc-mkl', 'gcc', 'mkl', 'cuda'].
     """
-    names = [flavor.get('name', '')]
+    name = flavor.get('name', '')
+    names = [name]
     if 'inherits' in flavor:
         names.append(flavor['inherits'])
+    # Add hyphen-separated components as fallbacks
+    for part in name.split('-'):
+        if part and part not in names:
+            names.append(part)
     return names
 
 

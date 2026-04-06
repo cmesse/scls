@@ -1,9 +1,9 @@
 # Linux GCC debug flavor — for use with valgrind, sanitizers, and gdb
-name: gcc-debug
+name: debug
 inherits: gcc
 platform: linux
 description: "Debug build with GCC compilers and reference BLAS/LAPACK"
-prefix: /opt/scls/gcc-debug
+prefix: /opt/scls/debug
 
 # RPM package dependencies
 rpm_build_requires:

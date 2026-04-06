@@ -324,6 +324,8 @@ class RPMBuilder:
         # Process commands
         processed_commands = []
         for cmd in commands:
+            # Expand recipe placeholders (%{prefix}, %{srcdir}, etc.)
+            cmd = self.check_args([cmd])[0]
             if cmd.strip().startswith('make '):
                 if inherit_args and build_args_str:
                     # Insert build args after "make "
@@ -1151,6 +1153,7 @@ SCLS_EOF
             'configure_env_vars': configure_env_vars,
             'patches': self.get_patches(),
             'test_commands': self.get_test_commands(),
+            'test_post_commands': self.check_args(self.recipe.get('test', {}).get('post', [])),
             'test_sources': self.recipe.get('test', {}).get('sources', []),
             'pre_build_setup': intel_oneapi_setup,  # UPDATED: Intel OneAPI setup
             'cuda': self.cuda_path,
@@ -1722,7 +1725,7 @@ SCLS_EOF
         # Write a local registry entry so build-order tracking knows this package
         # is done. The real registry entry is inside the RPM and gets installed
         # to the prefix when the RPM is installed.
-        local_registry = self.project_root / "rpmbuild" / "registry"
+        local_registry = self.project_root / "rpmbuild" / "registry" / self.flavor_name
         local_registry.mkdir(parents=True, exist_ok=True)
         marker = local_registry / f"{self.package}.yaml"
         marker.write_text(f"name: {self.package}\nversion: {self.recipe['version']}\n")
@@ -1732,11 +1735,19 @@ SCLS_EOF
         print(f"{'=' * 60}\n")
 
     def install_rpm(self) -> None:
-        """Install the most recently built RPMs for this package (excludes SRPMs)"""
-        rpm_files = sorted(
-            (self.rpm_base / "RPMS").rglob(f"{self.scls_name}*.rpm"),
-            key=lambda p: p.stat().st_mtime, reverse=True
+        """Install the most recently built RPMs for this package, including subpackages."""
+        # Collect RPMs for the main package
+        rpm_files = set(
+            (self.rpm_base / "RPMS").rglob(f"{self.scls_name}-[0-9]*.rpm")
         )
+        # Also collect RPMs for subpackages
+        for subpkg in self.get_subpackages_for_spec():
+            rpm_files.update(
+                (self.rpm_base / "RPMS").rglob(f"{subpkg['rpm_name']}-[0-9]*.rpm")
+            )
+        # Sort by modification time (newest first)
+        rpm_files = sorted(rpm_files, key=lambda p: p.stat().st_mtime, reverse=True)
+
         if not rpm_files:
             raise BuildError(f"No built RPMs found for {self.scls_name} in {self.rpm_base / 'RPMS'}")
 
@@ -1806,9 +1817,15 @@ SCLS_EOF
             # Get file patterns for this subpackage
             file_patterns = subpkg.get('files', [])
 
+            rpm_name = f"scls-{self.flavor_name}-{subpkg_name}"
+
+            # Skip subpackages that would collide with the main package name
+            if rpm_name == self.scls_name:
+                continue
+
             spec_subpackages.append({
                 'name': subpkg_name,
-                'rpm_name': f"scls-{self.flavor_name}-{subpkg_name}",
+                'rpm_name': rpm_name,
                 'summary': subpkg.get('summary', f'{subpkg_name} subpackage'),
                 'description': subpkg.get('description', subpkg.get('summary', '')),
                 'requires': rpm_requires,
@@ -1978,7 +1995,7 @@ SCLS_EOF
     print(f"\nFlavor meta-package {scls_name} built successfully!")
 
     # Write local registry marker
-    local_registry = project_root / 'rpmbuild' / 'registry'
+    local_registry = project_root / 'rpmbuild' / 'registry' / flavor
     local_registry.mkdir(parents=True, exist_ok=True)
     marker = local_registry / f"{FLAVOR_META}.yaml"
     marker.write_text(f"name: {FLAVOR_META}\nversion: {version}\n")

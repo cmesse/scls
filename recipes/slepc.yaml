@@ -57,6 +57,12 @@ install:
     - "SLEPC_DIR=%{srcdir}"
     - "PETSC_DIR=%{prefix}"
 
+test:
+  commands:
+    # SLEPc 'make check' runs basic eigenvalue verification tests
+    # PETSC_DIR points to installed PETSc (no PETSC_ARCH needed for installed prefix)
+    - "make SLEPC_DIR=%{srcdir} PETSC_DIR=%{prefix} check"
+
 registry:
   cflags: "-I%{prefix}/include"
   ldflags: "-L%{prefix}/lib -lslepc"

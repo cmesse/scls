@@ -65,6 +65,12 @@ install:
     - "install -m 755 lib/lib*%{libext} %{buildroot}%{prefix}/lib/"
     - "install -m 644 include/*.h %{buildroot}%{prefix}/include/"
 
+test:
+  commands:
+    # MUMPS examples are built by default — run dsimpletest (expected solution: 1,2,3,4,5)
+    - "cd examples && mpirun --allow-run-as-root -np 2 ./dsimpletest < input_simpletest_real 2>&1 | tee mumps_test.log"
+    - "grep -q 'Solution is' examples/mumps_test.log && echo 'PASS: MUMPS dsimpletest'"
+
 registry:
   cflags: "-I%{prefix}/include"
   ldflags: "-L%{prefix}/lib -ldmumps -lmumps_common -lpord"

@@ -51,6 +51,11 @@ configure:
 build:
   parallel: true
 
+test:
+  commands:
+    # METIS has no ctest targets — run gpmetis on a shipped sample graph
+    - "cd build && ./programs/gpmetis ../graphs/4elt.graph 4 && echo 'PASS: gpmetis partitioned 4elt.graph into 4 parts'"
+
 registry:
   cflags: "-I%{prefix}/include"
   ldflags: "-L%{prefix}/lib -lmetis"

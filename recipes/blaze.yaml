@@ -14,6 +14,8 @@ requires:
     - openblas
   macos:
     - openblas
+  debug:
+    - lapack
 
 features:
   fortran: false
@@ -49,6 +51,21 @@ configure:
 
 build:
   parallel: true
+
+test:
+  commands:
+    # Blaze is header-only — verify headers are usable with a minimal compile-and-run test
+    - |
+      cat > blaze_test.cpp << 'EOF'
+      #include <blaze/Math.h>
+      int main() {
+        blaze::DynamicMatrix<double> A{{1,0,0},{0,1,0},{0,0,1}};
+        blaze::DynamicVector<double> x{1.0, 2.0, 3.0};
+        blaze::DynamicVector<double> y = A * x;
+        return (y[0]==1 && y[1]==2 && y[2]==3) ? 0 : 1;
+      }
+      EOF
+      $CXX -std=c++14 -I%{prefix}/include -O0 -o blaze_test blaze_test.cpp && ./blaze_test && echo "PASS: blaze header-only test"
 
 # Blaze is header-only, no library to link
 registry:

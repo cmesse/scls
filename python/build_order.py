@@ -16,6 +16,8 @@ def get_flavor_names(flavor_str):
     """
     Given a flavor name string, return a list of names to check (with inheritance).
     Loads the flavor YAML to check for 'inherits' field.
+    Also adds hyphen-separated components so generic recipe keys like 'mkl',
+    'cuda', or 'debug' match concrete flavors like 'gcc-mkl-cuda'.
     """
     if not flavor_str:
         return []
@@ -26,6 +28,10 @@ def get_flavor_names(flavor_str):
             flavor_data = yaml.safe_load(f)
             if isinstance(flavor_data, dict) and 'inherits' in flavor_data:
                 names.append(flavor_data['inherits'])
+    # Add hyphen-separated components as fallbacks
+    for part in flavor_str.split('-'):
+        if part and part not in names:
+            names.append(part)
     return names
 
 
@@ -356,7 +362,7 @@ def get_next_unbuilt_package(directory, flavor, prefix):
     # Check registry for each package in order
     # Look in both the installed prefix registry and the local RPM build registry
     registry_dir = _Path(prefix) / 'share' / 'scls' / 'registry'
-    local_registry_dir = _Path(directory).parent / 'rpmbuild' / 'registry'
+    local_registry_dir = _Path(directory).parent / 'rpmbuild' / 'registry' / flavor
     for pkg_name in ordered:
         installed = (registry_dir / f'{pkg_name}.yaml').exists()
         built = (local_registry_dir / f'{pkg_name}.yaml').exists()
@@ -397,7 +403,7 @@ def get_next_uninstalled_package(directory, flavor, prefix):
         return None
 
     registry_dir = _Path(prefix) / 'share' / 'scls' / 'registry'
-    local_registry_dir = _Path(directory).parent / 'rpmbuild' / 'registry'
+    local_registry_dir = _Path(directory).parent / 'rpmbuild' / 'registry' / flavor
     for pkg_name in ordered:
         installed = (registry_dir / f'{pkg_name}.yaml').exists()
         built = (local_registry_dir / f'{pkg_name}.yaml').exists()

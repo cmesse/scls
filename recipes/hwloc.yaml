@@ -39,10 +39,7 @@ configure:
     - --disable-readme
 
   flavor_args:
-    gcc-debug:
-      - --disable-cuda
-      - --disable-nvml
-    clang-debug:
+    debug:
       - --disable-cuda
       - --disable-nvml
     gcc-mkl:

@@ -12,8 +12,7 @@ requires:
   all:
     - openmpi
     - cmake
-  gcc-debug:
-    - blas
+  debug:
     - lapack
   macos:
     []

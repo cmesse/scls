@@ -35,7 +35,9 @@ def load_all_recipes(recipes_dir):
                 'version': recipe.get('version', ''),
                 'summary': recipe.get('summary', recipe.get('description', '')),
                 'homepage': recipe.get('homepage', ''),
+                'license': recipe.get('license', ''),
                 'flavors': recipe.get('flavors', []),  # Empty = all flavors
+                'exclude_flavors': recipe.get('exclude_flavors', []),
                 'features': recipe.get('features', {})
             }
             recipes.append(package_info)
@@ -71,48 +73,92 @@ def load_all_flavors(flavors_dir, exclude_dev=True):
             print(f"Warning: Failed to load {yaml_file}: {e}")
 
     # Sort flavors in a logical order
-    flavor_order = ['gcc-debug', 'clang-debug', 'gcc-mkl', 'intel-mkl', 'gcc-mkl-cuda']
+    flavor_order = ['gcc', 'debug', 'lbl', 'gcc-mkl', 'intel-mkl', 'gcc-mkl-cuda']
     flavors.sort(key=lambda x: flavor_order.index(x['name']) if x['name'] in flavor_order else 999)
 
     return flavors
 
 
+def get_flavor_match_names(flavor_name):
+    """Return list of names to match against for a flavor.
+    E.g., 'gcc-mkl-cuda' returns ['gcc-mkl-cuda', 'gcc', 'mkl', 'cuda']."""
+    names = [flavor_name]
+    for part in flavor_name.split('-'):
+        if part and part not in names:
+            names.append(part)
+    return names
+
+
 def package_available_for_flavor(package, flavor_name):
     """Check if a package is available for a specific flavor"""
+    names = get_flavor_match_names(flavor_name)
+    # Check exclusion first
+    exclude = package.get('exclude_flavors', [])
+    if any(n in exclude for n in names):
+        return False
     # If no flavors specified, available for all
     if not package['flavors']:
         return True
-    # Otherwise check if flavor is in the list
-    return flavor_name in package['flavors']
+    # Otherwise check if any name matches
+    return any(n in package['flavors'] for n in names)
 
 
 def generate_flavor_descriptions(flavors):
     """Generate HTML descriptions for each flavor"""
     descriptions = []
 
-    # Group flavors by category
-    debug_flavors = [f for f in flavors if 'debug' in f['name']]
-    mkl_flavors = [f for f in flavors if 'mkl' in f['name'] and 'cuda' not in f['name'] and 'debug' not in f['name']]
-    cuda_flavors = [f for f in flavors if 'cuda' in f['name']]
+    # Group flavors by category (each flavor goes into exactly one group)
+    gcc_flavors = []
+    debug_flavors = []
+    mkl_flavors = []
+    intel_flavors = []
+    cuda_flavors = []
+
+    for f in flavors:
+        name = f['name']
+        if 'cuda' in name:
+            cuda_flavors.append(f)
+        elif 'debug' in name:
+            debug_flavors.append(f)
+        elif name.startswith('intel'):
+            intel_flavors.append(f)
+        elif 'mkl' in name:
+            mkl_flavors.append(f)
+        else:
+            gcc_flavors.append(f)
+
+    if gcc_flavors:
+        descriptions.append({
+            'title': 'GCC + OpenBLAS',
+            'description': 'Default production flavors using the system GCC toolchain and OpenBLAS for linear algebra. Suitable for most scientific computing workloads.',
+            'flavors': gcc_flavors
+        })
 
     if debug_flavors:
         descriptions.append({
-            'title': 'Debug flavors with reference BLAS/LAPACK',
-            'description': 'These flavors are compiled with debug symbols and linked against reference implementations of BLAS and LAPACK. Ideal for development, debugging, and memory leak detection with tools like valgrind.',
+            'title': 'Debug',
+            'description': 'Compiled with -Og -g and linked against reference BLAS/LAPACK. Designed for use with valgrind, address sanitizers, and debuggers. No SIMD optimizations that could confuse analysis tools.',
             'flavors': debug_flavors
         })
 
     if mkl_flavors:
         descriptions.append({
-            'title': 'Production flavors with Intel MKL',
-            'description': 'Optimized for high-performance computing with Intel Math Kernel Library (MKL). These flavors require Intel MKL to be installed on your system.',
+            'title': 'GCC + Intel MKL',
+            'description': 'Uses the system GCC toolchain with Intel Math Kernel Library for optimized BLAS, LAPACK, and ScaLAPACK. Requires Intel oneAPI MKL.',
             'flavors': mkl_flavors
+        })
+
+    if intel_flavors:
+        descriptions.append({
+            'title': 'Intel Compilers + MKL',
+            'description': 'Uses Intel oneAPI compilers (icx/icpx/ifx) with Intel MKL. Requires Intel oneAPI Base and HPC Toolkits.',
+            'flavors': intel_flavors
         })
 
     if cuda_flavors:
         descriptions.append({
-            'title': 'GPU-accelerated flavors with CUDA',
-            'description': 'Combine Intel MKL with NVIDIA CUDA support for GPU-accelerated computing. Requires NVIDIA GPU hardware and the NVIDIA HPC SDK.',
+            'title': 'GPU-accelerated with CUDA',
+            'description': 'Adds NVIDIA CUDA support for GPU-accelerated computing. Requires NVIDIA GPU hardware and CUDA toolkit.',
             'flavors': cuda_flavors
         })
 
@@ -123,9 +169,9 @@ def main():
     parser = argparse.ArgumentParser(description='Generate SCLS website from recipes')
     parser.add_argument('--recipes', default='recipes', help='Directory containing recipe YAML files')
     parser.add_argument('--flavors', default='flavors', help='Directory containing flavor YAML files')
-    parser.add_argument('--template', default='templates/scls.html.j2', help='Jinja2 template file')
+    parser.add_argument('--template', default='web/scls.html.j2', help='Jinja2 template file')
     parser.add_argument('--output', default='scls.html', help='Output HTML file')
-    parser.add_argument('--release-version', default='2025', help='SCLS release version')
+    parser.add_argument('--release-version', default='2026', help='SCLS release version')
 
     args = parser.parse_args()
 

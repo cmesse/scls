@@ -59,6 +59,10 @@ configure:
 build:
   parallel: true
 
+test:
+  commands:
+    - "cd build && ctest --output-on-failure"
+
 registry:
   cflags: "-I%{prefix}/include"
   ldflags: "-L%{prefix}/lib -larmadillo"

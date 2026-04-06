@@ -18,8 +18,6 @@ requires:
   macos:
     - gcc
     - openblas
-  debug:
-    - gcc
 
 features:
   fortran: true
@@ -86,8 +84,8 @@ configure:
     - "-DCMAKE_INSTALL_LIBDIR=lib"
     # XBLAS for extended precision
     - "-DXBLAS=OFF"
-    # Fortran compiler flags: -O3 is safe for LAPACK, -frecursive for recursive routines
-    - "-DCMAKE_Fortran_FLAGS=-O3 -frecursive"
+    # -frecursive is needed for LAPACK's recursive routines
+    - "-DCMAKE_Fortran_FLAGS=%{fcflags} -frecursive"
   flavor_args:
     debug:
       # Build BLAS and CBLAS for debug flavor (blaspp/lapackpp are separate packages)
@@ -116,7 +114,7 @@ build:
 
 test:
   commands:
-    - "ctest --output-on-failure"
+    - "cd build && ctest --output-on-failure"
 
 registry:
   cflags: "-I%{prefix}/include"
