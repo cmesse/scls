@@ -7,11 +7,6 @@ license: CeCILL-C
 source:
   url: https://mumps-solver.org/MUMPS_%{version}.tar.gz
 
-patches:
-  all:
-    - mumps_fix_mumps_c.patch
-    - mumps_fix_makefile.patch
-
 requires:
   all:
     - openmpi
@@ -68,8 +63,7 @@ install:
 test:
   commands:
     # MUMPS examples are built by default — run dsimpletest (expected solution: 1,2,3,4,5)
-    - "cd examples && mpirun --allow-run-as-root -np 2 ./dsimpletest < input_simpletest_real 2>&1 | tee mumps_test.log"
-    - "grep -q 'Solution is' examples/mumps_test.log && echo 'PASS: MUMPS dsimpletest'"
+    - "cd examples && mpirun --allow-run-as-root -np 2 ./dsimpletest < input_simpletest_real 2>&1 | tee mumps_test.log && grep -q 'Solution is' mumps_test.log && echo 'PASS: MUMPS dsimpletest'"
 
 registry:
   cflags: "-I%{prefix}/include"

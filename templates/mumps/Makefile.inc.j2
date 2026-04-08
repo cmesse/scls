@@ -10,6 +10,18 @@ SOVERSION = {{ version_major }}.{{ version_minor }}
 CC  = {{ mpicc }}
 CXX = {{ mpicxx }}
 FC  = {{ mpifort }}
+FL  = {{ mpifort }}
+
+# Output flag and rm — required by examples/Makefile (note trailing space)
+OUTC = -o{{ ' ' }}
+OUTF = -o{{ ' ' }}
+RM = /bin/rm -f
+
+# RPATH option used by examples/Makefile
+RPATH_OPT = -Wl,-rpath,{{ prefix }}/lib
+
+# BLAS library reference used by examples/Makefile
+LIBBLAS =
 
 {% if shared_libs %}
 AR = {{ mpifort }} -shared -o

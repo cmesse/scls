@@ -66,6 +66,57 @@ test:
       }
       EOF
       $CXX -std=c++14 -I%{prefix}/include -O0 -o blaze_test blaze_test.cpp && ./blaze_test && echo "PASS: blaze header-only test"
+    # Run the upstream blazetest suite
+    - |
+      BLAS_CFG="no"
+      BLAS_INC=""
+      BLAS_LIBPATH=""
+      BLAS_LIBS=""
+      LAPACK_CFG="no"
+      LAPACK_LIBPATH=""
+      LAPACK_LIBS=""
+      if [ -f %{prefix}/lib/libopenblas.so ]; then
+        BLAS_CFG="yes"
+        BLAS_INC="%{prefix}/include"
+        BLAS_LIBPATH="%{prefix}/lib"
+        BLAS_LIBS="-lopenblas"
+        LAPACK_CFG="yes"
+        LAPACK_LIBPATH="%{prefix}/lib"
+        LAPACK_LIBS="-lopenblas"
+      elif [ -f %{prefix}/lib/libblas.so ]; then
+        BLAS_CFG="yes"
+        BLAS_INC="%{prefix}/include"
+        BLAS_LIBPATH="%{prefix}/lib"
+        BLAS_LIBS="-lblas"
+        LAPACK_CFG="yes"
+        LAPACK_LIBPATH="%{prefix}/lib"
+        LAPACK_LIBS="-llapack"
+      fi
+      cat > blazetest/Configfile << CFGEOF
+      CXX=$CXX
+      CXXFLAGS=-std=c++14 $CXXFLAGS
+      BOOST="no"
+      BOOST_INCLUDE_PATH=
+      BOOST_LIBRARY_PATH=
+      BOOST_SYSTEM_LIBRARY=
+      BOOST_THREAD_LIBRARY=
+      BLAS="$BLAS_CFG"
+      BLAS_INCLUDE_PATH=$BLAS_INC
+      BLAS_INCLUDE_FILE=
+      BLAS_LIBRARY_PATH=$BLAS_LIBPATH
+      BLAS_LIBRARIES=$BLAS_LIBS
+      LAPACK="$LAPACK_CFG"
+      LAPACK_SUPPORTS_GESVDX="no"
+      LAPACK_LIBRARY_PATH=$LAPACK_LIBPATH
+      LAPACK_LIBRARIES=$LAPACK_LIBS
+      LIBRARY_DIRECTIVES=-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib
+      CFGEOF
+      cd blazetest && ./configure
+      make %{?_smp_mflags} -C src/utiltest && src/utiltest/run
+      for t in shims simd blas lapack typetraits traits constraints functors vectors matrices views; do
+        make %{?_smp_mflags} -C src/mathtest/$t || exit 1
+        test -x src/mathtest/$t/run && { src/mathtest/$t/run || exit 1; }
+      done
 
 # Blaze is header-only, no library to link
 registry:

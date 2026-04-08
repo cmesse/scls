@@ -16,6 +16,7 @@ Usage:
 import os
 import sys
 import argparse
+import shutil
 import subprocess
 import platform
 from pathlib import Path
@@ -108,6 +109,34 @@ def get_package_format(config: Dict) -> str:
 # "next" package resolution
 # =============================================================================
 
+def _rpm_installed_scls_packages(flavor: str) -> set:
+    """Return the set of recipe names whose scls-<flavor>-<name> RPM is installed.
+
+    Used to recover from partial installs where the RPM is registered with
+    rpm but the {prefix}/share/scls/registry/<name>.yaml marker file is
+    missing on disk (e.g., after a manual delete or interrupted install).
+    Returns an empty set if rpm is unavailable or the query fails.
+    """
+    if shutil.which('rpm') is None:
+        return set()
+    try:
+        result = subprocess.run(
+            ['rpm', '-qa', '--queryformat', '%{NAME}\n', f'scls-{flavor}-*'],
+            capture_output=True, text=True, check=False,
+        )
+    except OSError:
+        return set()
+    if result.returncode != 0:
+        return set()
+
+    prefix = f'scls-{flavor}-'
+    return {
+        line[len(prefix):]
+        for line in result.stdout.splitlines()
+        if line.startswith(prefix)
+    }
+
+
 def resolve_next_package(flavor: str) -> Optional[str]:
     """Resolve 'next' to the next unbuilt package in build order."""
     try:
@@ -118,7 +147,31 @@ def resolve_next_package(flavor: str) -> Optional[str]:
         return None
 
     recipes_dir = str(SCRIPT_DIR.parent / 'recipes')
-    pkg = get_next_unbuilt_package(recipes_dir, flavor, prefix)
+
+    # Cross-check rpm against the on-disk registry. A package whose RPM is
+    # installed but whose registry marker file is missing would otherwise
+    # cause "install next" to loop on it forever.
+    rpm_installed = _rpm_installed_scls_packages(flavor)
+    registry_dir = prefix / 'share' / 'scls' / 'registry'
+    missing_registry = {
+        name for name in rpm_installed
+        if not (registry_dir / f'{name}.yaml').exists()
+    }
+    if missing_registry:
+        names = ', '.join(sorted(missing_registry))
+        print(
+            f"Warning: RPM installed but registry marker missing for: {names}.",
+            file=sys.stderr,
+        )
+        print(
+            f"  Treating as installed. To restore the marker file, run: "
+            f"sudo dnf reinstall scls-{flavor}-<name>",
+            file=sys.stderr,
+        )
+
+    pkg = get_next_unbuilt_package(
+        recipes_dir, flavor, prefix, extra_installed=rpm_installed
+    )
     if pkg is None:
         print("All packages are already installed.")
     return pkg
@@ -234,11 +287,15 @@ def _install_rpm(package: str, flavor: str, prefix: Path, upgrade: bool) -> int:
     if ret != 0:
         return ret
 
-    # Find the built RPM
+    # Find the built RPM (RPMs are named scls-{flavor}-{package}-*.rpm)
     rpm_dir = Path('rpmbuild/RPMS')
-    rpms = list(rpm_dir.rglob(f'scls-{package}-*.rpm'))
+    scls_name = f'scls-{flavor}-{package}'
+    rpms = sorted(
+        rpm_dir.rglob(f'{scls_name}-[0-9]*.rpm'),
+        key=lambda p: p.stat().st_mtime, reverse=True
+    )
     if not rpms:
-        print(f"Error: No RPM found for {package}", file=sys.stderr)
+        print(f"Error: No RPM found for {scls_name} in {rpm_dir}", file=sys.stderr)
         return 1
 
     rpm_file = rpms[0]
@@ -338,25 +395,25 @@ def cmd_remove(args, config: Dict) -> int:
 
     # Dispatch based on package format
     if pkg_format == 'rpm':
-        return _remove_rpm(package, args.force)
+        return _remove_rpm(package, flavor, args.force)
     elif pkg_format == 'deb':
-        return _remove_deb(package, args.force)
+        return _remove_deb(package, flavor, args.force)
     else:  # pkg, tar.xz, direct
         return _remove_direct(package, flavor, prefix, args.force, args.with_deps,
                               args.dry_run)
 
 
-def _remove_rpm(package: str, force: bool) -> int:
+def _remove_rpm(package: str, flavor: str, force: bool) -> int:
     """Remove via RPM/dnf."""
     pkg_manager = 'dnf' if shutil_which('dnf') else 'yum'
-    cmd = ['sudo', pkg_manager, 'remove', '-y', f'scls-{package}']
+    cmd = ['sudo', pkg_manager, 'remove', '-y', f'scls-{flavor}-{package}']
     result = subprocess.run(cmd)
     return result.returncode
 
 
-def _remove_deb(package: str, force: bool) -> int:
+def _remove_deb(package: str, flavor: str, force: bool) -> int:
     """Remove via DEB/apt-get."""
-    cmd = ['sudo', 'apt-get', 'remove', '-y', f'scls-{package}']
+    cmd = ['sudo', 'apt-get', 'remove', '-y', f'scls-{flavor}-{package}']
     result = subprocess.run(cmd)
     return result.returncode
 

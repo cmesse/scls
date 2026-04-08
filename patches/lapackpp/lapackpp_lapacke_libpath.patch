@@ -1,18 +1,17 @@
 --- a/cmake/LAPACKConfig.cmake
 +++ b/cmake/LAPACKConfig.cmake
-@@ -74,7 +74,14 @@ endif()
+@@ -73,6 +73,14 @@
+ #-------------------------------------------------------------------------------
  # Find LAPACKE, either in the BLAS/LAPACK library or in -llapacke.
  # Check for pstrf (Cholesky with pivoting).
-
--set( lib_list ";-llapacke" )
-+# For libraries in our prefix, include the library path for try_run to find them
-+# CMAKE_LIBRARY_PATH should be set by the build system
-+if (DEFINED CMAKE_LIBRARY_PATH)
-+    set( lib_list ";-L${CMAKE_LIBRARY_PATH};-llapacke" )
-+else()
-+    set( lib_list ";-llapacke" )
-+endif()
 +
- message( DEBUG "lib_list ${lib_list}" )
++# For libraries in our prefix, add include and library paths so try_run can find lapacke.
++if (DEFINED CMAKE_INCLUDE_PATH)
++    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${CMAKE_INCLUDE_PATH}" )
++endif()
++if (DEFINED CMAKE_LIBRARY_PATH)
++    set( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${CMAKE_LIBRARY_PATH}" )
++endif()
 
- foreach (lib IN LISTS lib_list)
+ set( lib_list ";-llapacke" )
+ message( DEBUG "lib_list ${lib_list}" )

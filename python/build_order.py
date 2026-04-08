@@ -342,13 +342,18 @@ def get_ordered_package_list(directory, flavor=None):
     return ordered
 
 
-def get_next_unbuilt_package(directory, flavor, prefix):
+def get_next_unbuilt_package(directory, flavor, prefix, extra_installed=None):
     """Find the next package in build order that is not yet installed.
 
     Args:
         directory: Path to the recipes directory.
         flavor: Flavor name string.
         prefix: Installation prefix (Path) where the registry lives.
+        extra_installed: Optional set of package names to additionally treat
+            as installed (e.g. packages reported by ``rpm -q`` whose registry
+            marker file is missing on disk). Used to recover from partial
+            installs where the RPM is registered but the registry file was
+            deleted.
 
     Returns:
         Package name string, or None if all packages are installed.
@@ -359,6 +364,8 @@ def get_next_unbuilt_package(directory, flavor, prefix):
     if not ordered:
         return None
 
+    extra_installed = extra_installed or set()
+
     # Check registry for each package in order
     # Look in both the installed prefix registry and the local RPM build registry
     registry_dir = _Path(prefix) / 'share' / 'scls' / 'registry'
@@ -366,7 +373,7 @@ def get_next_unbuilt_package(directory, flavor, prefix):
     for pkg_name in ordered:
         installed = (registry_dir / f'{pkg_name}.yaml').exists()
         built = (local_registry_dir / f'{pkg_name}.yaml').exists()
-        if not installed and not built:
+        if not installed and not built and pkg_name not in extra_installed:
             return pkg_name
 
     return None

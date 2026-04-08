@@ -193,7 +193,10 @@ make PREFIX=%{prefix}{% for arg in build_args %} {{ arg }}{% endfor %}
 # Ensure our binaries are still in PATH for tests
 {{ path_setup }}
 # Ensure test executables can find shared libraries in prefix
-export LD_LIBRARY_PATH={{ prefix }}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=%{buildroot}{{ prefix }}/lib:{{ prefix }}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+# Ensure compilers can find headers and libraries installed into buildroot
+export CPATH=%{buildroot}{{ prefix }}/include${CPATH:+:$CPATH}
+export LIBRARY_PATH=%{buildroot}{{ prefix }}/lib${LIBRARY_PATH:+:$LIBRARY_PATH}
 {% if test_sources %}
 # Extract test data into the build/test directory
 mkdir -p build/test

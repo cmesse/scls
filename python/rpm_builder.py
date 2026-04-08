@@ -11,7 +11,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from datetime import datetime
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound, select_autoescape
 from typing import Dict, List
 
 from build_common import (
@@ -742,7 +742,9 @@ class RPMBuilder:
             'cflags': cflags,
             'cxxflags': cxxflags,
             'fcflags': fcflags,
-            'ldflags': add_rpath_for_libdirs(self.flavor['flags'].get('ldflags', ''), 'linux'),
+            # Expand %{prefix} etc. since the rendered Makefile.inc is escaped (%% → %)
+            # before being written, so RPM macros would not be expanded otherwise.
+            'ldflags': add_rpath_for_libdirs(self.check_args([self.flavor['flags'].get('ldflags', '')])[0], 'linux'),
             'oflags': oflags,
             'ar': 'ar',
             'interface': interface,
@@ -779,13 +781,21 @@ class RPMBuilder:
             context['math_provider'] = 'lapack'
             context['mkl_linker_flags'] = ''
             context['mkl_mpi_linker_flags'] = ''
-            context['blas_libs'] = '-lopenblas'
-            context['lapack_libs'] = '-llapack'
-            if self.recipe.get('features', {}).get('math') == 'parallel':
-                context['scalapack_libs'] = '-lscalapack -llapack -lopenblas'
-                context['math_libs'] = '-lscalapack -llapack -lopenblas'
+            # OpenBLAS bundles both BLAS and LAPACK in a single library;
+            # reference (lapack/blas) keeps them split. Avoid duplicates so
+            # the link line lists each implementation only once.
+            if math_linalg == 'openblas':
+                context['blas_libs'] = '-lopenblas'
+                context['lapack_libs'] = ''
             else:
-                context['math_libs'] = '-llapack -lopenblas'
+                context['blas_libs'] = '-lblas'
+                context['lapack_libs'] = '-llapack'
+            if self.recipe.get('features', {}).get('math') == 'parallel':
+                context['scalapack_libs'] = '-lscalapack'
+                context['math_libs'] = f"-lscalapack {context['lapack_libs']} {context['blas_libs']}".strip()
+            else:
+                context['scalapack_libs'] = ''
+                context['math_libs'] = f"{context['lapack_libs']} {context['blas_libs']}".strip()
 
         # OpenMP
         if self.recipe.get('features', {}).get('openmp', False):
@@ -1008,7 +1018,9 @@ SCLS_EOF
         template_name = self.recipe.get('template', 'default.spec.j2')
         try:
             template = self.jinja_env.get_template(template_name)
-        except:
+        except TemplateNotFound:
+            if template_name != 'default.spec.j2':
+                print(f"Warning: Template '{template_name}' not found, using default.spec.j2")
             template = self.jinja_env.get_template('default.spec.j2')
 
         # Get optimization flags

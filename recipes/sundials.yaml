@@ -37,13 +37,16 @@ configure:
     - "-DKLU_INCLUDE_DIR=%{prefix}/include/suitesparse"
     - "-DKLU_LIBRARY=%{prefix}/lib/libklu%{libext}"
     - "-DMPIEXEC_EXECUTABLE=%{prefix}/bin/mpiexec"
-    - "-DEXAMPLES_ENABLE_C=OFF"
-    - "-DEXAMPLES_ENABLE_CXX=OFF"
+    - "-DEXAMPLES_ENABLE_C=ON"
+    - "-DEXAMPLES_ENABLE_CXX=ON"
     - "-DEXAMPLES_INSTALL=OFF"
-    # Testing - disable GTest (SUNDIALS bundles old version incompatible with GCC 15)
-    - "-DSUNDIALS_TEST_ENABLE_UNIT_TESTS=OFF"
-    - "-DSUNDIALS_TEST_ENABLE_GTEST=OFF"
+    # Testing — use system GTest at %{prefix} (SUNDIALS' bundled FetchContent
+    # 1.16.0 is incompatible with GCC 15, but the cmake logic prefers an
+    # already-installed system GTest, which we have at %{prefix}).
+    - "-DSUNDIALS_TEST_ENABLE_UNIT_TESTS=ON"
+    - "-DSUNDIALS_TEST_ENABLE_GTEST=ON"
     - "-DSUNDIALS_TEST_ENABLE_DIFF_OUTPUT=OFF"
+    - "-DGTest_ROOT=%{prefix}"
   # LP64/ILP64 index size
   lp64_args:
     - "-DSUNDIALS_INDEX_SIZE=32"
