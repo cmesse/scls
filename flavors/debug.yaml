@@ -30,3 +30,8 @@ math:
   linalg: lapack
   threading: openmp
   interface: lp64
+
+# We don't ship our own zlib RPM — recipes that need libz should use the
+# distro's package (zlib at /usr/lib64/libz.so).
+system_libraries:
+  zlib: true

@@ -65,24 +65,24 @@ configure:
       - "-DBLAS_LIBRARIES=%{prefix}/lib/libblas%{libext}"
       - "-DLAPACK_LIBRARIES=%{prefix}/lib/liblapack%{libext}"
       - "-DSUITESPARSE_USE_CUDA=OFF"
-    gcc-mkl:
+    mkl:
       - "-DSUITESPARSE_USE_CUDA=OFF"
-    intel-mkl:
+    intel:
       - "-DSUITESPARSE_USE_CUDA=OFF"
     cuda:
       - "-DSUITESPARSE_USE_CUDA=ON"
   # MKL vendor depends on interface (LP64 vs ILP64)
   lp64_flavor_args:
-    gcc-mkl:
+    mkl:
       - "-DBLA_VENDOR=Intel10_64lp"
-    intel-mkl:
+    intel:
       - "-DBLA_VENDOR=Intel10_64lp"
     cuda:
       - "-DBLA_VENDOR=Intel10_64lp"
   ilp64_flavor_args:
-    gcc-mkl:
+    mkl:
       - "-DBLA_VENDOR=Intel10_64ilp"
-    intel-mkl:
+    intel:
       - "-DBLA_VENDOR=Intel10_64ilp"
     cuda:
       - "-DBLA_VENDOR=Intel10_64ilp"

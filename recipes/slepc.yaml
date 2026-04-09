@@ -37,10 +37,10 @@ configure:
       []
     debug:
       []
-    gcc-mkl:
+    mkl:
       # FEAST requires MKL
       - "--with-feast=1"
-    intel-mkl:
+    intel:
       - "--with-feast=1"
   optimization:
     O_level: 2

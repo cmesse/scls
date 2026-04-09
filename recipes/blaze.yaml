@@ -16,6 +16,7 @@ requires:
     - openblas
   debug:
     - lapack
+  mkl: []  # Intel MKL is pulled in via the flavor (intel-oneapi-mkl[-devel])
 
 features:
   fortran: false
@@ -47,7 +48,12 @@ configure:
       - "-DBLAS_LIBRARIES=%{prefix}/lib/libblas.so"
       - "-DLAPACK_LIBRARIES=%{prefix}/lib/liblapack.so"
     mkl:
-      # MKL provides BLAS/LAPACK via environment
+      # MKL ships its own cblas-compatible header — point blaze at it so the
+      # generated config defines BLAZE_BLAS_INCLUDE_FILE=<mkl_cblas.h>
+      # instead of the default <cblas.h>.
+      - "-DBLAZE_BLAS_INCLUDE_FILE=<mkl_cblas.h>"
+      - "-DBLAS_LIBRARIES=%{math_ldflags}"
+      - "-DLAPACK_LIBRARIES=%{math_ldflags}"
 
 build:
   parallel: true
@@ -70,12 +76,23 @@ test:
     - |
       BLAS_CFG="no"
       BLAS_INC=""
+      BLAS_INCFILE=""
       BLAS_LIBPATH=""
       BLAS_LIBS=""
       LAPACK_CFG="no"
       LAPACK_LIBPATH=""
       LAPACK_LIBS=""
-      if [ -f %{prefix}/lib/libopenblas.so ]; then
+      if [ -n "${MKLROOT:-}" ] && [ -f "$MKLROOT/include/mkl_cblas.h" ]; then
+        # Intel MKL: ships its own cblas/lapacke under mkl_cblas.h / mkl_lapacke.h
+        BLAS_CFG="yes"
+        BLAS_INC="$MKLROOT/include"
+        BLAS_INCFILE="mkl_cblas.h"
+        BLAS_LIBPATH="$MKLROOT/lib/intel64"
+        BLAS_LIBS="-lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl"
+        LAPACK_CFG="yes"
+        LAPACK_LIBPATH="$MKLROOT/lib/intel64"
+        LAPACK_LIBS="-lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl"
+      elif [ -f %{prefix}/lib/libopenblas.so ]; then
         BLAS_CFG="yes"
         BLAS_INC="%{prefix}/include"
         BLAS_LIBPATH="%{prefix}/lib"
@@ -87,29 +104,31 @@ test:
         BLAS_CFG="yes"
         BLAS_INC="%{prefix}/include"
         BLAS_LIBPATH="%{prefix}/lib"
-        BLAS_LIBS="-lblas"
+        # Reference BLAS splits the C interface (cblas) from the Fortran one;
+        # blaze's BLAS module calls cblas_* symbols and needs both.
+        BLAS_LIBS="-lcblas -lblas"
         LAPACK_CFG="yes"
         LAPACK_LIBPATH="%{prefix}/lib"
-        LAPACK_LIBS="-llapack"
+        LAPACK_LIBS="-llapacke -llapack"
       fi
       cat > blazetest/Configfile << CFGEOF
-      CXX=$CXX
-      CXXFLAGS=-std=c++14 $CXXFLAGS
+      CXX="$CXX"
+      CXXFLAGS="-std=c++14 $CXXFLAGS"
       BOOST="no"
       BOOST_INCLUDE_PATH=
       BOOST_LIBRARY_PATH=
       BOOST_SYSTEM_LIBRARY=
       BOOST_THREAD_LIBRARY=
       BLAS="$BLAS_CFG"
-      BLAS_INCLUDE_PATH=$BLAS_INC
-      BLAS_INCLUDE_FILE=
-      BLAS_LIBRARY_PATH=$BLAS_LIBPATH
-      BLAS_LIBRARIES=$BLAS_LIBS
+      BLAS_INCLUDE_PATH="$BLAS_INC"
+      BLAS_INCLUDE_FILE="$BLAS_INCFILE"
+      BLAS_LIBRARY_PATH="$BLAS_LIBPATH"
+      BLAS_LIBRARIES="$BLAS_LIBS"
       LAPACK="$LAPACK_CFG"
       LAPACK_SUPPORTS_GESVDX="no"
-      LAPACK_LIBRARY_PATH=$LAPACK_LIBPATH
-      LAPACK_LIBRARIES=$LAPACK_LIBS
-      LIBRARY_DIRECTIVES=-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib
+      LAPACK_LIBRARY_PATH="$LAPACK_LIBPATH"
+      LAPACK_LIBRARIES="$LAPACK_LIBS"
+      LIBRARY_DIRECTIVES="-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib"
       CFGEOF
       cd blazetest && ./configure
       make %{?_smp_mflags} -C src/utiltest && src/utiltest/run

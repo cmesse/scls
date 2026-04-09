@@ -8,7 +8,13 @@ source:
   url: https://github.com/opencollab/arpack-ng/archive/%{version}/arpack-ng-%{version}.tar.gz
 
 requires:
-  - openmpi
+  all:
+    - openmpi
+    - scalapack
+  gcc:
+    - openblas
+  debug:
+    - lapack
 
 features:
   fortran: true

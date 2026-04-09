@@ -1,11 +1,7 @@
-name: gcc-mkl
+name: mkl
 platform: linux
 description: "Production build with GCC compilers and Intel MKL"
 prefix: /opt/scls/gcc-mkl
-
-# Pre-build setup commands
-pre_build_setup:
-  - "source /opt/intel/oneapi/setvars.sh intel64"
 
 # RPM package dependencies (for bootstrap packages only - we build our own GCC)
 rpm_build_requires:
@@ -40,3 +36,8 @@ math:
   linalg: mkl
   threading: openmp
   interface: lp64  # 32-bit integers
+
+# We don't ship our own zlib RPM — recipes that need libz should use the
+# distro's package (zlib at /usr/lib64/libz.so).
+system_libraries:
+  zlib: true

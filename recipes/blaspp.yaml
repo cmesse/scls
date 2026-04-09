@@ -60,20 +60,20 @@ configure:
       - "-Dgpu_backend=none"
       - '-DLAPACK_LIBRARIES=-llapack'
     mkl:
-      - '-Dblas="Intel MKL"'
-      - '-Dlapack="Intel MKL"'
+      - '-Dblas=Intel MKL'
+      - '-Dlapack=Intel MKL'
       - "-Dgpu_backend=none"
-      - '-DLAPACK_LIBRARIES="%{math_ldflags}"'
+      - '-DLAPACK_LIBRARIES=%{math_ldflags}'
     cuda:
-      - '-Dblas="Intel MKL"'
-      - '-Dlapack="Intel MKL"'
+      - '-Dblas=Intel MKL'
+      - '-Dlapack=Intel MKL'
       - "-Dgpu_backend=cuda"
-      - '-DLAPACK_LIBRARIES="%{math_ldflags}"'
+      - '-DLAPACK_LIBRARIES=%{math_ldflags}'
   # LP64/ILP64 integer interface
   lp64_args:
-    - '-Dblas_int="int (LP64)"'
+    - '-Dblas_int=int (LP64)'
   ilp64_args:
-    - '-Dblas_int="int64_t (ILP64)"'
+    - '-Dblas_int=int64_t (ILP64)'
   optimization:
     O_level: 3
 

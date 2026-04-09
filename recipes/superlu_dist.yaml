@@ -62,10 +62,10 @@ configure:
       - "-DTPL_PARMETIS_LIBRARIES=%{prefix}/lib/libparmetis.so;%{prefix}/lib/libmetis.so"
       - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libblas.so"
       - "-DTPL_LAPACK_LIBRARIES=%{prefix}/lib/liblapack.so"
-    gcc-mkl:
+    mkl:
       - "-DTPL_PARMETIS_LIBRARIES=%{prefix}/lib/libparmetis.so;%{prefix}/lib/libmetis.so"
       # MKL BLAS/LAPACK provided via environment
-    intel-mkl:
+    intel:
       - "-DTPL_PARMETIS_LIBRARIES=%{prefix}/lib/libparmetis.so;%{prefix}/lib/libmetis.so"
       # MKL BLAS/LAPACK provided via environment
     cuda:

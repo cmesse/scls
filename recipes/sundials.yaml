@@ -59,9 +59,9 @@ configure:
       - "-DCMAKE_CUDA_ARCHITECTURES=%{cuda_architectures}"
   # ILP64 with MKL enables oneMKL
   ilp64_flavor_args:
-    gcc-mkl:
+    mkl:
       - "-DENABLE_ONEMKL=ON"
-    intel-mkl:
+    intel:
       - "-DENABLE_ONEMKL=ON"
     cuda:
       - "-DENABLE_ONEMKL=ON"

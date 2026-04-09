@@ -563,6 +563,19 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
         cxx = compilers.get('cxx', 'g++')
         fc = compilers.get('fc', 'gfortran')
 
+    # For the mkl flavor, also include MKL's lib/include in the cmake search
+    # paths so cmake's own FindBLAS/FindLAPACK (used e.g. by lapackpp via
+    # use_cmake_find_lapack=ON + BLA_VENDOR=Intel10_64lp) can locate MKL.
+    # cmake's find_library reads CMAKE_LIBRARY_PATH, not the LIBRARY_PATH env
+    # var, so we have to thread it through here.
+    cmake_library_path = f"{prefix}/lib"
+    cmake_include_path = f"{prefix}/include"
+    if flavor.get('math', {}).get('linalg') == 'mkl':
+        import os as _os
+        mkl_root = _os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
+        cmake_library_path = f"{prefix}/lib;{mkl_root}/lib/intel64;{mkl_root}/lib"
+        cmake_include_path = f"{prefix}/include;{mkl_root}/include"
+
     args = [
         f"-DCMAKE_INSTALL_PREFIX={install_prefix}",
         "-DCMAKE_BUILD_TYPE=Release",
@@ -573,8 +586,8 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
         f"-DCMAKE_Fortran_COMPILER={fc}",
         # Help CMake find libraries/headers in our prefix (needed for try_run tests)
         f"-DCMAKE_PREFIX_PATH={prefix}",
-        f"-DCMAKE_LIBRARY_PATH={prefix}/lib",
-        f"-DCMAKE_INCLUDE_PATH={prefix}/include",
+        f"-DCMAKE_LIBRARY_PATH={cmake_library_path}",
+        f"-DCMAKE_INCLUDE_PATH={cmake_include_path}",
         # Pass linker flags so libraries in our prefix are found at link time
         # -rpath-link helps the linker resolve indirect shared library dependencies
         # (e.g. libopenblas.so -> libgfortran.so) during try_compile checks

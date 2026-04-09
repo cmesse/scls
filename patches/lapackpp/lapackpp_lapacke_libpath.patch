@@ -1,17 +1,20 @@
 --- a/cmake/LAPACKConfig.cmake
 +++ b/cmake/LAPACKConfig.cmake
-@@ -73,6 +73,14 @@
+@@ -73,6 +73,17 @@
  #-------------------------------------------------------------------------------
  # Find LAPACKE, either in the BLAS/LAPACK library or in -llapacke.
  # Check for pstrf (Cholesky with pivoting).
 +
-+# For libraries in our prefix, add include and library paths so try_run can find lapacke.
-+if (DEFINED CMAKE_INCLUDE_PATH)
-+    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${CMAKE_INCLUDE_PATH}" )
-+endif()
-+if (DEFINED CMAKE_LIBRARY_PATH)
-+    set( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${CMAKE_LIBRARY_PATH}" )
-+endif()
++# For libraries in our prefix, add include and library paths so try_run can
++# find lapacke. CMAKE_INCLUDE_PATH / CMAKE_LIBRARY_PATH may be ;-separated
++# lists (e.g. when MKL is added alongside our prefix), so iterate over them
++# to emit one -I/-L per entry instead of splatting the whole list as one arg.
++foreach (_dir IN LISTS CMAKE_INCLUDE_PATH)
++    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${_dir}" )
++endforeach()
++foreach (_dir IN LISTS CMAKE_LIBRARY_PATH)
++    set( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${_dir}" )
++endforeach()
 
  set( lib_list ";-llapacke" )
  message( DEBUG "lib_list ${lib_list}" )

@@ -161,13 +161,13 @@ configure:
       - "--with-mpi-include=%{prefix}/include"
       - "--with-mpi-lib=%{prefix}/lib/libmpi%{libext}"
       - "--with-mpiexec=%{prefix}/bin/mpiexec"
-      - "--with-zlib-include=%{zlib_include}"
-      - "--with-zlib-lib=%{zlib_lib}"
+      - "--with-zlib-include=/usr/include"
+      - "--with-zlib-lib=/usr/lib64/libz.so"
       - "--CC_LINKER_FLAGS=%{ldflags} -lgfortran"
       - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
       - "--with-openmp-include=/usr/include"
       - "--with-openmp-lib=/usr/lib64/libgomp.so.1"
-    gcc-mkl:
+    mkl:
       - "--with-cuda=0"
       - "--with-blaslapack-include=%{mklroot}/include"
       - "--with-blaslapack-lib=%{mkl_linker_flags}"
@@ -182,7 +182,7 @@ configure:
       - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
       - "--with-openmp-include=/usr/include"
       - "--with-openmp-lib=/usr/lib64/libgomp.so.1"
-    intel-mkl:
+    intel:
       - "--with-cuda=0"
       - "--with-blaslapack-include=%{mklroot}/include"
       - "--with-blaslapack-lib=%{mkl_linker_flags}"
@@ -231,9 +231,9 @@ build:
       - "PETSC_ARCH=arch-darwin-c-opt"
     debug:
       - "PETSC_ARCH=arch-linux-c-opt"
-    gcc-mkl:
+    mkl:
       - "PETSC_ARCH=arch-linux-c-opt"
-    intel-mkl:
+    intel:
       - "PETSC_ARCH=arch-linux-c-opt"
     cuda:
       - "PETSC_ARCH=arch-linux-c-opt"
@@ -249,9 +249,9 @@ install:
       - "PETSC_ARCH=arch-darwin-c-opt"
     debug:
       - "PETSC_ARCH=arch-linux-c-opt"
-    gcc-mkl:
+    mkl:
       - "PETSC_ARCH=arch-linux-c-opt"
-    intel-mkl:
+    intel:
       - "PETSC_ARCH=arch-linux-c-opt"
     cuda:
       - "PETSC_ARCH=arch-linux-c-opt"

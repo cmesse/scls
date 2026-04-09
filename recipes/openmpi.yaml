@@ -29,6 +29,10 @@ requires:
     - pmix
     - libevent
     - hwloc
+  mkl:
+    - pmix
+    - libevent
+    - hwloc
   lbl: []  # uses system pmix, hwloc, libevent
   macos:
     - gcc
@@ -55,6 +59,14 @@ configure:
     - --enable-mpi1-compatibility
   flavor_args:
     gcc:
+      - --with-pmix=%{prefix}
+      - --with-hwloc=%{prefix}
+      - --with-hwloc-libdir=%{prefix}/lib
+      - --with-libevent=%{prefix}
+      - --with-libevent-libdir=%{prefix}/lib
+    mkl:
+      # mkl flavor uses our own pmix/hwloc/libevent (same as gcc); MKL only
+      # affects math libs, not the MPI stack.
       - --with-pmix=%{prefix}
       - --with-hwloc=%{prefix}
       - --with-hwloc-libdir=%{prefix}/lib

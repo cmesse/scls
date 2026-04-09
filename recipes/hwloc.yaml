@@ -42,13 +42,13 @@ configure:
     debug:
       - --disable-cuda
       - --disable-nvml
-    gcc-mkl:
+    mkl:
       - --disable-cuda
       - --disable-nvml
     gcc-mkl-cuda:
       - --with-cuda=%{cuda}
       - --enable-nvml
-    intel-mkl:
+    intel:
       - --disable-cuda
       - --disable-nvml
     macos:

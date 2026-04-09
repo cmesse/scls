@@ -40,8 +40,8 @@ configure:
     - "-DCMAKE_INSTALL_LIBDIR=lib"
     - "-DBUILD_SHARED_LIBS=ON"
     - "-DCMAKE_BUILD_RPATH=%{prefix}/lib"
-    - "-DCMAKE_LIBRARY_PATH=%{prefix}/lib"
-    - "-DCMAKE_INCLUDE_PATH=%{prefix}/include"
+    # NB: CMAKE_LIBRARY_PATH and CMAKE_INCLUDE_PATH are set by build_common
+    # (and extended with MKL paths for the mkl flavor); don't override here.
     - "-Dbuild_tests=ON"
   flavor_args:
     gcc:
@@ -62,23 +62,18 @@ configure:
       - '-DBLAS_LIBRARIES=-lblas'
       - '-DLAPACK_LIBRARIES=-llapack'
     mkl:
-      # For MKL, use CMake's FindLAPACK with appropriate vendor
-      - "-Duse_cmake_find_lapack=ON"
+      # Skip cmake's FindBLAS/FindLAPACK — those default to looking for the
+      # Intel OpenMP runtime (libiomp5), which we don't have on GCC systems.
+      # Pass MKL libs directly via math_ldflags (which uses GNU's libgomp).
+      - "-Dlapack=auto"
       - "-Dgpu_backend=none"
+      - "-DBLAS_LIBRARIES=%{math_ldflags}"
+      - "-DLAPACK_LIBRARIES=%{math_ldflags}"
     cuda:
-      - "-Duse_cmake_find_lapack=ON"
+      - "-Dlapack=auto"
       - "-Dgpu_backend=cuda"
-  # LP64/ILP64: Only relevant for MKL (OpenBLAS/generic use lapackpp's auto-detection)
-  lp64_flavor_args:
-    mkl:
-      - "-DBLA_VENDOR=Intel10_64lp"
-    cuda:
-      - "-DBLA_VENDOR=Intel10_64lp"
-  ilp64_flavor_args:
-    mkl:
-      - "-DBLA_VENDOR=Intel10_64ilp"
-    cuda:
-      - "-DBLA_VENDOR=Intel10_64ilp"
+      - "-DBLAS_LIBRARIES=%{math_ldflags}"
+      - "-DLAPACK_LIBRARIES=%{math_ldflags}"
   optimization:
     O_level: 3
 
@@ -89,8 +84,19 @@ build:
 test:
   commands:
     # hegvd/hpgvd (Hermitian generalized eigenvalue divide-and-conquer) crash with
-    # SIGSEGV against OpenBLAS — known LAPACK reference bug, not a lapackpp regression.
-    - "cd build/test && LD_LIBRARY_PATH=%{prefix}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH} python3 run_tests.py --quick -x hegvd -x hpgvd"
+    # SIGSEGV against reference LAPACK / OpenBLAS — known LAPACK bug.
+    #
+    # gb* family (gbsv/gbtrf/gbtrs/gbcon/gbrfs) crashes against MKL: LAPACKE_zgbtrf
+    # segfaults on 100x100 complex-double general band matrices when kl ~= n and
+    # ku ~= n. Reproduced manually with `tester --type z --dim 100 --kl 100
+    # --ku 100 gbtrf`. Bug is in MKL itself; the gb* routines that depend on
+    # gbtrf cascade-fail. Exclude only for the mkl flavor.
+    - |
+      EXTRA_EXCLUDES=""
+      if [ -n "${MKLROOT:-}" ]; then
+        EXTRA_EXCLUDES="-x gbsv -x gbtrf -x gbtrs -x gbcon -x gbrfs"
+      fi
+      cd build/test && LD_LIBRARY_PATH=%{prefix}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH} python3 run_tests.py --quick -x hegvd -x hpgvd $EXTRA_EXCLUDES
 
 registry:
   cflags: "-I%{prefix}/include"

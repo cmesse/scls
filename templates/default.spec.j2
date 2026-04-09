@@ -143,7 +143,7 @@ export {{ env_var.name }}="{{ env_var.value }}"
 mkdir -p build && cd build
 cmake .. \
 {% for arg in cmake_args %}
-    {% if ';' in arg or ' ' in arg %}'{{ arg }}'{% else %}{{ arg }}{% endif %}{% if not loop.last %} \{% endif %}
+    {% if ';' in arg or ' ' in arg or '<' in arg or '>' in arg %}'{{ arg }}'{% else %}{{ arg }}{% endif %}{% if not loop.last %} \{% endif %}
 
 {% endfor %}
 
@@ -163,7 +163,7 @@ cmake .. \
 ./config \
 {% endif %}
 {% for arg in configure_args %}
-    {{ arg }}{% if not loop.last %} \{% endif %}
+    {% if ';' in arg or ' ' in arg or '<' in arg or '>' in arg %}'{{ arg }}'{% else %}{{ arg }}{% endif %}{% if not loop.last %} \{% endif %}
 
 {% endfor %}
 
@@ -190,6 +190,10 @@ make PREFIX=%{prefix}{% for arg in build_args %} {{ arg }}{% endfor %}
 
 {% if test_commands %}
 %check
+# Pre-check setup (Intel OneAPI, NVIDIA HPC SDK, etc.) — same env we used in %build
+{% for setup_cmd in pre_build_setup %}
+{{ setup_cmd }}
+{% endfor %}
 # Ensure our binaries are still in PATH for tests
 {{ path_setup }}
 # Ensure test executables can find shared libraries in prefix

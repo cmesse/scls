@@ -266,9 +266,11 @@ class RPMBuilder:
             self.nv_hpc_compilers = ''
 
 
-        # MKL paths if needed
+        # MKL paths if needed. Prefer the MKLROOT env var (set by sourcing
+        # /opt/intel/oneapi/setvars.sh or the equivalent module load) and
+        # fall back to the standard oneAPI install location.
         if 'mkl' in self.flavor_name:
-            self.mkl_root = '/opt/intel/oneapi/mkl/latest'
+            self.mkl_root = os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
         else:
             self.mkl_root = None
 
@@ -542,12 +544,34 @@ class RPMBuilder:
         return pre_commands, post_commands
 
     def get_intel_oneapi_setup(self) -> list:
-        """Get Intel OneAPI setup commands for MKL flavors"""
+        """Get Intel OneAPI setup commands for MKL flavors.
+
+        We avoid sourcing /opt/intel/oneapi/setvars.sh because:
+        - it pollutes the build environment with dozens of unrelated vars
+        - it doesn't exist on minimal Intel installs (only mkl shipped)
+        - we already know MKLROOT statically, so the explicit export is enough
+        """
         setup_commands = []
 
-        # Add Intel OneAPI setup for MKL flavors
-        if 'mkl' in self.flavor_name:
-            setup_commands.append("source /opt/intel/oneapi/setvars.sh intel64")
+        if 'mkl' in self.flavor_name and self.mkl_root:
+            setup_commands.append(f"export MKLROOT={self.mkl_root}")
+            # Make MKL .so files discoverable at runtime during %build/%check.
+            # Our binaries link against -lmkl_* but their embedded rpath only
+            # points into our prefix, so the loader needs LD_LIBRARY_PATH for
+            # any test executable run from the build tree.
+            setup_commands.append(
+                f"export LD_LIBRARY_PATH={self.mkl_root}/lib/intel64${{LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}}"
+            )
+            # LIBRARY_PATH and CPATH are read by gcc during try_compile in
+            # fresh subprocesses (e.g. cmake's BLAS finder), where our -L/-I
+            # flags don't reach. Without these, projects like blaspp/lapackpp
+            # report "BLAS library not found" even though MKL is installed.
+            setup_commands.append(
+                f"export LIBRARY_PATH={self.mkl_root}/lib/intel64${{LIBRARY_PATH:+:$LIBRARY_PATH}}"
+            )
+            setup_commands.append(
+                f"export CPATH={self.mkl_root}/include${{CPATH:+:$CPATH}}"
+            )
 
         # Add any flavor-specific pre-build setup
         if 'pre_build_setup' in self.flavor:
@@ -1045,6 +1069,30 @@ SCLS_EOF
                 self.cxxflags += f" {self.math_flags}"
                 self.fflags += f" {self.math_flags}"
 
+        # For the mkl flavor, every package may need MKL headers (e.g. C++
+        # bindings, headers that #include <mkl.h> transitively), regardless
+        # of whether the recipe sets `features.math`. Inject the MKL flags
+        # unconditionally so they always reach CFLAGS/CXXFLAGS/FFLAGS.
+        #
+        # Per Intel's link-line advisor, GNU/GCC builds against MKL need:
+        #   LP64  (32-bit BLAS ints): -m64 -I$MKLROOT/include
+        #   ILP64 (64-bit BLAS ints): -DMKL_ILP64 -m64 -I$MKLROOT/include
+        # The -DMKL_ILP64 macro toggles MKL's MKL_INT typedef from int to
+        # long long; without it, headers and libs would disagree on widths.
+        if 'mkl' in self.flavor_name and self.mkl_root:
+            interface = self.flavor.get('math', {}).get('interface', 'lp64')
+            mkl_flag_parts = ['-m64', f'-I{self.mkl_root}/include']
+            if interface == 'ilp64':
+                mkl_flag_parts.insert(0, '-DMKL_ILP64')
+            mkl_flags = ' '.join(mkl_flag_parts)
+            for flag in mkl_flag_parts:
+                if flag not in self.cflags:
+                    self.cflags += f" {flag}"
+                if flag not in self.cxxflags:
+                    self.cxxflags += f" {flag}"
+                if flag not in self.fflags:
+                    self.fflags += f" {flag}"
+
         # Get requirements
         build_requires, requires = self.get_rpm_requires()
 
@@ -1364,16 +1412,20 @@ SCLS_EOF
                     if req not in build_only_tools:
                         requires.append(scls_req)
 
-        # Math library requirements based on flavor
+        # Math library requirements based on flavor.
+        # The flavor file expresses the math provider via `math.linalg`
+        # ('mkl', 'openblas', 'lapack'/'reference', ...).
         math_feature = features.get('math', 'none')
         if math_feature in ['serial', 'parallel']:
             math_config = self.flavor.get('math', {})
-            if math_config.get('type') == 'mkl':
-                # Intel MKL requirements
-                if 'gcc-mkl' in flavor_name or 'intel-mkl' in flavor_name:
-                    requires.append('intel-mkl')
-                    build_requires.append('intel-mkl-devel')
-            elif math_config.get('type') == 'reference':
+            linalg = math_config.get('linalg', 'reference')
+            if linalg == 'mkl':
+                # Intel oneAPI MKL: both packages are required at runtime
+                # (the -devel package owns the unversioned .so symlinks
+                # against which our binaries are linked).
+                requires.extend(['intel-oneapi-mkl', 'intel-oneapi-mkl-devel'])
+                build_requires.extend(['intel-oneapi-mkl', 'intel-oneapi-mkl-devel'])
+            elif linalg in ('reference', 'lapack'):
                 # Reference BLAS/LAPACK
                 requires.extend(['blas', 'lapack'])
                 build_requires.extend(['blas-devel', 'lapack-devel'])

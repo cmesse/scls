@@ -13,6 +13,8 @@ requires:
     - metis
   gcc:
     - openblas
+  debug:
+    - lapack
 
 features:
   fortran: true

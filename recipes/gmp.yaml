@@ -36,9 +36,9 @@ configure:
   flavor_args:
     debug:
       - --enable-fat
-    gcc-mkl:
+    mkl:
       - --enable-fat
-    intel-mkl:
+    intel:
       - --enable-fat
     macos:
       - --disable-assembly  # Avoid assembly issues on macOS
