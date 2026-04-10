@@ -24,7 +24,7 @@ SCLS is deliberately opinionated.
 This is not a general-purpose meta-build framework. It makes choices so the resulting stack remains coherent:
 
 - GCC is the default toolchain because it is open, reliable, and has strong Fortran support.
-- MKL and OpenBLAS are treated as backend choices, not as an invitation to rebuild everything ad hoc.
+- MKL and OpenBLAS are treated as backend choices selected by flavor (`mkl` vs `gcc`), not as an invitation to rebuild everything ad hoc.
 - LP64 is the default integer model; ILP64 is supported when it is actually needed.
 - OpenMPI is the default MPI implementation.
 - Shared libraries are the normal target.
@@ -78,7 +78,7 @@ The project is built around three core concepts.
 
 ### Flavors
 
-[`flavors/`](flavors) contains platform and toolchain choices. A flavor defines the target platform, compilers, optimization flags, math backend, MPI implementation, and install prefix.
+[`flavors/`](flavors) contains platform and toolchain choices. A flavor defines the target platform, compilers, optimization flags, math backend, MPI implementation, and install prefix. See [Flavors](#flavors) above for the available flavors and their prefixes.
 
 ### Builders
 
@@ -103,35 +103,72 @@ The project is built around three core concepts.
 - [`rpmbuild/`](rpmbuild): local RPM build tree
 - [`work/`](work): downloaded sources and build artifacts
 
+## Flavors
+
+A flavor defines the target platform, compilers, optimization flags, math backend, and install prefix. Each flavor installs into its own prefix, so multiple flavors can coexist.
+
+| Flavor   | Prefix            | Compiler | Math      | Notes                                |
+|----------|-------------------|----------|-----------|--------------------------------------|
+| `gcc`    | `/opt/scls/gcc`   | GCC      | OpenBLAS  | Default production build             |
+| `mkl`    | `/opt/scls/mkl`   | GCC      | Intel MKL | Requires `intel-oneapi-mkl` RPMs     |
+| `debug`  | `/opt/scls/debug` | GCC      | Reference | `-Og -g`, for valgrind / sanitizers  |
+| `intel`  | `/opt/scls/intel` | Intel    | Intel MKL | Requires Intel oneAPI compilers      |
+| `lbl`    | `/opt/scls/lbl`   | GCC      | OpenBLAS  | LBL site-specific, builds own GCC    |
+| `macos`  | `/opt/scls/macos` | GCC      | OpenBLAS  | macOS (Intel + Apple Silicon)        |
+
 ## Quick Start
 
-Generate an RPM SPEC file:
+The `scls` wrapper is the recommended entry point. It reads `flavor.conf` (YAML) to determine the active flavor and dispatches to the appropriate builder.
+
+```yaml
+# flavor.conf
+flavor: gcc
+# gcc_toolset: 15        # uncomment on RHEL 8 to use Red Hat gcc-toolset-15
+# extra_packages:        # uncomment to build packages not in the flavor's allowlist
+#   - binutils
+#   - gcc
+```
+
+Build and install the next package in dependency order:
 
 ```bash
+./scls build next
+./scls install next
+```
+
+Build a specific package:
+
+```bash
+./scls build petsc
+./scls install petsc
+```
+
+Other commands:
+
+```bash
+./scls spec petsc          # Generate SPEC file only (RPM mode)
+./scls list                # List installed packages
+./scls order               # Show build order
+```
+
+### Direct builder invocation
+
+For cases where the wrapper is not suitable:
+
+```bash
+# RPM SPEC file only (Linux):
 python python/rpm_builder.py --package <package> --flavor <flavor> --spec-only
-```
 
-Build an RPM:
-
-```bash
+# Build RPM package (Linux):
 python python/rpm_builder.py --package <package> --flavor <flavor>
-```
 
-Build with the generic Unix builder:
-
-```bash
+# Generic Unix-style build/install:
 python python/unix_builder.py --package <package> --flavor <flavor> build install
-```
 
-Build for macOS:
-
-```bash
+# macOS build with PKG creation:
 python python/unix_builder.py --package <package> --flavor macos build install pkg
-```
 
-Determine the next package in build order:
-
-```bash
+# Build order:
 python python/build_order.py recipes --flavor <flavor>
 ```
 

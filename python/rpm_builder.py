@@ -11,6 +11,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from datetime import datetime
+import yaml
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound, select_autoescape
 from typing import Dict, List
 
@@ -188,16 +189,51 @@ class RPMBuilder:
         if self.flavor.get('platform') != 'linux':
             raise BuildError(f"Flavor {flavor} is not for Linux")
 
+        # Check if the package is in flavor.conf's extra_packages list. Such
+        # packages are foundation packages whose recipe's flavors: allowlist
+        # would normally exclude them, but the host needs them anyway (e.g.
+        # building gcc/binutils for the gcc flavor on RHEL 8). Listing them in
+        # extra_packages is the only supported override path — there is no
+        # CLI flag, since the flavor.conf entry is trackable per-host.
+        is_extra = package in _read_extra_packages(flavor)
+
         # Check if package should be built
         if not should_build_package(self.recipe, self.flavor):
-            raise BuildError(f"Package {package} not built for {flavor}")
+            if is_extra:
+                print(f"Note: {package} is not officially supported for "
+                      f"flavor {flavor}; building anyway because it is "
+                      f"listed in flavor.conf's extra_packages.")
+            else:
+                raise BuildError(
+                    f"Package {package} not built for {flavor}. "
+                    f"To override, add it to extra_packages: in flavor.conf."
+                )
 
         # Check if this is a bootstrap package (needs system compilers before our GCC is built)
         self.is_bootstrap = self.recipe.get('bootstrap', False)
         if self.is_bootstrap and 'bootstrap_compilers' in self.flavor:
             print(f"Using bootstrap compilers (bootstrap package)")
+            # If a Red Hat gcc-toolset is active (set by the wrapper sourcing
+            # /opt/rh/gcc-toolset-N/enable), rewrite the flavor's hardcoded
+            # /usr/bin/gcc bootstrap_compilers to point at the toolset's
+            # binaries directly. Otherwise SPEC files would still emit
+            # `export CC=/usr/bin/gcc`, defeating the purpose of the toolset.
+            toolset = os.environ.get('SCLS_GCC_TOOLSET', '').strip()
+            bootstrap = self.flavor['bootstrap_compilers'].copy()
+            if toolset:
+                ts_bin = f"/opt/rh/gcc-toolset-{toolset}/root/usr/bin"
+                for key, default_basename in (('cc', 'gcc'), ('cxx', 'g++'),
+                                              ('fc', 'gfortran')):
+                    val = bootstrap.get(key, '')
+                    # Replace any /usr/bin/<x> with the toolset path. Also
+                    # handle bare names (e.g. 'gcc') by prepending ts_bin.
+                    if val.startswith('/usr/bin/'):
+                        bootstrap[key] = val.replace('/usr/bin/', ts_bin + '/', 1)
+                    elif '/' not in val:
+                        bootstrap[key] = f"{ts_bin}/{val}"
+                print(f"  using gcc-toolset-{toolset} at {ts_bin}")
             # Override compilers with bootstrap compilers for this build
-            self.flavor['compilers'] = self.flavor['bootstrap_compilers'].copy()
+            self.flavor['compilers'] = bootstrap
 
         # Setup paths
         self.prefix = Path(self.flavor['prefix'])
@@ -982,6 +1018,15 @@ features:
   math: false
 has_pc_file: false
 SCLS_EOF
+
+%postun
+# When the environment package is fully removed ($1 = 0, not an upgrade),
+# clean up the entire flavor prefix tree.  The environment package is the
+# base of the stack — if it is gone, nothing else under this prefix can
+# function, so removing the tree avoids leaving stale directories behind.
+if [ "$1" -eq 0 ]; then
+    rm -rf %{{prefix}} 2>/dev/null || true
+fi
 
 %files
 {chr(10).join(files_list)}
@@ -1971,6 +2016,28 @@ def list_installed_packages(flavor_name: str) -> None:
     print(f"\n{count} packages installed.")
 
 
+def _read_extra_packages(flavor: str) -> list:
+    """Return extra_packages from flavor.conf if its `flavor:` matches the
+    requested flavor, else []. Used by the meta-package builder to include
+    host-extra foundation packages (e.g. gcc/binutils on RHEL 8) without
+    making them part of the recipe-level allowlist.
+    """
+    conf_path = Path(__file__).parent.parent / 'flavor.conf'
+    if not conf_path.exists():
+        return []
+    try:
+        data = yaml.safe_load(conf_path.read_text())
+    except yaml.YAMLError:
+        return []
+    if not isinstance(data, dict):
+        return []
+    if data.get('flavor') != flavor:
+        # Different flavor in flavor.conf — don't apply this host's overrides.
+        return []
+    extra = data.get('extra_packages') or []
+    return [str(p) for p in extra if isinstance(p, str)]
+
+
 def build_flavor_meta_package(flavor: str, spec_only: bool = False) -> None:
     """Build the flavor meta-package (e.g. scls-gcc) that depends on all
     packages in the flavor.  Installing it via dnf pulls in the entire stack.
@@ -1989,6 +2056,14 @@ def build_flavor_meta_package(flavor: str, spec_only: bool = False) -> None:
     packages = get_flavor_package_list(str(recipes_dir), flavor)
     if not packages:
         raise BuildError(f"No packages found for flavor {flavor}")
+
+    # Add any host-extra packages (e.g. gcc/binutils on RHEL 8) so they
+    # become Requires of the meta package and get installed alongside the
+    # rest of the stack.
+    extra = _read_extra_packages(flavor)
+    for pkg in extra:
+        if pkg not in packages:
+            packages.insert(0, pkg)  # foundation packages first
 
     scls_name = f"scls-{flavor}"
     requires = [f"scls-{flavor}-{pkg}" for pkg in packages]

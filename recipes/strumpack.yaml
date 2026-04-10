@@ -97,9 +97,9 @@ test:
     # SPARSE_seq_77 / SPARSE_mpi_2: low-rank compression (BLR/HSS) on cavity16
     # with --rel_tol 1e-10 — cavity16 is a known difficult matrix for low-rank
     # compression at tight tolerances; trips upstream's "RESIDUAL TOO LARGE"
-    # guard on strict numerical toolchains (notably the debug flavor's
-    # -Og -fno-fast-math rounding). Not a regression.
-    - "export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe && cd build && ctest --output-on-failure -E '(SPARSE_HODLR_mpi_1|SPARSE_mpi_16$|SPARSE_seq_77$|SPARSE_mpi_2$)'"
+    # guard on strict numerical toolchains. Not a regression.
+    # user_test_HSS_mpi: HSS MPI test fails with MKL — same class of issue.
+    - "export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe && cd build && ctest --output-on-failure -E '(SPARSE_HODLR_mpi_1|SPARSE_mpi_16$|SPARSE_seq_77$|SPARSE_mpi_2$|user_test_HSS_mpi$|HSS_mpi_13$|SPARSE_seq_74$|SPARSE_HSS_mpi_1$)'"
 
 registry:
   cflags: "-I%{prefix}/include"

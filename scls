@@ -1,21 +1,79 @@
 #!/usr/bin/env bash
 SCLS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Read flavor from flavor.conf (line 1: flavor name, line 2: optional python path)
+# Read flavor.conf (YAML). Required keys: flavor. Optional: python,
+# forced_packages.  We always use python3 to parse the conf so we don't
+# need a chicken-and-egg with the optional `python:` field.
 FLAVOR_CONF="$SCLS_DIR/flavor.conf"
 if [ ! -f "$FLAVOR_CONF" ]; then
     echo "Error: No flavor.conf found in $SCLS_DIR"
-    echo "Create one with the flavor name on the first line, e.g.:"
-    echo "  echo 'lbl' > $FLAVOR_CONF"
+    echo "Create one with at least:"
+    echo "  flavor: <name>"
     exit 1
 fi
-FLAVOR="$(sed -n '1p' "$FLAVOR_CONF" | tr -d '[:space:]')"
-PYTHON="$(sed -n '2p' "$FLAVOR_CONF" | tr -d '[:space:]')"
+
+# Parse flavor.conf into shell variables. Fall back to legacy line-based
+# format if it isn't valid YAML (one-line "<flavor>", optional second line
+# "<python>") so existing setups don't break.
+_conf_vars="$(python3 - "$FLAVOR_CONF" <<'PYEOF'
+import sys, yaml
+path = sys.argv[1]
+with open(path) as f:
+    text = f.read()
+data = None
+try:
+    data = yaml.safe_load(text)
+except yaml.YAMLError:
+    data = None
+if not isinstance(data, dict):
+    # Legacy line-based format: line 1 = flavor, line 2 = optional python
+    lines = [l.strip() for l in text.splitlines() if l.strip() and not l.lstrip().startswith('#')]
+    data = {}
+    if lines:
+        data['flavor'] = lines[0]
+    if len(lines) > 1:
+        data['python'] = lines[1]
+flavor = (data.get('flavor') or '').strip()
+python = (data.get('python') or '').strip()
+gcc_toolset = data.get('gcc_toolset')
+if gcc_toolset is not None:
+    gcc_toolset = str(gcc_toolset).strip()
+else:
+    gcc_toolset = ''
+extra = data.get('extra_packages') or []
+if not isinstance(extra, list):
+    extra = []
+print(f'FLAVOR={flavor!r}')
+print(f'PYTHON={python!r}')
+print(f'GCC_TOOLSET={gcc_toolset!r}')
+print(f'EXTRA_PACKAGES=({" ".join(repr(p) for p in extra)})')
+PYEOF
+)"
+if [ $? -ne 0 ] || [ -z "$_conf_vars" ]; then
+    echo "Error: failed to parse $FLAVOR_CONF"
+    exit 1
+fi
+eval "$_conf_vars"
 PYTHON="${PYTHON:-python3}"
 
 if [ -z "$FLAVOR" ]; then
-    echo "Error: flavor.conf is empty"
+    echo "Error: flavor.conf has no flavor: field"
     exit 1
+fi
+
+# If gcc_toolset is set, source the Red Hat toolset's enable script so the
+# toolset compilers and binutils are first in PATH. Also export
+# SCLS_GCC_TOOLSET so the python builder can rewrite bootstrap_compilers.
+if [ -n "$GCC_TOOLSET" ]; then
+    TOOLSET_ENABLE="/opt/rh/gcc-toolset-${GCC_TOOLSET}/enable"
+    if [ ! -f "$TOOLSET_ENABLE" ]; then
+        echo "Error: gcc_toolset=${GCC_TOOLSET} requested but $TOOLSET_ENABLE not found"
+        echo "       Install with: sudo dnf install gcc-toolset-${GCC_TOOLSET}"
+        exit 1
+    fi
+    # shellcheck disable=SC1090
+    source "$TOOLSET_ENABLE"
+    export SCLS_GCC_TOOLSET="$GCC_TOOLSET"
 fi
 if [ ! -f "$SCLS_DIR/flavors/${FLAVOR}.yaml" ]; then
     echo "Error: Flavor '${FLAVOR}' not found (no flavors/${FLAVOR}.yaml)"
@@ -104,7 +162,10 @@ if [ "$USE_RPM" = true ]; then
         install) RPM_EXTRA_ARGS="--install" ;;
         *)       RPM_EXTRA_ARGS="$1" ;;
     esac
-    $PYTHON python/rpm_builder.py --package "$PACKAGE" --flavor "$FLAVOR" $RPM_EXTRA_ARGS
+    # Forward any extra flags after the package name to rpm_builder.py.
+    # (extra_packages override and gcc-toolset are read from flavor.conf
+    # by rpm_builder itself, no CLI plumbing required.)
+    $PYTHON python/rpm_builder.py --package "$PACKAGE" --flavor "$FLAVOR" $RPM_EXTRA_ARGS "${@:3}"
 else
-    $PYTHON python/unix_builder.py --package "$PACKAGE" --flavor "$FLAVOR" $1
+    $PYTHON python/unix_builder.py --package "$PACKAGE" --flavor "$FLAVOR" $1 "${@:3}"
 fi

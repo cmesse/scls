@@ -34,6 +34,9 @@ configure:
   pre:
     # Fix CMake deprecation warning about minimum version
     - "sed -i 's/cmake_minimum_required(VERSION 3.3 FATAL_ERROR)/cmake_minimum_required(VERSION 3.10 FATAL_ERROR)/' CMakeLists.txt"
+    # Fix upstream Fortran syntax error: = should be == in IF expression.
+    # Bug is inside #ifdef HAVE_MKL so only manifests with MKL builds.
+    - "find . -name '*Bplus_utilities.f90' -exec sed -i 's/if(rank\\*num_vectors=1)then/if(rank*num_vectors==1)then/' {} +"
   args:
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DCMAKE_INSTALL_LIBDIR=lib"
@@ -59,7 +62,7 @@ configure:
     mkl:
       - "-DTPL_BLAS_LIBRARIES=%{math_ldflags}"
       - "-DTPL_LAPACK_LIBRARIES=%{math_ldflags}"
-      - "-DTPL_SCALAPACK_LIBRARIES=%{scalapack_ldflags}"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{math_ldflags}"
       - "-DTPL_ARPACK_LIBRARIES=%{prefix}/lib/libparpack%{libext};%{prefix}/lib/libarpack%{libext}"
   optimization:
     O_level: 2

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-SCLS (Scientific Core Library Stack) is a Python-based build system for creating optimized scientific computing packages. It manages compilation and packaging of scientific software with different optimization flavors (e.g., gcc, lbl, intel-oneapi, macos) for both Linux (RPM) and macOS systems.
+SCLS (Scientific Core Library Stack) is a Python-based build system for creating optimized scientific computing packages. It manages compilation and packaging of scientific software with different optimization flavors (e.g., gcc, mkl, debug, intel, lbl, macos) for both Linux (RPM) and macOS systems.
 
 Read [`README.md`](README.md) first for the project philosophy, supported build modes, and the intended user-facing model. Use this file for repository-specific implementation guidance.
 
@@ -32,7 +32,26 @@ Key modules:
 
 ### Using the `scls` wrapper (preferred)
 
-The `scls` wrapper reads the active flavor from `flavor.conf` and dispatches to the correct builder (RPM on RHEL-family Linux, unix_builder elsewhere):
+The `scls` wrapper reads the active flavor from `flavor.conf` (YAML format) and dispatches to the correct builder (RPM on RHEL-family Linux, unix_builder elsewhere).
+
+`flavor.conf` fields:
+- `flavor:` (required) — active flavor name (e.g., `gcc`, `mkl`, `debug`)
+- `python:` (optional) — path to the Python interpreter; defaults to `python3`
+- `gcc_toolset:` (optional) — Red Hat gcc-toolset version (e.g., `15`); sources `/opt/rh/gcc-toolset-N/enable` for RHEL 8 hosts
+- `extra_packages:` (optional) — list of packages to build even though the recipe's `flavors:` allowlist excludes the active flavor; also added to the meta-package's Requires
+
+Available flavors and their install prefixes:
+
+| Flavor   | Prefix            | Compiler | Math        |
+|----------|-------------------|----------|-------------|
+| `gcc`    | `/opt/scls/gcc`   | GCC      | OpenBLAS    |
+| `mkl`    | `/opt/scls/mkl`   | GCC      | Intel MKL   |
+| `debug`  | `/opt/scls/debug` | GCC      | Reference   |
+| `intel`  | `/opt/scls/intel` | Intel    | Intel MKL   |
+| `lbl`    | `/opt/scls/lbl`   | GCC      | OpenBLAS    |
+| `macos`  | `/opt/scls/macos` | GCC      | OpenBLAS    |
+
+Commands:
 
 ```bash
 ./scls build <package>       # Build a package
@@ -123,8 +142,8 @@ Flavors in `flavors/*.yaml` specify:
 - FFTW is excluded from the stack for this reason
 
 ### Flavor-specific package restrictions
-- `gcc` and `binutils` are only built for specific flavors (see their `flavors:` lists)
-- Most flavors (gcc, intel-oneapi, etc.) use the system compiler toolchain
+- `gcc` and `binutils` are only built for specific flavors (see their `flavors:` lists); on hosts where the system toolchain is too old (e.g. RHEL 8), they can be added to `extra_packages:` in `flavor.conf` or a `gcc_toolset:` can be specified instead
+- Most flavors (gcc, mkl, debug, etc.) use the system compiler toolchain
 - The `lbl` flavor builds its own GCC and binutils
 - macOS builds GCC but uses system binutils
 

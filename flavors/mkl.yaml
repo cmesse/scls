@@ -1,7 +1,7 @@
 name: mkl
 platform: linux
 description: "Production build with GCC compilers and Intel MKL"
-prefix: /opt/scls/gcc-mkl
+prefix: /opt/scls/mkl
 
 # RPM package dependencies (for bootstrap packages only - we build our own GCC)
 rpm_build_requires:

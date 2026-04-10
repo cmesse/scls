@@ -570,11 +570,37 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
     # var, so we have to thread it through here.
     cmake_library_path = f"{prefix}/lib"
     cmake_include_path = f"{prefix}/include"
+    extra_link_dirs = ""  # extra -L / -rpath / -rpath-link entries
+    extra_exe_link = ""   # extra flags for EXE link line only (MKL -l flags)
     if flavor.get('math', {}).get('linalg') == 'mkl':
         import os as _os
         mkl_root = _os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
         cmake_library_path = f"{prefix}/lib;{mkl_root}/lib/intel64;{mkl_root}/lib"
         cmake_include_path = f"{prefix}/include;{mkl_root}/include"
+        # Demos and tests link against libfoo.so which itself NEEDS libmkl_*.so.2.
+        # The linker needs -rpath-link to resolve those transitive deps. We also
+        # bake -rpath so the resulting binaries find MKL at runtime without
+        # needing LD_LIBRARY_PATH.
+        #
+        # Additionally, many test binaries (e.g. slate's tester) compile Fortran
+        # wrapper .o files that directly call MKL symbols like isamax_. Those
+        # symbols live in libmkl_gf_lp64.so, which is only a *transitive*
+        # NEEDED of libblaspp.so — the linker won't search it unless we put
+        # the MKL libs explicitly on the EXE link line.
+        interface = flavor.get('math', {}).get('interface', 'lp64')
+        mkl_iface_lib = 'mkl_gf_ilp64' if interface == 'ilp64' else 'mkl_gf_lp64'
+        mkl_exe_libs = (
+            f" -lmkl_intel_lp64 -l{mkl_iface_lib}"
+            f" -lmkl_gnu_thread -lmkl_core"
+            f" -lgomp -lpthread -ldl"
+        )
+        extra_link_dirs = (
+            f" -L{mkl_root}/lib/intel64"
+            f" -Wl,-rpath,{mkl_root}/lib/intel64"
+            f" -Wl,-rpath-link,{mkl_root}/lib/intel64"
+        )
+        # extra_exe_link: only for executables (tests/demos), not for shared libs
+        extra_exe_link = f"{extra_link_dirs}{mkl_exe_libs}"
 
     args = [
         f"-DCMAKE_INSTALL_PREFIX={install_prefix}",
@@ -588,11 +614,21 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
         f"-DCMAKE_PREFIX_PATH={prefix}",
         f"-DCMAKE_LIBRARY_PATH={cmake_library_path}",
         f"-DCMAKE_INCLUDE_PATH={cmake_include_path}",
-        # Pass linker flags so libraries in our prefix are found at link time
-        # -rpath-link helps the linker resolve indirect shared library dependencies
-        # (e.g. libopenblas.so -> libgfortran.so) during try_compile checks
-        f"-DCMAKE_SHARED_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib -Wl,-rpath-link,{prefix}/lib",
-        f"-DCMAKE_EXE_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib -Wl,-rpath-link,{prefix}/lib",
+        # Pass linker flags so libraries in our prefix are found at link time.
+        # -rpath-link helps the linker resolve indirect shared library
+        # dependencies (e.g. libopenblas.so -> libgfortran.so, libcholmod.so
+        # -> libmkl_*.so.2) during try_compile checks and demo/test linking.
+        # -lm catches projects (notably LAGraph's experimental tests) whose
+        # CMakeLists forgot to target_link_libraries(... m); on modern
+        # --as-needed linkers it's harmless for binaries that don't use it.
+        #
+        # For MKL: shared libs get -L/-rpath/-rpath-link only (their consumers
+        # resolve MKL via their own link lines). Executables additionally get
+        # the explicit MKL -l flags so the linker can resolve symbols that are
+        # only reachable transitively (e.g. isamax_ in libmkl_gf_lp64.so
+        # needed by slate's tester via libblaspp.so).
+        f"-DCMAKE_SHARED_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib -Wl,-rpath-link,{prefix}/lib{extra_link_dirs} -lm",
+        f"-DCMAKE_EXE_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib -Wl,-rpath-link,{prefix}/lib{extra_exe_link} -lm",
     ]
 
     # Get defaults configuration if it exists

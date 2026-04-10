@@ -236,6 +236,28 @@ export LDFLAGS="{{ ldflags }}"
 {% endif %}
 
 %install
+# Re-establish build environment (each RPM section runs in a fresh sub-shell,
+# so PATH, MKL vars, gcc-toolset etc. from %build are gone). Libtool relink
+# and custom install commands may need compilers, mpicc, etc.
+{% for setup_cmd in pre_build_setup %}
+{{ setup_cmd }}
+{% endfor %}
+{{ path_setup }}
+{% if not skip_compiler_env %}
+{% if features.mpi %}
+export CC=mpicc
+export CXX=mpicxx
+export FC=mpifort
+export F77=mpifort
+{% else %}
+export CC={{ flavor.compilers.cc }}
+export CXX={{ flavor.compilers.cxx }}
+export FC={{ flavor.compilers.fc }}
+export F77={{ flavor.compilers.fc }}
+{% endif %}
+export LDFLAGS="{{ ldflags }}"
+{% endif %}
+
 {% if install_pre_commands %}
 # Pre-install commands
 {% for cmd in install_pre_commands %}

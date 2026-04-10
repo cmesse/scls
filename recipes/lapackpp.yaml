@@ -62,18 +62,16 @@ configure:
       - '-DBLAS_LIBRARIES=-lblas'
       - '-DLAPACK_LIBRARIES=-llapack'
     mkl:
-      # Skip cmake's FindBLAS/FindLAPACK — those default to looking for the
-      # Intel OpenMP runtime (libiomp5), which we don't have on GCC systems.
-      # Pass MKL libs directly via math_ldflags (which uses GNU's libgomp).
+      # Let lapackpp's own LAPACKConfig auto-detect MKL via blaspp. Do NOT
+      # pass explicit BLAS/LAPACK_LIBRARIES — our %{math_ldflags} (serial)
+      # uses -lmkl_sequential while blaspp's BLASFinder picks
+      # -lmkl_gnu_thread, and both threading layers NEEDED in the same binary
+      # is undefined behavior (causes numerical instabilities).
       - "-Dlapack=auto"
       - "-Dgpu_backend=none"
-      - "-DBLAS_LIBRARIES=%{math_ldflags}"
-      - "-DLAPACK_LIBRARIES=%{math_ldflags}"
     cuda:
       - "-Dlapack=auto"
       - "-Dgpu_backend=cuda"
-      - "-DBLAS_LIBRARIES=%{math_ldflags}"
-      - "-DLAPACK_LIBRARIES=%{math_ldflags}"
   optimization:
     O_level: 3
 

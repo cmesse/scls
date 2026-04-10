@@ -60,15 +60,17 @@ configure:
       - "-Dgpu_backend=none"
       - '-DLAPACK_LIBRARIES=-llapack'
     mkl:
+      # Let blaspp's own BLASFinder auto-detect MKL — do NOT pass explicit
+      # LAPACK_LIBRARIES here, because our %{math_ldflags} (serial) produces
+      # -lmkl_sequential while BLASFinder picks -lmkl_gnu_thread, and having
+      # both threading layers NEEDED in the same binary is undefined behavior.
       - '-Dblas=Intel MKL'
       - '-Dlapack=Intel MKL'
       - "-Dgpu_backend=none"
-      - '-DLAPACK_LIBRARIES=%{math_ldflags}'
     cuda:
       - '-Dblas=Intel MKL'
       - '-Dlapack=Intel MKL'
       - "-Dgpu_backend=cuda"
-      - '-DLAPACK_LIBRARIES=%{math_ldflags}'
   # LP64/ILP64 integer interface
   lp64_args:
     - '-Dblas_int=int (LP64)'
