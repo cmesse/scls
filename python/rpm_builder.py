@@ -282,7 +282,8 @@ class RPMBuilder:
                 self.mpi = True
 
                 # override compilers with mpi wrappers
-                comp = self.flavor['compilers']
+                # Copy first so we don't permanently mutate the flavor dict
+                comp = dict(self.flavor['compilers'])
                 comp['cc'] = 'mpicc'
                 comp['cxx'] = 'mpicxx'
                 comp['fc'] = 'mpifort'

@@ -207,7 +207,8 @@ def cmd_build(args, config: Dict) -> int:
         return _build_rpm(package, flavor)
     else:
         # pkg, deb, tar.xz all use unix_builder for the build step
-        return _build_unix(package, flavor, pkg_format)
+        # build-only: don't install into the live prefix (use 'scls install' for that)
+        return _build_unix(package, flavor, pkg_format, build_only=True)
 
 
 def _build_rpm(package: str, flavor: str) -> int:
@@ -218,12 +219,15 @@ def _build_rpm(package: str, flavor: str) -> int:
     return result.returncode
 
 
-def _build_unix(package: str, flavor: str, pkg_format: str) -> int:
+def _build_unix(package: str, flavor: str, pkg_format: str, build_only: bool = False) -> int:
     """Build using unix_builder."""
     # Determine which commands to run based on format
-    commands = ['build', 'install']
-    if pkg_format == 'pkg':
-        commands.append('pkg')
+    if build_only:
+        commands = ['build']
+    else:
+        commands = ['build', 'install']
+        if pkg_format == 'pkg':
+            commands.append('pkg')
 
     cmd = [sys.executable, str(SCRIPT_DIR / 'unix_builder.py'),
            '--package', package, '--flavor', flavor] + commands

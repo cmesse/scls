@@ -5,6 +5,7 @@ Builds directly without creating SPEC files
 Supports macOS, Linux, and other Unix-like systems
 """
 
+import copy
 import os
 import sys
 import argparse
@@ -69,8 +70,10 @@ class UnixBuilder:
                 self.recipe['source'].update(platform_section['source'])
 
         # Apply flavor-specific overrides (e.g., version, source URL)
+        # Deepcopy first so overrides from one flavor don't bleed into
+        # another if the same recipe dict is reused across calls.
         from build_common import apply_flavor_overrides
-        self.recipe = apply_flavor_overrides(self.recipe, self.flavor)
+        self.recipe = apply_flavor_overrides(copy.deepcopy(self.recipe), self.flavor)
 
         # Validate platform
         supported_platforms = ['macos', 'linux']
@@ -163,77 +166,95 @@ class UnixBuilder:
                         # Make sure it's executable
                         config_file.chmod(0o755)
 
-    def configure(self, source_dir: Path, env: Dict[str, str]) -> None:
-        """Run configure step"""
-        self.math_flags
-        configure_type = self.recipe.get('configure', {}).get('type', 'autotools')
+    def _prepare_build_env(self, env: Dict[str, str], pkg_config_path: str,
+                           skip_compiler_env: bool = False) -> Dict[str, str]:
+        """Set up compiler flags and environment variables for building.
 
-        pkg_config_path = str(self.prefix / 'lib/pkgconfig') + ':' + "/opt/X11/lib/pkgconfig:/usr/lib/pkgconfig"
+        Centralizes the MPI compiler override, optimization flags, ldflags,
+        math flags, and environment variable assignment that was previously
+        duplicated across every configure_type branch.
 
-        # check for MPI
-        features = self.recipe.get('features', {})
-        self.openmp = features.get('openmp', False)
-        self.mpi = features.get('mpi', False)
-        self.math = features.get('math', None)
+        Args:
+            env: The environment dict to modify.
+            pkg_config_path: PKG_CONFIG_PATH value to set.
+            skip_compiler_env: If True, don't set CC/CXX/FC or CFLAGS/LDFLAGS
+                in env (used by 'custom' type when package manages its own).
 
-        # Add math flags if math features are enabled
-        if self.math :
-            self.math_flags = get_math_compile_flags(self.flavor, self.recipe)
-            self.math_ldflags = get_math_link_line(self.flavor, self.recipe)
+        Returns:
+            The modified environment dict.
+        """
+        # Override compilers for MPI
+        if self.mpi and not skip_compiler_env:
+            env['CC'] = 'mpicc'
+            env['CXX'] = 'mpicxx'
+            env['FC'] = 'mpifort'
+            env['FF'] = 'mpifort'
+            env['F77'] = 'mpifort'
 
-            # Replace %{mklroot} with actual path (not applicable on macOS, but for consistency)
-            mklroot = getattr(self, 'mklroot', '/opt/intel/oneapi/mkl/latest')
-            self.math_ldflags = self.math_ldflags.replace('%{mklroot}', mklroot)
+        # Get optimization flags
+        self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
+            self.recipe, self.flavor, env.get('CC', 'gcc')
+        )
 
-        if configure_type == 'autotools':
-            # Update config scripts
-            self.update_config_scripts(source_dir)
+        # Get ldflags from flavor
+        self.ldflags = self.flavor['flags'].get('ldflags', '').replace('%{prefix}', str(self.prefix))
 
-            if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
-                self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
-            else:
-                self.install_prefix = self.prefix
+        # Add math flags to existing flags
+        if self.math:
+            self.cflags += f" {self.math_flags}"
+            self.cxxflags += f" {self.math_flags}"
+            self.fcflags += f" {self.math_flags}"
+            self.ldflags += f" {self.math_ldflags}"
 
-            # Get configure arguments
-            args = get_configure_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix )
-
-            # Add interface-specific arguments (LP64/ILP64)
-            args.extend(get_interface_args(self.recipe, self.flavor))
-
-            # override compilers
-            if self.mpi:
-                env['CC'] = 'mpicc'
-                env['CXX'] = 'mpicxx'
-                env['FC'] = 'mpifort'
-                env['FF'] = 'mpifort'
-                env['F77'] = 'mpifort'
-
-            # Get optimization flags
-            self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
-                self.recipe, self.flavor, env['CC']
-            )
-
-            # Get ldflags from flavor
-            self.ldflags = self.flavor['flags'].get('ldflags', '').replace('%{prefix}', str(self.prefix))
-
-            # Add math flags to existing flags
-            if self.math:
-                self.cflags += f" {self.math_flags}"
-                self.cxxflags += f" {self.math_flags}"
-                self.fcflags += f" {self.math_flags}"
-                self.ldflags += f" {self.math_ldflags}"
-
+        # Set environment variables
+        if not skip_compiler_env:
             env['CFLAGS'] = self.cflags
             env['CXXFLAGS'] = self.cxxflags
             env['FFLAGS'] = self.fcflags
             env['FCFLAGS'] = self.fcflags
             env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, self.platform)
-            env['PKG_CONFIG_PATH'] = pkg_config_path
 
-            # Apply enhanced configure environment (supports +=, -=, etc.)
+        env['PKG_CONFIG_PATH'] = pkg_config_path
+
+        return env
+
+    def configure(self, source_dir: Path, env: Dict[str, str]) -> None:
+        """Run configure step"""
+        configure_type = self.recipe.get('configure', {}).get('type', 'autotools')
+
+        pkg_config_path = str(self.prefix / 'lib/pkgconfig') + ':' + "/opt/X11/lib/pkgconfig:/usr/lib/pkgconfig"
+
+        # Detect features
+        features = self.recipe.get('features', {})
+        self.openmp = features.get('openmp', False)
+        self.mpi = features.get('mpi', False)
+        self.math = features.get('math', None)
+
+        # Compute math flags once (used by _prepare_build_env via self.math_flags)
+        if self.math:
+            self.math_flags = get_math_compile_flags(self.flavor, self.recipe)
+            self.math_ldflags = get_math_link_line(self.flavor, self.recipe)
+            mklroot = getattr(self, 'mklroot', '/opt/intel/oneapi/mkl/latest')
+            self.math_ldflags = self.math_ldflags.replace('%{mklroot}', mklroot)
+
+        # Resolve install_prefix (shared across all types)
+        if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
+            self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
+        else:
+            self.install_prefix = self.prefix
+
+        if configure_type == 'autotools':
+            # Update config scripts
+            self.update_config_scripts(source_dir)
+
+            # Get configure arguments
+            args = get_configure_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
+
+            # Add interface-specific arguments (LP64/ILP64)
+            args.extend(get_interface_args(self.recipe, self.flavor))
+
+            env = self._prepare_build_env(env, pkg_config_path)
             env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
-
-            # Apply platform-specific environment variables
             env = self.apply_platform_env(env)
 
             # apply special clang hack (macOS only - removes -qversion flag for clang compatibility)
@@ -244,7 +265,6 @@ class UnixBuilder:
             # Run any pre-configure commands
             if 'configure' in self.recipe and 'pre' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['pre']:
-                    # Apply check_args to replace %{sdk} and %{host}
                     checked_cmd = self.check_args([cmd])[0]
                     run_command(['sh', '-c', checked_cmd], source_dir, env, "pre-configure")
 
@@ -258,23 +278,13 @@ class UnixBuilder:
             # Run any post-configure commands
             if 'configure' in self.recipe and 'post' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['post']:
-                    # Apply check_args to replace %{sdk} and %{host}
                     checked_cmd = self.check_args([cmd])[0]
                     run_command(['sh', '-c', checked_cmd], source_dir, env, "post-configure")
 
         elif configure_type == 'cmake':
-
-            # Apply enhanced configure environment (supports +=, -=, etc.)
-            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
-
             # Create build directory
             build_dir = source_dir / 'build'
             build_dir.mkdir(exist_ok=True)
-
-            if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
-                self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
-            else:
-                self.install_prefix = self.prefix
 
             # Get CMake arguments
             args = get_cmake_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
@@ -282,45 +292,14 @@ class UnixBuilder:
             # Add interface-specific arguments (LP64/ILP64)
             args.extend(get_interface_args(self.recipe, self.flavor))
 
-            # override compilers
-            if self.mpi:
-                env['CC'] = 'mpicc'
-                env['CXX'] = 'mpicxx'
-                env['FC'] = 'mpifort'
-                env['FF'] = 'mpifort'
-                env['F77'] = 'mpifort'
-
-            # Get optimization flags
-            self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
-                self.recipe, self.flavor, env['CC']
-            )
-
-            self.ldflags = self.flavor['flags'].get('ldflags', '').replace('%{prefix}', str(self.prefix))
-
-            # Add math flags to existing flags
-            if self.math :
-                self.cflags += f" {self.math_flags}"
-                self.cxxflags += f" {self.math_flags}"
-                self.fcflags += f" {self.math_flags}"
-                self.ldflags += f" {self.math_ldflags}"
-
-            env['CFLAGS'] = self.cflags
-            env['CXXFLAGS'] = self.cxxflags
-            env['FFLAGS'] = self.fcflags
-            env['FCFLAGS'] = self.fcflags
-            env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, self.platform)
-            env['PKG_CONFIG_PATH'] = pkg_config_path
-
-            # Apply enhanced configure environment (supports +=, -=, etc.)
+            env = self._prepare_build_env(env, pkg_config_path)
+            # apply_configure_environment ONCE, after flags are finalized
             env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
-
-            # Apply platform-specific environment variables
             env = self.apply_platform_env(env)
 
             # Run any pre-configure commands
             if 'configure' in self.recipe and 'pre' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['pre']:
-                    # Apply check_args to replace %{sdk} and %{host}
                     checked_cmd = self.check_args([cmd])[0]
                     run_command(['sh', '-c', checked_cmd], source_dir, env, "pre-configure")
 
@@ -334,72 +313,29 @@ class UnixBuilder:
             # Run any post-configure commands
             if 'configure' in self.recipe and 'post' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['post']:
-                    # Apply check_args to replace %{sdk} and %{host}
                     checked_cmd = self.check_args([cmd])[0]
                     run_command(['sh', '-c', checked_cmd], source_dir, env, "post-configure")
-
 
             # Update source_dir to build_dir for subsequent steps
             return build_dir
 
         elif configure_type == 'custom':
             # Custom configuration system (like OpenSSL's ./config or PETSc's ./configure)
-            if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
-                self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
-            else:
-                self.install_prefix = self.prefix
-
-            # Check if we should skip setting compiler environment variables
-            # (Some packages like PETSc prefer command-line args and warn about env vars)
             skip_compiler_env = self.recipe.get('configure', {}).get('skip_compiler_env', False)
 
-            if not skip_compiler_env:
-                # Set compilers in environment
-                if self.mpi:
-                    env['CC'] = 'mpicc'
-                    env['CXX'] = 'mpicxx'
-                    env['FC'] = 'mpifort'
-                    env['FF'] = 'mpifort'
-                    env['F77'] = 'mpifort'
+            # Custom type may need bootstrap compiler detection before _prepare_build_env
+            if not skip_compiler_env and not self.mpi:
+                is_bootstrap = self.recipe.get('bootstrap', False)
+                if is_bootstrap and 'bootstrap_compilers' in self.flavor:
+                    compilers = self.flavor['bootstrap_compilers']
                 else:
-                    # Use bootstrap compilers if this is a bootstrap package
-                    is_bootstrap = self.recipe.get('bootstrap', False)
-                    if is_bootstrap and 'bootstrap_compilers' in self.flavor:
-                        compilers = self.flavor['bootstrap_compilers']
-                    else:
-                        compilers = self.flavor.get('compilers', {})
-                    env['CC'] = compilers.get('cc', 'gcc')
-                    env['CXX'] = compilers.get('cxx', 'g++')
-                    env['FC'] = compilers.get('fc', 'gfortran')
+                    compilers = self.flavor.get('compilers', {})
+                env['CC'] = compilers.get('cc', 'gcc')
+                env['CXX'] = compilers.get('cxx', 'g++')
+                env['FC'] = compilers.get('fc', 'gfortran')
 
-            # Get optimization flags (still needed for placeholder substitution)
-            self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
-                self.recipe, self.flavor, env.get('CC', 'gcc')
-            )
-
-            # Get ldflags from flavor
-            self.ldflags = self.flavor['flags'].get('ldflags', '').replace('%{prefix}', str(self.prefix))
-
-            # Add math flags to existing flags
-            if self.math:
-                self.cflags += f" {self.math_flags}"
-                self.cxxflags += f" {self.math_flags}"
-                self.fcflags += f" {self.math_flags}"
-                self.ldflags += f" {self.math_ldflags}"
-
-            if not skip_compiler_env:
-                env['CFLAGS'] = self.cflags
-                env['CXXFLAGS'] = self.cxxflags
-                env['FFLAGS'] = self.fcflags
-                env['FCFLAGS'] = self.fcflags
-                env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, self.platform)
-
-            env['PKG_CONFIG_PATH'] = pkg_config_path
-
-            # Apply enhanced configure environment (supports +=, -=, etc.)
+            env = self._prepare_build_env(env, pkg_config_path, skip_compiler_env=skip_compiler_env)
             env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
-
-            # Apply platform-specific environment variables
             env = self.apply_platform_env(env)
 
             # Run any pre-configure commands
@@ -438,85 +374,12 @@ class UnixBuilder:
 
         elif configure_type == 'none':
             # No configuration step needed (e.g., simple Makefiles)
-            if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
-                self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
-            else:
-                self.install_prefix = self.prefix
-
-            # override compilers
-            if self.mpi:
-                env['CC'] = 'mpicc'
-                env['CXX'] = 'mpicxx'
-                env['FC'] = 'mpifort'
-                env['FF'] = 'mpifort'
-                env['F77'] = 'mpifort'
-
-            # Get optimization flags
-            self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
-                self.recipe, self.flavor, env['CC']
-            )
-
-            self.ldflags = self.flavor['flags'].get('ldflags', '').replace('%{prefix}', str(self.prefix))
-
-            # Add math flags to existing flags
-            if self.math:
-                self.cflags += f" {self.math_flags}"
-                self.cxxflags += f" {self.math_flags}"
-                self.fcflags += f" {self.math_flags}"
-                self.ldflags += f" {self.math_ldflags}"
-
-            env['CFLAGS'] = self.cflags
-            env['CXXFLAGS'] = self.cxxflags
-            env['FFLAGS'] = self.fcflags
-            env['FCFLAGS'] = self.fcflags
-            env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, self.platform)
-            env['PKG_CONFIG_PATH'] = pkg_config_path
-
+            env = self._prepare_build_env(env, pkg_config_path)
             print("Skipping configure step (type: none)")
 
         elif configure_type == 'custom_makefile':
-            # Set install_prefix
-            if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
-                self.install_prefix = self.prefix / self.recipe['configure']['install_prefix']
-            else:
-                self.install_prefix = self.prefix
-
-            # Get optimization flags and set environment
-            cflags, cxxflags, fcflags = get_optimization_flags(self.recipe, self.flavor, env['CC'])
-
-            # override compilers
-            if self.mpi:
-                env['CC'] = 'mpicc'
-                env['CXX'] = 'mpicxx'
-                env['FC'] = 'mpifort'
-                env['FF'] = 'mpifort'
-                env['F77'] = 'mpifort'
-
-            # Get optimization flags
-            self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
-                self.recipe, self.flavor, env['CC']
-            )
-
-            self.ldflags = self.flavor['flags'].get('ldflags', '').replace('%{prefix}', str(self.prefix))
-
-            # Add math flags to existing flags
-            if self.math:
-                self.cflags += f" {self.math_flags}"
-                self.cxxflags += f" {self.math_flags}"
-                self.fcflags += f" {self.math_flags}"
-                self.ldflags += f" {self.math_ldflags}"
-
-            env['CFLAGS'] = self.cflags
-            env['CXXFLAGS'] = self.cxxflags
-            env['FFLAGS'] = self.fcflags
-            env['FCFLAGS'] = self.fcflags
-            env['LDFLAGS'] = add_rpath_for_libdirs(self.ldflags, self.platform)
-            env['PKG_CONFIG_PATH'] = pkg_config_path
-
-            # Apply enhanced configure environment
+            env = self._prepare_build_env(env, pkg_config_path)
             env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
-
-            # *** CALL IT HERE ***
             self.process_custom_makefile(source_dir, env)
 
         else:
@@ -817,14 +680,22 @@ class UnixBuilder:
             self.installed_files = []
 
             for src_path in src_prefix.rglob('*'):
-                if src_path.is_file():
-                    rel_path = src_path.relative_to(src_prefix)
-                    dest_path = self.prefix / rel_path
+                rel_path = src_path.relative_to(src_prefix)
+                dest_path = self.prefix / rel_path
 
-                    # Create parent directory if needed
-                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+                # Create parent directory if needed
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-                    # Copy file
+                if src_path.is_symlink():
+                    # Preserve symlink topology (e.g. libfoo.so -> libfoo.so.1)
+                    # instead of flattening to a copy of the target
+                    link_target = os.readlink(src_path)
+                    if dest_path.exists() or dest_path.is_symlink():
+                        dest_path.unlink()
+                    dest_path.symlink_to(link_target)
+                    self.installed_files.append(dest_path)
+                elif src_path.is_file():
+                    # Regular file — copy preserving metadata
                     shutil.copy2(src_path, dest_path)
                     self.installed_files.append(dest_path)
 
@@ -1296,8 +1167,9 @@ class UnixBuilder:
             # Apply patches
             apply_patches(source_dir, self.recipe, self.package, self.patch_dir, self.flavor)
 
-            # Setup environment
-            env = setup_environment(self.flavor, self.prefix, self.source_dir )
+            # Setup environment (pass recipe for bootstrap compiler detection
+            # and legacy configure.env handling)
+            env = setup_environment(self.flavor, self.prefix, self.source_dir, self.recipe)
 
             # Configure
             build_dir = self.configure(source_dir, env)
@@ -1319,7 +1191,7 @@ class UnixBuilder:
             self.source_dir = build_dir
             if (build_dir / 'build').exists():  # CMake build
                 build_dir = build_dir / 'build'
-            env = setup_environment(self.flavor, self.prefix, self.source_dir)
+            env = setup_environment(self.flavor, self.prefix, self.source_dir, self.recipe)
 
         # Test
         if 'test' in commands:

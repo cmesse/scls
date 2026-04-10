@@ -163,21 +163,14 @@ def load_flavor(flavor_name: str, flavors_dir: Path = Path("flavors")) -> Dict:
     return load_yaml(flavor_path)
 
 
-def _flavor_names(flavor) -> list:
-    """
-    Internal helper: accepts either a flavor dict or a plain string.
-    Returns a list of names to check (with inheritance).
-    """
-    if isinstance(flavor, dict):
-        return get_flavor_names(flavor)
-    elif flavor:
-        return [flavor]
-    return []
-
-
-def get_flavor_names(flavor: Dict) -> list:
+def get_flavor_names(flavor) -> list:
     """
     Return a list of flavor names to check, in priority order.
+
+    Accepts either a flavor dict (with 'name' and optional 'inherits' keys)
+    or a plain flavor name string.  When given a string, loads the flavor
+    YAML to check for an 'inherits' field.
+
     If the flavor has an 'inherits' field, the parent name is appended as fallback.
     Hyphen-separated components are also added so that generic recipe keys
     like 'mkl', 'cuda', or 'debug' match concrete flavors like 'gcc-mkl',
@@ -185,10 +178,28 @@ def get_flavor_names(flavor: Dict) -> list:
     E.g., for flavor 'gcc-mkl-cuda' inheriting from 'gcc-mkl', returns
     ['gcc-mkl-cuda', 'gcc-mkl', 'gcc', 'mkl', 'cuda'].
     """
-    name = flavor.get('name', '')
+    if isinstance(flavor, dict):
+        name = flavor.get('name', '')
+        inherits = flavor.get('inherits', None)
+    elif isinstance(flavor, str) and flavor:
+        name = flavor
+        # Load flavor file to check for inheritance
+        flavor_path = Path("flavors") / f"{flavor}.yaml"
+        inherits = None
+        if flavor_path.exists():
+            with open(flavor_path, 'r') as f:
+                flavor_data = yaml.safe_load(f)
+                if isinstance(flavor_data, dict):
+                    inherits = flavor_data.get('inherits', None)
+    else:
+        return []
+
+    if not name:
+        return []
+
     names = [name]
-    if 'inherits' in flavor:
-        names.append(flavor['inherits'])
+    if inherits:
+        names.append(inherits)
     # Add hyphen-separated components as fallbacks
     for part in name.split('-'):
         if part and part not in names:
@@ -392,7 +403,10 @@ def extract_source(tarball: Path, work_dir: Path, package_name: str, version: st
 
     print(f"Extracting {tarball}...")
     with tarfile.open(tarball, 'r:*') as tar:
-        tar.extractall(work_dir)
+        if sys.version_info >= (3, 12):
+            tar.extractall(work_dir, filter='data')
+        else:
+            tar.extractall(work_dir)
 
     # Find the extracted directory
     # Usually it's package-version, but we should check
@@ -686,7 +700,7 @@ def get_parallel_jobs() -> int:
     try:
         import multiprocessing
         return min(multiprocessing.cpu_count(), 64)
-    except:
+    except Exception:
         return 4
 
 
@@ -911,12 +925,7 @@ def get_package_dependencies(recipe: Dict, flavor_name = None) -> List[str]:
         deps.append('gcc')
 
     # Build list of flavor names to check (supports inheritance)
-    if isinstance(flavor_name, dict):
-        names_to_check = get_flavor_names(flavor_name)
-    elif flavor_name:
-        names_to_check = [flavor_name]
-    else:
-        names_to_check = []
+    names_to_check = get_flavor_names(flavor_name)
 
     # Get explicit requires from recipe
     requires = recipe.get('requires', [])
@@ -1484,7 +1493,7 @@ def get_subpackages_for_flavor(recipe: Dict, flavor_name: str) -> List[Dict]:
             subpkg_name = subpkg_config.get('name', '')
             allowed_flavors = subpkg_config.get('flavors', None)
 
-            if allowed_flavors is None or any(n in allowed_flavors for n in (_flavor_names(flavor_name))):
+            if allowed_flavors is None or any(n in allowed_flavors for n in (get_flavor_names(flavor_name))):
                 subpackages.append(subpkg_config)
     else:
         # Dictionary format: {'foo': {'summary': '...'}, ...}
@@ -1496,7 +1505,7 @@ def get_subpackages_for_flavor(recipe: Dict, flavor_name: str) -> List[Dict]:
                     'name': subpkg_name,
                     **subpkg_config
                 })
-            elif any(n in allowed_flavors for n in (_flavor_names(flavor_name))):
+            elif any(n in allowed_flavors for n in (get_flavor_names(flavor_name))):
                 subpackages.append({
                     'name': subpkg_name,
                     **subpkg_config
@@ -1526,7 +1535,7 @@ def get_subpackage_dependencies(subpkg_config: Dict, flavor_name: str) -> List[s
         if 'all' in requires:
             deps.extend(requires['all'])
         # Add flavor-specific dependencies (with inheritance fallback)
-        for name in _flavor_names(flavor_name):
+        for name in get_flavor_names(flavor_name):
             if name in requires:
                 deps.extend(requires[name])
                 break

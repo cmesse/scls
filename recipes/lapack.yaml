@@ -15,9 +15,6 @@ flavors:
 requires:
   all:
     - cmake
-  macos:
-    - gcc
-    - openblas
 
 features:
   fortran: true
@@ -25,8 +22,7 @@ features:
   openmp: false
   math: false
 
-# Subpackages: blas and cblas only built for debug flavor
-# lapack and lapacke built for all flavors
+# Subpackages: blas, cblas, lapack, and lapacke (all debug-only)
 subpackages:
   blas:
     summary: The Basic Linear Algebra Subprograms library (reference)
@@ -55,8 +51,6 @@ subpackages:
     requires:
       debug:
         - blas
-      macos:
-        - openblas
     files:
       - "lib/liblapack.so*"
       - "lib/libtmglib.so*"
@@ -91,16 +85,6 @@ configure:
       # Build BLAS and CBLAS for debug flavor (blaspp/lapackpp are separate packages)
       - "-DCBLAS=ON"
       - "-DUSE_OPTIMIZED_BLAS=OFF"
-    macos:
-      # Use OpenBLAS, don't build reference BLAS/CBLAS
-      - "-DCBLAS=OFF"
-      - "-DUSE_OPTIMIZED_BLAS=ON"
-      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
-    mkl:
-      # MKL flavor - typically wouldn't use this recipe
-      - "-DCBLAS=OFF"
-      - "-DUSE_OPTIMIZED_BLAS=ON"
-      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.so"
   # Integer interface: LP64 (32-bit) vs ILP64 (64-bit)
   lp64_args:
     - "-DBUILD_INDEX64=OFF"

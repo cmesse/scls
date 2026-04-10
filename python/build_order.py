@@ -6,33 +6,12 @@ from collections import defaultdict, deque
 import sys
 import argparse
 
+from build_common import get_flavor_names
+
 # Sentinel package name for the flavor meta-package (e.g. scls-gcc).
 # Appended as the last entry in the build order so that "scls build next"
 # creates the meta-RPM once every real package has been built.
 FLAVOR_META = '_meta'
-
-
-def get_flavor_names(flavor_str):
-    """
-    Given a flavor name string, return a list of names to check (with inheritance).
-    Loads the flavor YAML to check for 'inherits' field.
-    Also adds hyphen-separated components so generic recipe keys like 'mkl',
-    'cuda', or 'debug' match concrete flavors like 'gcc-mkl-cuda'.
-    """
-    if not flavor_str:
-        return []
-    names = [flavor_str]
-    flavor_path = os.path.join("flavors", f"{flavor_str}.yaml")
-    if os.path.exists(flavor_path):
-        with open(flavor_path, 'r') as f:
-            flavor_data = yaml.safe_load(f)
-            if isinstance(flavor_data, dict) and 'inherits' in flavor_data:
-                names.append(flavor_data['inherits'])
-    # Add hyphen-separated components as fallbacks
-    for part in flavor_str.split('-'):
-        if part and part not in names:
-            names.append(part)
-    return names
 
 
 def load_yaml_files(directory, flavor=None, flavor_names=None):

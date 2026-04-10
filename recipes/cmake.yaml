@@ -45,9 +45,9 @@ configure:
     strict_aliasing: true
   pre:
      - "sed -i '/\"lib64\"/s/64//' Modules/GNUInstallDirs.cmake"
+  env:
+    SED: "sed"
   flavor_env:
-    all:
-      SED: "sed"
     macos:
       SED: "gsed"
 

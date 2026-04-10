@@ -8,6 +8,8 @@ import shutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from build_common import BuildError
+
 
 def get_patches_from_recipe(recipe: Dict, flavor: Dict = None) -> List[Dict]:
     """
@@ -48,6 +50,7 @@ def get_patches_from_recipe(recipe: Dict, flavor: Dict = None) -> List[Dict]:
             patches.append({
                 'file': patch_entry['file'],
                 'strip': patch_entry.get('strip', 1),
+                'allow_failure': patch_entry.get('allow_failure', False),
                 'source': 'recipe_patches'
             })
 
@@ -242,10 +245,15 @@ def apply_patches(source_dir: Path, recipe: Dict, package_name: str, patches_dir
         # Look for patch file in current directory (copied by copy_patches_to_sources)
         patch_path = patches_dir / patch_file
 
+        # Check if this patch is allowed to fail (opt-in via recipe)
+        allow_failure = patch.get('allow_failure', False)
+
         if not patch_path.exists():
-            print(f"  ERROR: Patch file not found: {patch_file}")
-            print(f"    Expected at: {patch_path}")
-            continue
+            msg = f"Patch file not found: {patch_file} (expected at: {patch_path})"
+            if allow_failure:
+                print(f"  WARNING: {msg}")
+                continue
+            raise BuildError(msg)
 
         print(f"  Using patch from: {patch_path}")
 
@@ -271,18 +279,30 @@ def apply_patches(source_dir: Path, recipe: Dict, package_name: str, patches_dir
                         print(f"    Patched files: {', '.join(patched_files[:3])}" +
                               (f" and {len(patched_files) - 3} more" if len(patched_files) > 3 else ""))
             else:
-                print(f"  WARNING: Patch {patch_file} failed to apply")
-                print(f"    Return code: {result.returncode}")
+                msg = f"Patch {patch_file} failed to apply (return code {result.returncode})"
                 if result.stderr:
-                    print(f"    Error: {result.stderr.strip()}")
+                    msg += f"\n    Error: {result.stderr.strip()}"
                 if result.stdout:
-                    print(f"    Output: {result.stdout.strip()}")
-                # Don't fail the build for patch failures - just warn
+                    msg += f"\n    Output: {result.stdout.strip()}"
+                if allow_failure:
+                    print(f"  WARNING: {msg}")
+                else:
+                    raise BuildError(msg)
 
         except subprocess.TimeoutExpired:
-            print(f"  ERROR: Patch {patch_file} timed out")
+            msg = f"Patch {patch_file} timed out"
+            if allow_failure:
+                print(f"  WARNING: {msg}")
+            else:
+                raise BuildError(msg)
+        except BuildError:
+            raise
         except Exception as e:
-            print(f"  ERROR: Failed to apply patch {patch_file}: {e}")
+            msg = f"Failed to apply patch {patch_file}: {e}"
+            if allow_failure:
+                print(f"  WARNING: {msg}")
+            else:
+                raise BuildError(msg)
 
 
 def validate_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("patches")) -> bool:
