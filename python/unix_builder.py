@@ -1075,6 +1075,37 @@ class UnixBuilder:
 
         print(f"All dependencies satisfied: {', '.join(deps)}")
 
+    def check_host_tools(self) -> None:
+        """Verify that required host tools are available before starting a build.
+
+        Checks for base tools (make, patch, curl, tar) and conditionally for
+        tools implied by the recipe's features or configure type.
+        """
+        base_tools = ['make', 'patch', 'curl', 'tar']
+
+        # Platform-specific tools
+        if self.platform == 'macos':
+            base_tools.append('gsed')
+
+        # Configure-type-specific tools
+        configure_type = self.recipe.get('configure', {}).get('type', 'autotools')
+        if configure_type == 'cmake':
+            base_tools.append('cmake')
+
+        # Feature-specific tools
+        features = self.recipe.get('features', {})
+        if features.get('mpi', False):
+            base_tools.extend(['mpicc', 'mpicxx', 'mpifort'])
+        if features.get('fortran', False):
+            base_tools.append('gfortran')
+
+        missing = [tool for tool in base_tools if shutil.which(tool) is None]
+        if missing:
+            raise BuildError(
+                f"Missing required host tools: {', '.join(missing)}\n"
+                f"Install them before building."
+            )
+
     def run(self, commands: List[str]) -> None:
         """Run the build process"""
         print(f"\n{'=' * 60}")
@@ -1087,6 +1118,10 @@ class UnixBuilder:
             print(f"WARNING: {self.package} is licensed under {pkg_license}")
             print("         GPL-3 libraries must NOT be distributed as part of this stack.")
             print("         Building locally for development use only.\n")
+
+        # Pre-flight: verify required host tools are present
+        if 'build' in commands:
+            self.check_host_tools()
 
         # Check all dependencies before starting
         self.check_dependencies()
