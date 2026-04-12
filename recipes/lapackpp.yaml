@@ -62,16 +62,27 @@ configure:
       - '-DBLAS_LIBRARIES=-lblas'
       - '-DLAPACK_LIBRARIES=-llapack'
     mkl:
-      # Let lapackpp's own LAPACKConfig auto-detect MKL via blaspp. Do NOT
-      # pass explicit BLAS/LAPACK_LIBRARIES — our %{math_ldflags} (serial)
-      # uses -lmkl_sequential while blaspp's BLASFinder picks
-      # -lmkl_gnu_thread, and both threading layers NEEDED in the same binary
-      # is undefined behavior (causes numerical instabilities).
-      - "-Dlapack=auto"
+      # Prescribe MKL libraries explicitly — bypasses upstream LAPACKFinder
+      # auto-detection entirely. MKL bundles BLAS+LAPACK in the same libs.
+      # Threading: use gnu_thread (matching blaspp) for OpenMP applications.
       - "-Dgpu_backend=none"
     cuda:
-      - "-Dlapack=auto"
       - "-Dgpu_backend=cuda"
+  # LP64/ILP64 MKL library selection (interface inherited from blaspp)
+  lp64_flavor_args:
+    mkl:
+      - '-DBLAS_LIBRARIES=-lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+      - '-DLAPACK_LIBRARIES=-lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+    cuda:
+      - '-DBLAS_LIBRARIES=-lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+      - '-DLAPACK_LIBRARIES=-lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+  ilp64_flavor_args:
+    mkl:
+      - '-DBLAS_LIBRARIES=-lmkl_gf_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+      - '-DLAPACK_LIBRARIES=-lmkl_gf_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+    cuda:
+      - '-DBLAS_LIBRARIES=-lmkl_gf_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+      - '-DLAPACK_LIBRARIES=-lmkl_gf_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
   optimization:
     O_level: 3
 

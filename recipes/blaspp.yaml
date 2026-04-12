@@ -11,6 +11,7 @@ patches:
   all:
     - blaspp_fix_testsweep.patch
     - blaspp_cblas_include.patch
+    - blaspp_lapack_libpath.patch
 
 requires:
   all:
@@ -60,22 +61,34 @@ configure:
       - "-Dgpu_backend=none"
       - '-DLAPACK_LIBRARIES=-llapack'
     mkl:
-      # Let blaspp's own BLASFinder auto-detect MKL — do NOT pass explicit
-      # LAPACK_LIBRARIES here, because our %{math_ldflags} (serial) produces
-      # -lmkl_sequential while BLASFinder picks -lmkl_gnu_thread, and having
-      # both threading layers NEEDED in the same binary is undefined behavior.
-      - '-Dblas=Intel MKL'
-      - '-Dlapack=Intel MKL'
+      # Prescribe MKL libraries explicitly — bypasses upstream BLASFinder/
+      # LAPACKFinder auto-detection entirely, which is fragile across blaspp
+      # versions. MKL bundles BLAS+LAPACK in the same libraries.
+      # Threading: use gnu_thread (not sequential) because blaspp will be
+      # linked into OpenMP applications. CMAKE_LIBRARY_PATH already contains
+      # the MKL lib directory (set by get_cmake_args in build_common).
       - "-Dgpu_backend=none"
     cuda:
-      - '-Dblas=Intel MKL'
-      - '-Dlapack=Intel MKL'
       - "-Dgpu_backend=cuda"
-  # LP64/ILP64 integer interface
+  # LP64/ILP64 integer interface + MKL library selection
   lp64_args:
     - '-Dblas_int=int (LP64)'
+  lp64_flavor_args:
+    mkl:
+      - '-DBLAS_LIBRARIES=-lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+      - '-DLAPACK_LIBRARIES=-lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+    cuda:
+      - '-DBLAS_LIBRARIES=-lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+      - '-DLAPACK_LIBRARIES=-lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
   ilp64_args:
     - '-Dblas_int=int64_t (ILP64)'
+  ilp64_flavor_args:
+    mkl:
+      - '-DBLAS_LIBRARIES=-lmkl_gf_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+      - '-DLAPACK_LIBRARIES=-lmkl_gf_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+    cuda:
+      - '-DBLAS_LIBRARIES=-lmkl_gf_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+      - '-DLAPACK_LIBRARIES=-lmkl_gf_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
   optimization:
     O_level: 3
 

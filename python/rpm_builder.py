@@ -1472,12 +1472,17 @@ fi
                 requires.extend(['intel-oneapi-mkl', 'intel-oneapi-mkl-devel'])
                 build_requires.extend(['intel-oneapi-mkl', 'intel-oneapi-mkl-devel'])
             elif linalg in ('reference', 'lapack'):
-                # Reference BLAS/LAPACK
-                requires.extend(['blas', 'lapack'])
-                build_requires.extend(['blas-devel', 'lapack-devel'])
+                # Reference BLAS/LAPACK — provided by the SCLS `lapack` recipe
+                # (which produces scls-<flavor>-blas / scls-<flavor>-lapack
+                # subpackages). Don't pull system blas-devel/lapack-devel.
+                scls_blas = f"scls-{self.flavor_name}-blas"
+                scls_lapack = f"scls-{self.flavor_name}-lapack"
+                requires.extend([scls_blas, scls_lapack])
+                build_requires.extend([scls_blas, scls_lapack])
                 if math_feature == 'parallel':
-                    requires.append('scalapack')
-                    build_requires.append('scalapack-devel')
+                    scls_scalapack = f"scls-{self.flavor_name}-scalapack"
+                    requires.append(scls_scalapack)
+                    build_requires.append(scls_scalapack)
 
         # MPI requirements — use our own SCLS-built MPI, not the system package
         if features.get('mpi', False):
