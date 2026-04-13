@@ -5,6 +5,16 @@
 %define prefix {{ prefix }}
 %define scls_name {{ scls_name }}
 
+# Disable debuginfo/debugsource package generation — SCLS installs into a
+# non-standard prefix so the debug packages are not useful and extracting
+# them is very slow.
+%global debug_package %{nil}
+
+# SCLS installs into a non-standard prefix (/opt/scls/...). EL10's
+# check-rpaths flags these as "invalid" (0x0002). Some packages (e.g. VTK)
+# also place $ORIGIN after the absolute rpath (0x0008). Allow all three.
+%global __brp_check_rpaths QA_RPATHS=$(( 0x0001 | 0x0002 | 0x0008 )) /usr/lib/rpm/check-rpaths
+
 {% if flavor.nvidia %}
 %define cuda {{ cuda }}
 %define gpu {{ nv_gpu_target }}

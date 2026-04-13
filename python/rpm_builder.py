@@ -996,6 +996,13 @@ Summary:        {self.recipe.get('summary', 'SCLS environment package')}
 License:        {self.recipe.get('license', 'BSD-3-Clause')}
 BuildArch:      noarch
 
+# Pull in basic build tools so they are available for the rest of the stack
+BuildRequires:  autoconf
+BuildRequires:  automake
+BuildRequires:  m4
+BuildRequires:  make
+BuildRequires:  libtool
+
 %description
 {self.recipe.get('summary', 'SCLS environment setup and activation scripts.')}
 
