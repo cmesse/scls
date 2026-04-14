@@ -8,6 +8,10 @@ source:
   # Pinned to commit e2856c2 (2026-02-23)
   url: https://github.com/KarypisLab/GKlib/archive/e2856c2f595b.tar.gz
 
+update:
+  strategy: github_commit
+  repo: KarypisLab/GKlib
+
 requires:
   - cmake
 

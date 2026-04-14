@@ -8,6 +8,11 @@ bootstrap: true  # Build with system compiler before scls gcc is available
 source:
   url: https://pkgconfig.freedesktop.org/releases/pkg-config-%{version}.tar.gz
 
+update:
+  strategy: html_regex
+  url: https://pkgconfig.freedesktop.org/releases/
+  pattern: 'pkg-config-(\d+\.\d+\.\d+)\.tar\.gz'
+
 # Only build for these flavors
 flavors:
   - macos

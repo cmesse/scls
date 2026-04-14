@@ -1,5 +1,5 @@
 name: hwloc
-version: 2.12.1
+version: 2.13.0
 summary: Portable Hardware Locality
 homepage: https://www-lb.open-mpi.org/software/hwloc/
 license: BSD
@@ -9,7 +9,12 @@ exclude_flavors:
   - lbl
 
 source:
-  url: https://download.open-mpi.org/release/hwloc/v2.12/hwloc-%{version}.tar.bz2
+  url: https://download.open-mpi.org/release/hwloc/v2.13/hwloc-%{version}.tar.bz2
+
+update:
+  strategy: github_tag
+  repo: open-mpi/hwloc
+  tag_prefix: "hwloc-"
 
 requires:
   - libevent

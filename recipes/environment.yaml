@@ -8,6 +8,10 @@ bootstrap: true
 source:
   type: generated
 
+update:
+  strategy: skip
+  reason: Generated package, no external source
+
 configure:
   type: none
 

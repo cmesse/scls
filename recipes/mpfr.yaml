@@ -8,6 +8,11 @@ license: LGPL-3.0-or-later
 source:
   url: https://www.mpfr.org/mpfr-current/mpfr-%{version}.tar.xz
 
+update:
+  strategy: html_regex
+  url: https://www.mpfr.org/mpfr-current/
+  pattern: 'mpfr-(\d+\.\d+\.\d+)\.tar'
+
 requires:
   all:
     - gmp

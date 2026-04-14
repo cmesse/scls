@@ -99,6 +99,11 @@ case "$1" in
         $PYTHON python/build_order.py "$SCLS_DIR/recipes" --flavor "$FLAVOR"
         exit 0
         ;;
+    check-updates)
+        shift
+        $PYTHON python/update_checker.py --recipes-dir "$SCLS_DIR/recipes" "$@"
+        exit 0
+        ;;
 esac
 
 # Commands that require a package name

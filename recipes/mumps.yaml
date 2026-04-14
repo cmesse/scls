@@ -7,6 +7,12 @@ license: CeCILL-C
 source:
   url: https://mumps-solver.org/MUMPS_%{version}.tar.gz
 
+update:
+  strategy: html_regex
+  url: https://mumps-solver.org/index.php
+  # Latest release link on the main page: <a href="...">X.Y.Z</a>
+  pattern: 'page=dwnld">(\d+\.\d+\.\d+)</a>'
+
 requires:
   all:
     - openmpi

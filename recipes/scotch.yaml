@@ -7,6 +7,12 @@ license: CeCILL-C
 source:
   url: https://gitlab.inria.fr/scotch/scotch/-/archive/v%{version}/scotch-v%{version}.tar.bz2
 
+update:
+  strategy: gitlab
+  instance: https://gitlab.inria.fr
+  repo: scotch/scotch
+  tag_prefix: "v"
+
 patches:
   all:
     # Add missing mpi.h include for GCC 7+ compatibility

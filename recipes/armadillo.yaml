@@ -7,6 +7,11 @@ license: Apache-2.0
 source:
   url: http://sourceforge.net/projects/arma/files/armadillo-%{version}.tar.xz
 
+update:
+  strategy: html_regex
+  url: https://arma.sourceforge.net/download.html
+  pattern: 'armadillo-(\d+\.\d+\.\d+)\.tar\.xz'
+
 requires:
   all:
     - cmake

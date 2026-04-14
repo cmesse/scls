@@ -10,6 +10,12 @@ source:
   # Extracted directory uses dashes too
   extract_dir: seacas-2025-10-14
 
+update:
+  strategy: github_tag
+  repo: sandialabs/seacas
+  tag_prefix: "v"
+  version_transform: dots_to_dashes
+
 requires:
   all:
     - cmake

@@ -1,5 +1,5 @@
 name: texinfo
-version: 7.2
+version: 7.3
 summary: Tools needed to create Texinfo format documentation files
 homepage: https://www.gnu.org/software/texinfo/
 license: GPL-3.0-or-later

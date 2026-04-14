@@ -7,6 +7,12 @@ license: BSD
 source:
   url: https://bitbucket.org/blaze-lib/blaze/downloads/blaze-%{version}.tar.gz
 
+update:
+  strategy: html_regex
+  # Bitbucket API returns JSON with tag names; regex still extracts the version
+  url: https://api.bitbucket.org/2.0/repositories/blaze-lib/blaze/refs/tags?sort=-name&pagelen=100
+  pattern: '"name":\s*"v(\d+\.\d+\.\d+)"'
+
 requires:
   all:
     - cmake

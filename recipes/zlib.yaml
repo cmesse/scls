@@ -4,6 +4,15 @@ homepage: https://zlib.net
 license: zlib and Boost
 bootstrap: true  # Build with system compiler before scls gcc is available
 
+update:
+  strategy: github_tag
+  repo: apple-oss-distributions/zlib
+  tag_prefix: "zlib-"
+  # Apple's zlib uses sequential tag numbers (zlib-100, zlib-101, ...) that
+  # do not match the upstream zlib version. Compare against the tag number
+  # currently pinned in the source URL instead of the recipe's version field.
+  current: "100"
+
 # Only build for these flavors
 flavors:
   - macos

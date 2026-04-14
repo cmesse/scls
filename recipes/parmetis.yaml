@@ -8,6 +8,10 @@ source:
   # Pinned to commit 8ee6a372 (2023-03-26) - no tagged releases available
   url: https://github.com/KarypisLab/ParMETIS/archive/8ee6a372ca70.tar.gz
 
+update:
+  strategy: github_commit
+  repo: KarypisLab/ParMETIS
+
 requires:
   all:
     - cmake

@@ -1,11 +1,17 @@
 name: slepc
-version: 3.24.3
+version: 3.25.0
 summary: Scalable Library for Eigenvalue Problem Computations
 homepage: https://slepc.upv.es/
 license: BSD-2-Clause
 
 source:
   url: https://slepc.upv.es/download/distrib/slepc-%{version}.tar.gz
+
+update:
+  strategy: gitlab
+  instance: https://gitlab.com
+  repo: slepc/slepc
+  tag_prefix: "v"
 
 requires:
   all:

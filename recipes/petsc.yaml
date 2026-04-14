@@ -1,5 +1,5 @@
 name: petsc
-version: 3.24.5
+version: 3.25.0
 
 summary: Portable Extensible Toolkit for Scientific Computation
 homepage: https://petsc.org/
@@ -7,6 +7,12 @@ license: BSD-2-Clause
 
 source:
   url: https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-%{version}.tar.gz
+
+update:
+  strategy: gitlab
+  instance: https://gitlab.com
+  repo: petsc/petsc
+  tag_prefix: "v"
 
 requires:
   all:

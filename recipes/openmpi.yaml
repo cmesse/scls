@@ -11,6 +11,11 @@ rpm_files_auto: true
 source:
   url: https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-%{version}.tar.bz2
 
+update:
+  strategy: github_tag
+  repo: open-mpi/ompi
+  tag_prefix: "v"
+
 # Flavor-specific version overrides
 # OpenMPI 5.x requires PMIx >= 4.2.0, but the LBL HPC has system PMIx 4.1.3.
 # Use OpenMPI 4.1.6 for the lbl flavor to maintain Slurm compatibility.

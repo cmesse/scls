@@ -1,5 +1,5 @@
 name: superlu
-version: 7.0.0
+version: 7.0.1
 summary: Subroutines to directly solve sparse linear systems
 homepage: https://github.com/xiaoyeli/superlu
 license: BSD-3-Clause

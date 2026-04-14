@@ -7,6 +7,11 @@ license: NetCDF
 source:
   url: https://downloads.unidata.ucar.edu/netcdf-c/%{version}/netcdf-c-%{version}.tar.gz
 
+update:
+  strategy: github_tag
+  repo: Unidata/netcdf-c
+  tag_prefix: "v"
+
 requires:
   all:
     - cmake

@@ -7,6 +7,12 @@ license: BSD-3-Clause
 source:
   url: https://vtk.org/files/release/9.6/VTK-%{version}.tar.gz
 
+update:
+  strategy: gitlab
+  instance: https://gitlab.kitware.com
+  repo: vtk/vtk
+  tag_prefix: "v"
+
 requires:
   all:
     - cmake

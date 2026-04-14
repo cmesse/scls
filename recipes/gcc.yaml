@@ -8,6 +8,11 @@ bootstrap: true  # Build with system compilers (this IS the GCC we're building)
 source:
   url: https://ftp.gnu.org/gnu/gcc/gcc-15.1/gcc-%{version}.tar.xz
 
+update:
+  strategy: gnu_ftp
+  ftp_path: /gnu/gcc/
+  dir_pattern: 'gcc-(\d+\.\d+\.\d+)'
+
 # Additional sources for in-tree build (Linux From Scratch approach)
 # These are extracted into the GCC source tree before configure
 # Versions are pulled from the respective recipe files (single source of truth)
