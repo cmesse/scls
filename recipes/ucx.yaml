@@ -4,6 +4,10 @@ summary: Unified Communication X - high-performance communication framework
 homepage: https://openucx.org
 license: BSD
 
+# UCX installs many platform-dependent files (transport plugins, arch-specific
+# headers, cmake config, pkg-config files). Auto-generate %files from BUILDROOT.
+rpm_files_auto: true
+
 # Not built for macos (no InfiniBand)
 exclude_flavors:
   - macos

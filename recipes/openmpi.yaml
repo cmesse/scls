@@ -95,11 +95,14 @@ configure:
       - --with-libevent-libdir=%{prefix}/lib
       - --with-ucx=%{prefix}
     lbl:
+      # OpenMPI 4.x: disable legacy OpenFabrics/verbs BTL; RDMA goes via UCX.
+      # (Removed in OpenMPI 5.x, so only applicable here.)
       - --with-slurm
       - --with-pmix=external
       - --with-hwloc=external
       - --with-libevent=external
       - --with-ucx=%{prefix}
+      - --without-verbs
     gcc-mkl-cuda:
       - --enable-mpi-ext=cuda
       - --with-cuda=%{cuda}
