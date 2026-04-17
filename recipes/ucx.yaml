@@ -1,0 +1,48 @@
+name: ucx
+version: 1.20.0
+summary: Unified Communication X - high-performance communication framework
+homepage: https://openucx.org
+license: BSD
+
+# Not built for macos (no InfiniBand)
+exclude_flavors:
+  - macos
+
+source:
+  url: https://github.com/openucx/ucx/releases/download/v%{version}/ucx-%{version}.tar.gz
+
+update:
+  strategy: github_release
+  repo: openucx/ucx
+
+requires: []
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: autotools
+  args:
+    - --enable-optimizations
+    - --enable-mt
+    - --enable-cma
+    - --without-cuda
+    - --without-rocm
+    - --without-java
+    - --without-go
+
+  optimization:
+    O_level: 2
+    strict_aliasing: true
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make check 2>&1 | tee check.log"
+  post:
+    - "echo 'Test Summary:' && grep -E '^(PASS|FAIL|SKIP|XFAIL):' check.log || echo 'No test results found'"

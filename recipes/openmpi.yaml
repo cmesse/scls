@@ -34,11 +34,19 @@ requires:
     - pmix
     - libevent
     - hwloc
+    - ucx
   mkl:
     - pmix
     - libevent
     - hwloc
-  lbl: []  # uses system pmix, hwloc, libevent
+    - ucx
+  debug:
+    - pmix
+    - libevent
+    - hwloc
+    - ucx
+  lbl:
+    - ucx
   macos:
     - gcc
     - pmix
@@ -69,6 +77,7 @@ configure:
       - --with-hwloc-libdir=%{prefix}/lib
       - --with-libevent=%{prefix}
       - --with-libevent-libdir=%{prefix}/lib
+      - --with-ucx=%{prefix}
     mkl:
       # mkl flavor uses our own pmix/hwloc/libevent (same as gcc); MKL only
       # affects math libs, not the MPI stack.
@@ -77,12 +86,20 @@ configure:
       - --with-hwloc-libdir=%{prefix}/lib
       - --with-libevent=%{prefix}
       - --with-libevent-libdir=%{prefix}/lib
+      - --with-ucx=%{prefix}
+    debug:
+      - --with-pmix=%{prefix}
+      - --with-hwloc=%{prefix}
+      - --with-hwloc-libdir=%{prefix}/lib
+      - --with-libevent=%{prefix}
+      - --with-libevent-libdir=%{prefix}/lib
+      - --with-ucx=%{prefix}
     lbl:
       - --with-slurm
       - --with-pmix=external
       - --with-hwloc=external
       - --with-libevent=external
-      - --with-ucx
+      - --with-ucx=%{prefix}
     gcc-mkl-cuda:
       - --enable-mpi-ext=cuda
       - --with-cuda=%{cuda}
