@@ -13,6 +13,7 @@
 %{prefix}/include/petsc/finclude/petscdevice.h
 %{prefix}/include/petsc/finclude/petscdevice_cuda.h
 %{prefix}/include/petsc/finclude/petscdevice_cupm.h
+%{prefix}/include/petsc/finclude/petscda.h
 %{prefix}/include/petsc/finclude/petscdevice_hip.h
 %{prefix}/include/petsc/finclude/petscdm.h
 %{prefix}/include/petsc/finclude/petscdmadaptor.h
@@ -75,13 +76,13 @@
 %{prefix}/include/petsc/finclude/petsctao.h
 %{prefix}/include/petsc/finclude/petsctao_deprecations.h
 %{prefix}/include/petsc/finclude/petsctaolinesearch.h
+%{prefix}/include/petsc/finclude/petsctaoterm.h
 %{prefix}/include/petsc/finclude/petsctime.h
 %{prefix}/include/petsc/finclude/petscts.h
 %{prefix}/include/petsc/finclude/petscvec.h
 %{prefix}/include/petsc/finclude/petscvecbase.h
 %{prefix}/include/petsc/finclude/petscviennacl.h
 %{prefix}/include/petsc/finclude/petscviewer.h
-%{prefix}/include/petsc/finclude/petscviewerexodusii.h
 %{prefix}/include/petsc/finclude/petscviewerhdf5.h
 %{prefix}/include/petsc/finclude/petscviewersaws.h
 %{prefix}/include/petsc/finclude/petscwebclient.h
@@ -105,6 +106,8 @@
 %{prefix}/include/petsc/private/cupminterface.hpp
 %{prefix}/include/petsc/private/cupmobject.hpp
 %{prefix}/include/petsc/private/cupmsolverinterface.hpp
+%{prefix}/include/petsc/private/daensembleimpl.h
+%{prefix}/include/petsc/private/daimpl.h
 %{prefix}/include/petsc/private/deviceimpl.h
 %{prefix}/include/petsc/private/dmadaptorimpl.h
 %{prefix}/include/petsc/private/dmdaimpl.h
@@ -222,6 +225,7 @@
 %{prefix}/include/petscconfiginfo.h
 %{prefix}/include/petscconvest.h
 %{prefix}/include/petsccxxcomplexfix.h
+%{prefix}/include/petscda.h
 %{prefix}/include/petscdevice.h
 %{prefix}/include/petscdevice_cuda.h
 %{prefix}/include/petscdevice_cupm.h
@@ -342,6 +346,8 @@
 %{prefix}/include/petsctao_deprecations.h
 %{prefix}/include/petsctaodef.mod
 %{prefix}/include/petsctaolinesearch.h
+%{prefix}/include/petsctaoterm.h
+%{prefix}/include/petsctaotypes.h
 %{prefix}/include/petsctime.h
 %{prefix}/include/petscts.h
 %{prefix}/include/petscts.mod
@@ -353,7 +359,6 @@
 %{prefix}/include/petscversion.h
 %{prefix}/include/petscviennacl.h
 %{prefix}/include/petscviewer.h
-%{prefix}/include/petscviewerexodusii.h
 %{prefix}/include/petscviewerhdf5.h
 %{prefix}/include/petscviewersaws.h
 %{prefix}/include/petscviewertypes.h
@@ -364,13 +369,16 @@
 %{prefix}/lib/petsc/bin/PetscBinaryIOTrajectory.py
 %{prefix}/lib/petsc/bin/PetscBinaryIO_tests.py
 %{prefix}/lib/petsc/bin/configureTAS.py
+%{prefix}/lib/petsc/bin/cuda_use_first_gpu.sh
 %{prefix}/lib/petsc/bin/extract.py
+%{prefix}/lib/petsc/bin/generatefortranbindings.py
+%{prefix}/lib/petsc/bin/getAPI.py
 %{prefix}/lib/petsc/bin/petsc_conf.py
 %{prefix}/lib/petsc/bin/petsc_gen_xdmf.py
 %{prefix}/lib/petsc/bin/petsc_tas_analysis.py
 %{prefix}/lib/petsc/bin/petsc_tas_style.mplstyle
 %{prefix}/lib/petsc/bin/petscdiff
-%{prefix}/lib/petsc/bin/petscfreesharedmemory
+%{prefix}/lib/petsc/bin/petscfreesharedmemory.sh
 %{prefix}/lib/petsc/bin/petsclogformat.py
 %{prefix}/lib/petsc/bin/petscmpiexec
 %{prefix}/lib/petsc/bin/petscnagfor
@@ -382,8 +390,9 @@
 %{prefix}/lib/petsc/bin/tasClasses.py
 %{prefix}/lib/petsc/bin/taucc.py
 %{prefix}/lib/petsc/bin/xml2flamegraph.py
+%{prefix}/lib/petsc/conf/classes.data
 %{prefix}/lib/petsc/conf/configure-hash
-%{prefix}/lib/petsc/conf/modules/petsc/3.24.5
+%{prefix}/lib/petsc/conf/modules/petsc/%{version}
 %{prefix}/lib/petsc/conf/petscrules
 %{prefix}/lib/petsc/conf/petscvariables
 %{prefix}/lib/petsc/conf/reconfigure-arch-linux-c-opt.py

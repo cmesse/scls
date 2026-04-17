@@ -8,7 +8,7 @@ bootstrap: true
 source:
   url: https://github.com/openssl/openssl/releases/download/openssl-%{version}/openssl-%{version}.tar.gz
 
-flavors:
+include_flavors:
   - macos
 
 features:

@@ -9,7 +9,7 @@ source:
   url: https://ftp.gnu.org/gnu/autoconf/autoconf-%{version}.tar.xz
 
 # Only build for these flavors
-flavors:
+include_flavors:
   - macos
 
 requires:

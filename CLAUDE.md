@@ -38,7 +38,7 @@ The `scls` wrapper reads the active flavor from `flavor.conf` (YAML format) and 
 - `flavor:` (required) — active flavor name (e.g., `gcc`, `mkl`, `debug`)
 - `python:` (optional) — path to the Python interpreter; defaults to `python3`
 - `gcc_toolset:` (optional) — Red Hat gcc-toolset version (e.g., `15`); sources `/opt/rh/gcc-toolset-N/enable` for RHEL 8 hosts
-- `extra_packages:` (optional) — list of packages to build even though the recipe's `flavors:` allowlist excludes the active flavor; also added to the meta-package's Requires
+- `extra_packages:` (optional) — list of packages to build even though the recipe's `include_flavors:` allowlist excludes the active flavor; also added to the meta-package's Requires
 
 Available flavors and their install prefixes:
 
@@ -90,7 +90,7 @@ Recipes in `recipes/*.yaml` define:
 - Dependencies (can be flavor-specific via dict with `all:`, `<flavor>:` keys)
 - Build configuration (configure type: autotools/cmake/custom/none)
 - Features (fortran, mpi, openmp, math requirements)
-- Flavor restrictions (`flavors:` allowlist, `exclude_flavors:` blocklist)
+- Flavor restrictions (`include_flavors:` allowlist, `exclude_flavors:` blocklist). If `include_flavors:` is omitted, the package builds for all flavors; an explicit empty list (`include_flavors: []`) means the recipe is never built by default and must be opted in via `extra_packages:` in `flavor.conf`.
 - Pre/post build commands
 - Test commands
 
@@ -141,11 +141,42 @@ Flavors in `flavors/*.yaml` specify:
 - GPL-3 libraries must NOT be distributed as part of the stack; local builds only
 - FFTW is excluded from the stack for this reason
 
+### No Python / language bindings in the stack
+
+SCLS deliberately does not ship Python, and recipes disable Python bindings (and other language-specific bindings such as Julia, R, Go) by default. The reason is that interpreter choice is highly site- and user-specific — system Python, pyenv, conda, spack, module files all coexist — and pinning one would conflict with users' own environments. Build-time use of the system Python as a tool (e.g. PETSc's configure, meson generators) is fine; what we avoid is runtime ABI coupling between the stack and a user's interpreter.
+
+When adding a new recipe that offers language bindings, default to turning them off (`-DBUILD_PYTHON_BINDINGS=OFF`, etc.). Do not propose adding a Python recipe.
+
 ### Flavor-specific package restrictions
-- `gcc` and `binutils` are only built for specific flavors (see their `flavors:` lists); on hosts where the system toolchain is too old (e.g. RHEL 8), they can be added to `extra_packages:` in `flavor.conf` or a `gcc_toolset:` can be specified instead
+- `gcc` and `binutils` are only built for specific flavors (see their `include_flavors:` lists); on hosts where the system toolchain is too old (e.g. RHEL 8), they can be added to `extra_packages:` in `flavor.conf` or a `gcc_toolset:` can be specified instead
 - Most flavors (gcc, mkl, debug, etc.) use the system compiler toolchain
 - The `lbl` flavor builds its own GCC and binutils
 - macOS builds GCC but uses system binutils
+
+## Update Checker
+
+`python/update_checker.py` checks upstream sources for newer versions of packages in the stack. Each recipe may declare an `update:` block; without one the package is reported as `undetermined`.
+
+Usage:
+
+```bash
+python python/update_checker.py all              # check all recipes
+python python/update_checker.py cmake            # check a single recipe
+python python/update_checker.py all --json       # machine-readable output
+python python/update_checker.py all --verify-downloads   # HEAD-check derived URLs
+```
+
+Supported strategies (set under `update:` in the recipe):
+
+- `github_release` — latest GitHub release (`repo: owner/name`, optional `tag_prefix`)
+- `github_tag` — latest semver-sorted tag (`repo: owner/name`, optional `tag_prefix`, `version_transform: dots_to_dashes`)
+- `github_commit` — pin to a commit hash (`repo: owner/name`)
+- `gitlab` — GitLab tag/release (`instance:`, `repo:`)
+- `gnu_ftp` — GNU FTP mirror listing (`ftp_path:`)
+- `html_regex` — scrape any page with a regex (`url:`, `pattern:` with a single capture group for the version)
+- `skip` — explicitly do not check (pair with a `reason:`)
+
+When bumping a version, also update `changelogs/<package>.md`, and re-check `files/<package>.txt` and any patches for drift (patch hunks, hard-coded version directories like `lib/cmake/<pkg>-<x.y.z>/`, new installed files). Prefer `%{version}` in file manifests when a directory embeds the upstream version.
 
 ## Testing
 

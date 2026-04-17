@@ -7,10 +7,14 @@ license: BSD-3-Clause
 source:
   url: https://github.com/OpenMathLib/OpenBLAS/archive/v%{version}/OpenBLAS-%{version}.tar.gz
 
-# Debug flavor uses reference BLAS/LAPACK, MKL flavors use Intel MKL
+# Debug flavor uses reference BLAS/LAPACK, MKL flavors use Intel MKL.
+# debug inherits from gcc, so it also needs an explicit exclusion.
+include_flavors:
+  - gcc
+  - lbl
+  - macos
 exclude_flavors:
   - debug
-  - mkl
 
 patches:
   # Drop extra 'p' from threaded library name

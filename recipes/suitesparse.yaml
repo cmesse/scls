@@ -13,13 +13,6 @@ requires:
     - gmp
     - mpfr
     - metis
-  gcc:
-    - openblas
-  macos:
-    - openblas
-  debug:
-    - blas
-    - lapack
 
 features:
   fortran: true

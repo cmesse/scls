@@ -13,15 +13,6 @@ requires:
     - openmpi
     - parmetis
     - superlu
-  gcc:
-    - openblas
-  macos:
-    - openblas
-  debug:
-    - blas
-    - lapack
-  mkl:
-    []
 
 features:
   fortran: true

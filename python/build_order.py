@@ -33,11 +33,11 @@ def load_yaml_files(directory, flavor=None, flavor_names=None):
                     if 'exclude_flavors' in data and any(n in data['exclude_flavors'] for n in flavor_names):
                         print(f"Skipping {data['name']} - excluded for flavor '{flavor}'", file=sys.stderr)
                         continue
-                    # If 'flavors' key exists, check if our flavor (or parent) is in the list
-                    if 'flavors' in data and not any(n in data['flavors'] for n in flavor_names):
+                    # If 'include_flavors' key exists, check if our flavor (or parent) is in the list
+                    if 'include_flavors' in data and not any(n in data['include_flavors'] for n in flavor_names):
                         print(f"Skipping {data['name']} - not built for flavor '{flavor}'", file=sys.stderr)
                         continue
-                    # If no 'flavors' key, package is built for all flavors (default behavior)
+                    # If no 'include_flavors' key, package is built for all flavors (default behavior)
 
                 # Get explicit requires from recipe
                 requires = data.get('requires', [])
@@ -67,31 +67,59 @@ def load_yaml_files(directory, flavor=None, flavor_names=None):
                     elif not isinstance(requires, dict):
                         requires = {'all': []}
 
-                    # Add math library dependencies per flavor
-                    # macos: openblas + lapack
+                    # Add math library dependencies per flavor.
+                    # Parallel math packages additionally depend on scalapack
+                    # (MKL provides its own, so mkl/intel/gcc-mkl-cuda are skipped).
+                    is_parallel = (math_type == 'parallel')
+
+                    # macos: openblas + lapack (+ scalapack for parallel)
                     if 'macos' not in requires:
                         requires['macos'] = []
                     if 'openblas' not in requires['macos'] and pkg_name != 'openblas':
                         requires['macos'].append('openblas')
                     if 'lapack' not in requires['macos'] and pkg_name != 'lapack':
                         requires['macos'].append('lapack')
+                    if is_parallel and pkg_name != 'scalapack' and 'scalapack' not in requires['macos']:
+                        requires['macos'].append('scalapack')
 
-                    # debug: blas + lapack (reference implementations from lapack recipe)
+                    # debug: blas + lapack + (scalapack for parallel)
                     if 'debug' not in requires:
                         requires['debug'] = []
                     if 'blas' not in requires['debug'] and pkg_name not in ('blas', 'lapack'):
                         requires['debug'].append('blas')
                     if 'lapack' not in requires['debug'] and pkg_name != 'lapack':
                         requires['debug'].append('lapack')
+                    if is_parallel and pkg_name != 'scalapack' and 'scalapack' not in requires['debug']:
+                        requires['debug'].append('scalapack')
 
-                    # mkl: Intel MKL provides BLAS/LAPACK, no additional deps needed
-                    # MKL is provided by Intel oneAPI installation, not built by SCLS
+                    # gcc / lbl: openblas (provides BLAS+LAPACK via compat symlinks)
+                    #            + scalapack for parallel
+                    for openblas_flavor in ('gcc', 'lbl'):
+                        if openblas_flavor not in requires:
+                            requires[openblas_flavor] = []
+                        if pkg_name != 'openblas' and 'openblas' not in requires[openblas_flavor]:
+                            requires[openblas_flavor].append('openblas')
+                        if is_parallel and pkg_name != 'scalapack' and 'scalapack' not in requires[openblas_flavor]:
+                            requires[openblas_flavor].append('scalapack')
+
+                    # mkl / intel / gcc-mkl-cuda: Intel MKL provides BLAS and
+                    # LAPACK. ScaLAPACK comes from our own scalapack recipe
+                    # built on top of MKL (see math_common.py for rationale),
+                    # so parallel math packages need a build edge to it.
+                    # We always set an explicit (possibly empty) entry so
+                    # that the hyphen-split fallback doesn't silently pick
+                    # up the 'gcc: [openblas]' injection above.
+                    for mkl_flavor in ('mkl', 'intel', 'gcc-mkl-cuda'):
+                        if mkl_flavor not in requires:
+                            requires[mkl_flavor] = []
+                        if is_parallel and pkg_name != 'scalapack' and 'scalapack' not in requires[mkl_flavor]:
+                            requires[mkl_flavor].append('scalapack')
 
                 package = {
                     'name': pkg_name,
                     'requires': requires,
                     'filepath': filepath,
-                    'flavors': data.get('flavors', []),  # Empty list means all flavors
+                    'include_flavors': data.get('include_flavors'),  # None means all flavors
                     'bootstrap': is_bootstrap
                 }
                 packages.append(package)

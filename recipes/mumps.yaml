@@ -19,13 +19,6 @@ requires:
     - metis
     - parmetis
     - scotch
-  macos:
-    - openblas
-    - scalapack
-  debug:
-    - blas
-    - lapack
-    - scalapack
 
 features:
   fortran: true

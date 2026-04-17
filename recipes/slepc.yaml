@@ -17,7 +17,6 @@ requires:
   all:
     - petsc
     - arpack-ng
-    - scalapack
 
 features:
   fortran: true
@@ -68,6 +67,17 @@ install:
 # prefix /opt/scls/gcc/lib, but during %check those files only exist in
 # %{buildroot}/opt/scls/gcc/lib, and SLEPc's loader ignores LD_LIBRARY_PATH for
 # the plugin lookup. Tests can be run by users post-install.
+
+subpackages:
+  - name: slepc-examples
+    summary: Examples for SLEPc
+    requires:
+      - slepc
+    files:
+      - "share/slepc/CMakeLists.txt"
+      - "share/slepc/Makefile*"
+      - "share/slepc/datafiles"
+      - "share/slepc/examples"
 
 registry:
   cflags: "-I%{prefix}/include"

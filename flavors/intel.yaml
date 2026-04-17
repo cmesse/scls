@@ -1,9 +1,8 @@
 # Linux Intel OneAPI + MKL flavor configuration
-# Enhanced intel-mkl.yaml
-name: intel-mkl
+name: intel
 platform: linux
 description: "Intel OneAPI compilers with OpenMPI and Intel MKL"
-prefix: /opt/scls/intel-mkl
+prefix: /opt/scls/intel
 
 # Pre-build setup commands
 pre_build_setup:
@@ -26,10 +25,10 @@ compilers:
   fc: ifx
 
 flags:
-  cflags: "-mcpu=x86-64-v3 -fPIC -fp-model=precise"
-  cxxflags: "-mcpu=x86-64-v3 -fPIC -fp-model=precise"
-  fflags: "-mcpu=x86-64-v3 -fPIC -fp-model=precise"
-  ldflags: "-Wl,-rpath,/opt/scls/lib -L/opt/scls/lib"
+  cflags: "-march=x86-64-v3 -fPIC -fp-model=precise"
+  cxxflags: "-march=x86-64-v3 -fPIC -fp-model=precise"
+  fflags: "-march=x86-64-v3 -fPIC -fp-model=precise"
+  ldflags: "-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib"
 
 # Math libraries configuration
 math:
@@ -39,3 +38,8 @@ math:
 
 # MPI implementation
 mpi: openmpi
+
+# We don't ship our own zlib RPM — recipes that need libz should use the
+# distro's package (zlib at /usr/lib64/libz.so).
+system_libraries:
+  zlib: true

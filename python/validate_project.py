@@ -216,10 +216,10 @@ class Validator:
             if '_error' in recipe:
                 continue
 
-            # Check flavors: allowlist
-            for f in recipe.get('flavors', []):
+            # Check include_flavors: allowlist
+            for f in recipe.get('include_flavors', []):
                 if f not in all_match_names:
-                    self.warn(f"recipe/{name}: flavors entry '{f}' does not match "
+                    self.warn(f"recipe/{name}: include_flavors entry '{f}' does not match "
                               f"any known flavor or component")
 
             # Check exclude_flavors
@@ -252,18 +252,18 @@ class Validator:
             if isinstance(subpackages, list):
                 for subpkg in subpackages:
                     if isinstance(subpkg, dict):
-                        for f in subpkg.get('flavors', []):
+                        for f in subpkg.get('include_flavors', []):
                             if f not in all_match_names:
                                 self.warn(f"recipe/{name}: subpackage "
                                           f"'{subpkg.get('name', '?')}' "
-                                          f"flavors entry '{f}' unknown")
+                                          f"include_flavors entry '{f}' unknown")
             elif isinstance(subpackages, dict):
                 for sname, subpkg in subpackages.items():
                     if isinstance(subpkg, dict):
-                        for f in subpkg.get('flavors', []):
+                        for f in subpkg.get('include_flavors', []):
                             if f not in all_match_names:
                                 self.warn(f"recipe/{name}: subpackage '{sname}' "
-                                          f"flavors entry '{f}' unknown")
+                                          f"include_flavors entry '{f}' unknown")
 
     def _check_flavor_dict_keys(self, recipe_name, mapping, field_name):
         """Check that keys in a flavor-keyed dict are resolvable."""
@@ -349,10 +349,10 @@ class Validator:
         if any(n in excludes for n in flavor_names):
             return False
         # Check inclusion
-        flavors = recipe.get('flavors', [])
-        if not flavors:
+        includes = recipe.get('include_flavors')
+        if includes is None:
             return True
-        return any(n in flavors for n in flavor_names)
+        return any(n in includes for n in flavor_names)
 
     # --- Patches ---
 

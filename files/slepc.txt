@@ -87,7 +87,7 @@
 %{prefix}/lib/libslepc.so.*
 %{prefix}/lib/pkgconfig/SLEPc.pc
 %{prefix}/lib/pkgconfig/slepc.pc
-%{prefix}/lib/slepc/conf/modules/slepc/3.24.3
+%{prefix}/lib/slepc/conf/modules/slepc/%{version}
 %{prefix}/lib/slepc/conf/slepc_common
 %{prefix}/lib/slepc/conf/slepc_rules
 %{prefix}/lib/slepc/conf/slepc_rules_util.mk

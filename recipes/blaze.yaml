@@ -16,13 +16,6 @@ update:
 requires:
   all:
     - cmake
-  gcc:
-    - openblas
-  macos:
-    - openblas
-  debug:
-    - lapack
-  mkl: []  # Intel MKL is pulled in via the flavor (intel-oneapi-mkl[-devel])
 
 features:
   fortran: false
@@ -94,10 +87,10 @@ test:
         BLAS_INC="$MKLROOT/include"
         BLAS_INCFILE="mkl_cblas.h"
         BLAS_LIBPATH="$MKLROOT/lib/intel64"
-        BLAS_LIBS="-lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl"
+        BLAS_LIBS="%{mkl_linker_flags}"
         LAPACK_CFG="yes"
         LAPACK_LIBPATH="$MKLROOT/lib/intel64"
-        LAPACK_LIBS="-lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl"
+        LAPACK_LIBS="%{mkl_linker_flags}"
       elif [ -f %{prefix}/lib/libopenblas.so ]; then
         BLAS_CFG="yes"
         BLAS_INC="%{prefix}/include"

@@ -10,17 +10,12 @@ source:
 requires:
   all:
     - openmpi
-    - scalapack
-  gcc:
-    - openblas
-  debug:
-    - lapack
 
 features:
   fortran: true
   mpi: true
   openmp: false
-  math: serial
+  math: parallel
 
 
 # should provide a list
@@ -33,13 +28,35 @@ configure:
     - -DMPI=ON
     - -DMPI_BASE_DIR=%{prefix}
     - -DCMAKE_POLICY_VERSION_MINIMUM=4.0
-    - "-DBLAS_LIBRARIES=%{math_ldflags}"
-    - "-DLAPACK_LIBRARIES=%{math_ldflags}"
     - -DBUILD_STATIC_LIBS=OFF
     - -DBUILD_SHARED_LIBS=ON
+  # ARPACK-NG (PARPACK) links only BLAS/LAPACK, not ScaLAPACK —
+  # parallelism uses MPI directly. Pin serial BLAS/LAPACK per flavor
+  # so the MKL flavor does not inherit the ScaLAPACK-bearing line
+  # that %{math_ldflags} would produce for parallel math recipes.
   flavor_args:
+    gcc:
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.so"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/libopenblas.so"
+    lbl:
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.so"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/libopenblas.so"
     macos:
-    - -DTESTS=OFF
+      - -DTESTS=OFF
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
+    debug:
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libblas.so"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/liblapack.so"
+    mkl:
+      - "-DBLAS_LIBRARIES=%{mkl_linker_flags}"
+      - "-DLAPACK_LIBRARIES=%{mkl_linker_flags}"
+    intel:
+      - "-DBLAS_LIBRARIES=%{mkl_linker_flags}"
+      - "-DLAPACK_LIBRARIES=%{mkl_linker_flags}"
+    cuda:
+      - "-DBLAS_LIBRARIES=%{mkl_linker_flags}"
+      - "-DLAPACK_LIBRARIES=%{mkl_linker_flags}"
   # Integer interface: LP64 (32-bit) vs ILP64 (64-bit)
   lp64_args:
     - "-DINTERFACE64=OFF"

@@ -5,7 +5,7 @@ homepage: https://www.gnu.org/software/binutils/
 license: GPL-3.0-or-later
 bootstrap: true
 
-flavors:
+include_flavors:
   - lbl
 
 source:

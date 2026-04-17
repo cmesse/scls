@@ -9,7 +9,7 @@ source:
 
 # Only build for debug flavor (reference BLAS/LAPACK)
 # gcc/lbl and macos use OpenBLAS which bundles LAPACK
-flavors:
+include_flavors:
   - debug
 
 requires:
@@ -26,7 +26,7 @@ features:
 subpackages:
   blas:
     summary: The Basic Linear Algebra Subprograms library (reference)
-    flavors:
+    include_flavors:
       - debug
     files:
       - "lib/libblas.so*"
@@ -36,7 +36,7 @@ subpackages:
     summary: C interface to BLAS
     description: |
       CBLAS provides a C interface to the Basic Linear Algebra Subprograms.
-    flavors:
+    include_flavors:
       - debug
     requires:
       - blas

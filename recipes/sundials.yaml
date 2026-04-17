@@ -39,7 +39,8 @@ configure:
     - "-DMPIEXEC_EXECUTABLE=%{prefix}/bin/mpiexec"
     - "-DEXAMPLES_ENABLE_C=ON"
     - "-DEXAMPLES_ENABLE_CXX=ON"
-    - "-DEXAMPLES_INSTALL=OFF"
+    - "-DEXAMPLES_INSTALL=ON"
+    - "-DSUNDIALS_EXAMPLES_INSTALL_PATH=%{prefix}/share/sundials/examples"
     # Testing — use system GTest at %{prefix} (SUNDIALS' bundled FetchContent
     # 1.16.0 is incompatible with GCC 15, but the cmake logic prefers an
     # already-installed system GTest, which we have at %{prefix}).
@@ -78,3 +79,15 @@ test:
 registry:
   cflags: "-I%{prefix}/include"
   ldflags: "-L%{prefix}/lib -lsundials_cvode -lsundials_nvecserial"
+
+subpackages:
+  - name: sundials-examples
+    summary: Example programs for SUNDIALS
+    description: |
+      Example source files for the SUNDIALS solvers (ARKODE, CVODE, CVODES,
+      IDA, IDAS, KINSOL), including serial, parallel (MPI), OpenMP, PETSc,
+      and KLU variants.
+    requires:
+      - sundials
+    files:
+      - "share/sundials/examples"

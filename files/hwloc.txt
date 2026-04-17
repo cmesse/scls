@@ -93,6 +93,9 @@
 %{prefix}/share/man/man3/hwloc_topology_diff_load_xmlbuffer.3
 %{prefix}/share/man/man3/hwloc_distances_add_values.3
 %{prefix}/share/man/man3/HWLOC_TOPOLOGY_FLAG_THISSYSTEM_ALLOWED_RESOURCES.3
+%{prefix}/share/man/man3/HWLOC_TOPOLOGY_FLAG_NO_CPUKINDS.3
+%{prefix}/share/man/man3/HWLOC_TOPOLOGY_FLAG_NO_DISTANCES.3
+%{prefix}/share/man/man3/HWLOC_TOPOLOGY_FLAG_NO_MEMATTRS.3
 %{prefix}/share/man/man3/hwloc_topology_set_userdata_export_callback.3
 %{prefix}/share/man/man3/hwlocality_distances_get.3
 %{prefix}/share/man/man3/hwloc_topology_allow.3

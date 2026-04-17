@@ -11,10 +11,6 @@ requires:
   all:
     - cmake
     - metis
-  gcc:
-    - openblas
-  debug:
-    - lapack
 
 features:
   fortran: true

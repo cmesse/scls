@@ -20,13 +20,6 @@ requires:
     - scotch
     - zfp
     - butterflypack
-  macos:
-    - openblas
-    - scalapack
-  debug:
-    - blas
-    - lapack
-    - scalapack
   cuda:
     - slate
 
@@ -60,12 +53,40 @@ configure:
     macos:
       - "-DSTRUMPACK_USE_CUDA=OFF"
       - "-DTPL_ENABLE_SLATE=OFF"
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
+      - "-DTPL_LAPACK_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.dylib"
     debug:
       - "-DSTRUMPACK_USE_CUDA=OFF"
       - "-DTPL_ENABLE_SLATE=OFF"
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libblas.so"
+      - "-DTPL_LAPACK_LIBRARIES=%{prefix}/lib/liblapack.so"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so"
+    gcc:
+      - "-DSTRUMPACK_USE_CUDA=OFF"
+      - "-DTPL_ENABLE_SLATE=OFF"
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libopenblas.so"
+      - "-DTPL_LAPACK_LIBRARIES=%{prefix}/lib/libopenblas.so"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so"
+    lbl:
+      - "-DSTRUMPACK_USE_CUDA=OFF"
+      - "-DTPL_ENABLE_SLATE=OFF"
+      - "-DTPL_BLAS_LIBRARIES=%{prefix}/lib/libopenblas.so"
+      - "-DTPL_LAPACK_LIBRARIES=%{prefix}/lib/libopenblas.so"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so"
     mkl:
       - "-DSTRUMPACK_USE_CUDA=OFF"
       - "-DTPL_ENABLE_SLATE=OFF"
+      # Serial MKL for BLAS/LAPACK; stack-owned ScaLAPACK for the parallel slot.
+      - "-DTPL_BLAS_LIBRARIES=%{mkl_linker_flags}"
+      - "-DTPL_LAPACK_LIBRARIES=%{mkl_linker_flags}"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so"
+    intel:
+      - "-DSTRUMPACK_USE_CUDA=OFF"
+      - "-DTPL_ENABLE_SLATE=OFF"
+      - "-DTPL_BLAS_LIBRARIES=%{mkl_linker_flags}"
+      - "-DTPL_LAPACK_LIBRARIES=%{mkl_linker_flags}"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so"
     cuda:
       - "-DSTRUMPACK_USE_CUDA=ON"
       - "-DTPL_ENABLE_SLATE=ON"
@@ -73,6 +94,9 @@ configure:
       - "-Dlapackpp_DIR=%{prefix}/lib/cmake/lapackpp"
       - "-Dslate_DIR=%{prefix}/lib/cmake/slate"
       - "-DCMAKE_CUDA_ARCHITECTURES=%{cuda_architectures}"
+      - "-DTPL_BLAS_LIBRARIES=%{mkl_linker_flags}"
+      - "-DTPL_LAPACK_LIBRARIES=%{mkl_linker_flags}"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so"
   optimization:
     O_level: 3
 

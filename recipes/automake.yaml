@@ -9,7 +9,7 @@ source:
   url: https://ftp.gnu.org/gnu/automake/automake-%{version}.tar.xz
 
 # Only build for these flavors
-flavors:
+include_flavors:
   - macos
 
 requires:

@@ -41,6 +41,8 @@ from patch_common import (
 from math_common import (
     get_math_link_line,
     get_math_compile_flags,
+    get_mkl_serial_link_line,
+    get_mkl_mpi_link_line,
     get_cuda_path,
     nv_hpc_compiler_path,
     get_nv_gpu_targets )
@@ -465,15 +467,11 @@ class RPMBuilder:
         cmd = [s.replace('%{cuda}', str(self.cuda_path)) for s in cmd]
         cuda_archs = self.flavor.get('nvidia', {}).get('architectures', '')
         cmd = [s.replace('%{cuda_architectures}', cuda_archs) for s in cmd]
-        # MKL paths and linker flags
+        # MKL paths and linker flags (canonical definitions in math_common)
         cmd = [s.replace('%{mklroot}', str(self.mkl_root)) for s in cmd]
-        interface = self.flavor.get('math', {}).get('interface', 'lp64')
-        if interface == 'ilp64':
-            mkl_lp = 'ilp64'
-        else:
-            mkl_lp = 'lp64'
-        mkl_linker = f'-lmkl_intel_{mkl_lp} -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
-        mkl_mpi_linker = f'-lmkl_scalapack_{mkl_lp} -lmkl_intel_{mkl_lp} -lmkl_gnu_thread -lmkl_core -lmkl_blacs_intelmpi_{mkl_lp} -lgomp -lpthread -lm -ldl'
+        mkl_linker = get_mkl_serial_link_line(self.flavor)
+        mkl_mpi_linker = get_mkl_mpi_link_line(self.flavor)
+        mkl_mpi_linker = mkl_mpi_linker.replace('%{prefix}', str(self.prefix))
         cmd = [s.replace('%{mkl_linker_flags}', mkl_linker) for s in cmd]
         cmd = [s.replace('%{mkl_mpi_linker_flags}', mkl_mpi_linker) for s in cmd]
         # Platform
@@ -835,9 +833,9 @@ class RPMBuilder:
         # Math libraries
         if math_linalg == 'mkl':
             context['math_provider'] = 'mkl'
-            mkl_iface = 'ilp64' if interface == 'ilp64' else 'lp64'
-            context['mkl_linker_flags'] = f'-lmkl_intel_{mkl_iface} -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
-            context['mkl_mpi_linker_flags'] = f'-lmkl_scalapack_{mkl_iface} -lmkl_intel_{mkl_iface} -lmkl_gnu_thread -lmkl_core -lmkl_blacs_openmpi_{mkl_iface} -lgomp -lpthread -lm -ldl'
+            context['mkl_linker_flags'] = get_mkl_serial_link_line(self.flavor)
+            mkl_mpi = get_mkl_mpi_link_line(self.flavor)
+            context['mkl_mpi_linker_flags'] = mkl_mpi.replace('%{prefix}', str(self.prefix))
         else:
             context['math_provider'] = 'lapack'
             context['mkl_linker_flags'] = ''
@@ -1152,6 +1150,14 @@ fi
         # Get file list
         files = self.get_file_list()
 
+        # Exclude paths claimed by subpackages from the main %files section.
+        # get_file_list collapses share/<pkg>/ into a single entry, which would
+        # otherwise conflict with subpackage %files claiming share/<pkg>/examples.
+        subpkg_specs = self.get_subpackages_for_spec()
+        for subpkg in subpkg_specs:
+            for pattern in subpkg.get('files', []):
+                files.append(f"%exclude %{{prefix}}/{pattern}")
+
         # Load description and changelog
         description = load_description(self.package)
         if not description:
@@ -1320,6 +1326,13 @@ fi
         # Add interface-specific arguments (LP64/ILP64)
         args.extend(get_interface_args(self.recipe, self.flavor))
 
+        # MKL link-line placeholders. Non-MKL flavors never reference these
+        # macros (gcc/debug recipes prescribe -lopenblas / -llapack directly),
+        # so computing them unconditionally is safe.
+        mkl_linker = get_mkl_serial_link_line(self.flavor)
+        mkl_mpi_linker = get_mkl_mpi_link_line(self.flavor).replace(
+            '%{prefix}', str(self.prefix))
+
         # Process arguments for MKL and CUDA paths
         processed_args = []
         for arg in args:
@@ -1336,6 +1349,8 @@ fi
             arg = arg.replace('%{ldflags}', self.ldflags)
             arg = arg.replace('%{math_flags}', self.math_flags)
             arg = arg.replace('%{math_ldflags}', self.math_ldflags)
+            arg = arg.replace('%{mkl_linker_flags}', mkl_linker)
+            arg = arg.replace('%{mkl_mpi_linker_flags}', mkl_mpi_linker)
             # Replace CUDA architectures
             cuda_archs = self.flavor.get('nvidia', {}).get('architectures', '')
             arg = arg.replace('%{cuda_architectures}', cuda_archs)
@@ -1478,6 +1493,23 @@ fi
                 # against which our binaries are linked).
                 requires.extend(['intel-oneapi-mkl', 'intel-oneapi-mkl-devel'])
                 build_requires.extend(['intel-oneapi-mkl', 'intel-oneapi-mkl-devel'])
+                # ScaLAPACK: we ship our own reference build layered on
+                # MKL BLAS/LAPACK (see math_common.py for rationale).
+                if math_feature == 'parallel':
+                    scls_scalapack = f"scls-{self.flavor_name}-scalapack"
+                    requires.append(scls_scalapack)
+                    build_requires.append(scls_scalapack)
+            elif linalg == 'openblas':
+                # OpenBLAS provides BLAS+LAPACK via compat symlinks
+                # (liblapack.so -> libopenblas.so). ScaLAPACK is a separate
+                # recipe on OpenBLAS flavors.
+                scls_openblas = f"scls-{self.flavor_name}-openblas"
+                requires.append(scls_openblas)
+                build_requires.append(scls_openblas)
+                if math_feature == 'parallel':
+                    scls_scalapack = f"scls-{self.flavor_name}-scalapack"
+                    requires.append(scls_scalapack)
+                    build_requires.append(scls_scalapack)
             elif linalg in ('reference', 'lapack'):
                 # Reference BLAS/LAPACK — provided by the SCLS `lapack` recipe
                 # (which produces scls-<flavor>-blas / scls-<flavor>-lapack
@@ -2133,6 +2165,11 @@ SCLS_EOF
         f.write(spec_content)
     print(f"Generated SPEC file: {spec_file}")
 
+    # Also generate/build the examples meta-package if any recipe defines an
+    # *-examples subpackage.
+    build_examples_meta_package(flavor, packages, version, changelog_date,
+                                spec_only=spec_only)
+
     if spec_only:
         return
 
@@ -2151,6 +2188,90 @@ SCLS_EOF
     local_registry.mkdir(parents=True, exist_ok=True)
     marker = local_registry / f"{FLAVOR_META}.yaml"
     marker.write_text(f"name: {FLAVOR_META}\nversion: {version}\n")
+
+
+def _discover_example_subpackages(recipes_dir: Path, packages: list, flavor: str) -> list:
+    """Return the list of *-examples subpackage names defined by recipes in
+    the given package set for the given flavor."""
+    from build_common import get_subpackages_for_flavor
+    example_subpkgs = []
+    for pkg in packages:
+        recipe_path = recipes_dir / f"{pkg}.yaml"
+        if not recipe_path.exists():
+            continue
+        try:
+            recipe = load_recipe(pkg)
+        except Exception:
+            continue
+        for subpkg in get_subpackages_for_flavor(recipe, flavor):
+            name = subpkg.get('name', '')
+            if name.endswith('-examples'):
+                example_subpkgs.append(name)
+    return example_subpkgs
+
+
+def build_examples_meta_package(flavor: str, packages: list, version: str,
+                                changelog_date: str, spec_only: bool = False) -> None:
+    """Build scls-<flavor>-examples — a meta-package that Requires every
+    *-examples subpackage discovered across the flavor's recipes.  Skipped
+    silently when no example subpackages are defined."""
+    project_root = Path(__file__).parent.parent
+    recipes_dir = project_root / 'recipes'
+    rpm_base = project_root / 'rpmbuild'
+    specs_dir = rpm_base / 'SPECS'
+
+    example_subpkgs = _discover_example_subpackages(recipes_dir, packages, flavor)
+    if not example_subpkgs:
+        return
+
+    scls_name = f"scls-{flavor}-examples"
+    requires = [f"scls-{flavor}-{name}" for name in example_subpkgs]
+    summary = f"Example programs for the SCLS {flavor} flavor"
+
+    spec_content = f"""\
+# Examples meta-package for {scls_name}
+# Installing this RPM pulls in every *-examples subpackage in the {flavor} flavor.
+
+Name:           {scls_name}
+Version:        {version}
+Release:        1%{{?dist}}
+Summary:        {summary}
+License:        BSD-3-Clause-LBNL
+BuildArch:      noarch
+
+{"".join(f"Requires:       {r}{chr(10)}" for r in requires)}
+AutoReqProv:    no
+
+%description
+{summary}.
+
+This meta-package pulls in the example programs shipped by packages in the
+SCLS {flavor} flavor (e.g. PETSc, SLEPc, SUNDIALS). It is optional — install it
+only if you want the upstream example sources on disk.
+
+%files
+
+%changelog
+* {changelog_date} SCLS Builder <scls@lbl.gov> - {version}-1
+- Examples meta-package for {flavor}
+"""
+
+    spec_file = specs_dir / f"{scls_name}.spec"
+    with open(spec_file, 'w') as f:
+        f.write(spec_content)
+    print(f"Generated SPEC file: {spec_file}")
+
+    if spec_only:
+        return
+
+    cmd = ['rpmbuild', '--define', f'_topdir {rpm_base}', '-ba', str(spec_file)]
+    print(f"\n=== Building examples meta-package {scls_name} ===")
+    print(f"Command: {' '.join(cmd)}")
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        raise BuildError(f"rpmbuild failed with return code {result.returncode}")
+
+    print(f"\nExamples meta-package {scls_name} built successfully!")
 
 
 def main():

@@ -29,6 +29,9 @@ This is not a general-purpose meta-build framework. It makes choices so the resu
 - OpenMPI is the default MPI implementation.
 - Shared libraries are the normal target.
 - Numerical correctness matters more than aggressive flag games; this project is not interested in `-ffast-math`.
+- Python is not part of the stack. Interpreter choice is too site- and user-specific (system, pyenv, conda, spack, modules), so SCLS does not ship a Python and recipes disable Python (and other language) bindings by default. Users bring their own interpreter and bind against the installed C/C++ libraries themselves.
+- Boost is not part of the stack. Modern C++ (C++17/20) has absorbed most of what scientific code historically needed from Boost (`filesystem`, `optional`, `variant`, `any`, `string_view`), and the libraries SCLS cares about (cereal, ensmallen, mlpack 4.x, etc.) either never required Boost or have dropped the dependency. Adding Boost would mean pulling in a very large, slow-to-build tree of sublibraries to satisfy a shrinking set of optional features. Where a recipe offers a "build tests with Boost" switch, SCLS disables it.
+- GPL-3 libraries are not distributed as part of the stack. The project targets BSD-3 compatibility for anything downstream code links against, which excludes libraries like FFTW (GPL-2+). GPL-3 *build tools* — autoconf, automake, libtool, make, sed, m4, binutils — are fine to use: they are executed as binaries during the build, not linked into the resulting libraries, so their license does not propagate to the output. GCC is similarly fine to use as a compiler because libgcc and libstdc++ ship under GPL with the GCC Runtime Library Exception, which explicitly permits linking the runtime into non-GPL binaries.
 
 The bias is toward a curated stack rather than an infinitely configurable one. If the requirement is "I need exactly seventeen custom feature toggles for one package," this is the wrong tool. If the requirement is "I need PETSc, HDF5, OpenBLAS, NetCDF, MUMPS, and friends to build and coexist sanely," this is exactly the kind of tool that helps.
 
@@ -150,6 +153,10 @@ Other commands:
 ./scls list                # List installed packages
 ./scls order               # Show build order
 ```
+
+### Optional examples
+
+PETSc, SLEPc, and SUNDIALS install their upstream tutorial/example sources under `%{prefix}/share/<package>/examples/`. These are split into `<package>-examples` subpackages and are not pulled in by the flavor meta-package. An optional companion meta-package, `scls-<flavor>-examples`, is built alongside `scls-<flavor>` and groups all of them; install it if you want the examples on disk.
 
 ### Direct builder invocation
 

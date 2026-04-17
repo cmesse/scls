@@ -2,6 +2,56 @@
 from typing import Dict
 from pathlib import Path
 
+
+def get_mkl_interface_lib(flavor: Dict) -> str:
+    """Return the MKL Fortran interface library name (without -l prefix).
+
+    The interface library encodes the Fortran calling convention. MKL ships
+    two variants matching the two common Fortran ABIs:
+      - 'mkl_gf_{lp64,ilp64}'    — gfortran (GCC) name mangling
+      - 'mkl_intel_{lp64,ilp64}' — Intel ifort/ifx name mangling
+    Mixing them within a single flavor is incorrect and produces either
+    link-time unresolved symbols or subtle runtime corruption, so this
+    is the single source of truth used across math_common, rpm_builder,
+    unix_builder, and build_common.
+    """
+    cc = flavor.get('compilers', {}).get('cc', 'gcc')
+    interface = flavor.get('math', {}).get('interface', 'lp64')
+    family = 'intel' if cc in ('icx', 'icpx', 'icc') else 'gf'
+    return f'mkl_{family}_{interface}'
+
+
+def get_mkl_serial_link_line(flavor: Dict) -> str:
+    """Canonical MKL serial (non-ScaLAPACK) link line for the given flavor.
+
+    Used by %{mkl_linker_flags} expansion and anywhere else a package
+    needs the raw MKL BLAS+LAPACK link line without ScaLAPACK/BLACS.
+    """
+    cc = flavor.get('compilers', {}).get('cc', 'gcc')
+    iface = get_mkl_interface_lib(flavor)
+    if cc in ('icx', 'icpx', 'icc'):
+        threading = 'mkl_intel_thread'
+        omp_rt = 'iomp5'
+    else:
+        threading = 'mkl_gnu_thread'
+        omp_rt = 'gomp'
+    return (f'-l{iface} -l{threading} -lmkl_core '
+            f'-l{omp_rt} -lpthread -lm -ldl')
+
+
+def get_mkl_mpi_link_line(flavor: Dict) -> str:
+    """Canonical ScaLAPACK-enabled MKL link line.
+
+    Per the stack's ScaLAPACK policy (see math_common.get_math_link_line),
+    we do NOT use libmkl_scalapack/libmkl_blacs on MKL flavors. Instead we
+    prefix the stack's own -lscalapack (built against MKL BLAS/LAPACK) to
+    the serial MKL line. This keeps the link line identical regardless of
+    whether the host's MKL ships ScaLAPACK or which BLACS variant it has.
+    """
+    return ('-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib -lscalapack '
+            + get_mkl_serial_link_line(flavor))
+
+
 def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
     """Generate math library link line based on flavor and recipe settings"""
     # Get flavor settings
@@ -21,25 +71,31 @@ def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
 
     # Determine if we need parallel math libs
     parallel = (math_type == 'parallel') or (use_mpi and math_type)
+    # Strict parallel: needs actual ScaLAPACK symbols, not just per-rank
+    # BLAS. 'mpi:true + math:serial' packages do not call ScaLAPACK.
+    needs_scalapack = (math_type == 'parallel')
 
     args = []
 
     if linalg == 'mkl':
-        # MKL base path and rpath
-        args.append('-Wl,-rpath,%{mklroot}/lib -L%{mklroot}/lib')
+        # MKL base path and rpath. oneAPI 2024+ installs into MKLROOT/lib
+        # directly; older oneAPI (and some offline installers) use the
+        # legacy MKLROOT/lib/intel64 layout. List both so the linker's
+        # -L search covers either, and bake both into rpath so runtime
+        # resolution matches. This mirrors build_common.py's
+        # cmake_library_path, keeping the two sources consistent.
+        args.append(
+            '-Wl,-rpath,%{mklroot}/lib/intel64 -Wl,-rpath,%{mklroot}/lib '
+            '-L%{mklroot}/lib/intel64 -L%{mklroot}/lib'
+        )
 
-        # ScaLAPACK if parallel
-        if parallel:
-            if interface == 'lp64':
-                args.append('-lmkl_scalapack_lp64')
-            else:
-                args.append('-lmkl_scalapack_ilp64')
+        # ScaLAPACK (our build) goes first so it resolves against MKL
+        # BLAS/LAPACK that follows. See get_mkl_mpi_link_line for rationale.
+        if needs_scalapack:
+            args.append('-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib -lscalapack')
 
-        # Interface layer
-        if interface == 'lp64':
-            args.append('-lmkl_intel_lp64')
-        else:
-            args.append('-lmkl_intel_ilp64')
+        # Interface library (compiler-specific: mkl_gf for GCC, mkl_intel for ICX)
+        args.append(f'-l{get_mkl_interface_lib(flavor)}')
 
         # Threading layer
         if use_omp:
@@ -53,13 +109,6 @@ def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
         # Core library
         args.append('-lmkl_core')
 
-        # BLACS for parallel
-        if parallel:
-            if interface == 'lp64':
-                args.append('-lmkl_blacs_openmpi_lp64')
-            else:
-                args.append('-lmkl_blacs_openmpi_ilp64')
-
         # OpenMP runtime
         if use_omp:
             if compiler == 'gcc' or (compiler == 'clang' and omp_threading == 'openmp'):
@@ -72,7 +121,7 @@ def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
 
     elif linalg == 'accelerate':
         # ScaLAPACK if parallel (must be built against Accelerate)
-        if parallel:
+        if needs_scalapack:
             args.append('-lscalapack')
 
         # Apple Accelerate framework
@@ -86,9 +135,33 @@ def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
         # System libraries
         args.append('-lpthread -lm')
 
+    elif linalg == 'openblas':
+        # OpenBLAS provides BLAS+LAPACK via compat symlinks
+        args.append('-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib')
+
+        if needs_scalapack:
+            args.append('-lscalapack')
+
+        args.append('-lopenblas')
+
+        # OpenMP runtime
+        if use_omp:
+            if compiler == 'gcc':
+                args.append('-lgomp')
+            elif compiler in ['icx', 'icpx', 'icc']:
+                args.append('-liomp5')
+            elif compiler == 'clang':
+                if flavor.get('platform') == 'macos':
+                    args.append('-lgomp')
+                else:
+                    args.append('-lomp')
+
+        # System libraries
+        args.append('-lpthread -lm -ldl')
+
     elif linalg in ['reference', 'lapack', None]:  # Handle all reference implementations
         # ScaLAPACK if parallel
-        if parallel:
+        if needs_scalapack:
             args.append('-lscalapack')
 
         # LAPACK and BLAS

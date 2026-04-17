@@ -9,7 +9,7 @@ source:
   url: http://ftp.gnu.org/gnu/libtool/libtool-%{version}.tar.xz
 
 # Only build for these flavors
-flavors:
+include_flavors:
   - macos
 
 requires:

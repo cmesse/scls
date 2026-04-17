@@ -9,7 +9,7 @@ source:
   url: https://ftp.gnu.org/pub/gnu/sed/sed-%{version}.tar.xz
 
 # Only build for these flavors
-flavors:
+include_flavors:
   - macos
 
 requires:

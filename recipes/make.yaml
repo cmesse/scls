@@ -9,7 +9,7 @@ source:
   url: https://ftp.gnu.org/gnu/make/make-%{version}.tar.gz
 
 # Only build for these flavors
-flavors:
+include_flavors:
   - macos
 
 requires:

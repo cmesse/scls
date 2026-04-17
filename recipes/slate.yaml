@@ -17,7 +17,6 @@ requires:
     - blaspp
     - lapackpp
     - testsweeper
-    - scalapack
 
 features:
   fortran: true
@@ -37,19 +36,25 @@ configure:
   flavor_args:
     gcc:
       - "-Dgpu_backend=none"
-      - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so;%{prefix}/lib/liblapack.so;%{prefix}/lib/libopenblas.so"
+      - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so;%{prefix}/lib/libopenblas.so"
     macos:
       - "-Dgpu_backend=none"
-      - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.dylib;%{prefix}/lib/liblapack.dylib;%{prefix}/lib/libopenblas.dylib"
+      - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.dylib;%{prefix}/lib/libopenblas.dylib"
     debug:
       - "-Dgpu_backend=none"
       - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so;%{prefix}/lib/liblapack.so;%{prefix}/lib/libblas.so"
     mkl:
       - "-Dgpu_backend=none"
-      # MKL provides ScaLAPACK via linker flags
+      # ScaLAPACK: stack-owned build, layered on serial MKL BLAS/LAPACK.
+      # Use %{mkl_linker_flags} (serial) not %{math_ldflags} so the line
+      # does not carry a second -lscalapack from the parallel math expansion.
+      - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so;%{mkl_linker_flags}"
+    intel:
+      - "-Dgpu_backend=none"
+      - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so;%{mkl_linker_flags}"
     cuda:
       - "-Dgpu_backend=cuda"
-    # MKL provides ScaLAPACK via linker flags
+      - "-DSCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack.so;%{mkl_linker_flags}"
   optimization:
     O_level: 3
 

@@ -1,0 +1,3 @@
+%{prefix}/include/ensmallen.hpp
+%{prefix}/include/ensmallen_bits
+%{prefix}/lib/cmake/ensmallen

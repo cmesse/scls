@@ -14,7 +14,7 @@ update:
   pattern: 'pkg-config-(\d+\.\d+\.\d+)\.tar\.gz'
 
 # Only build for these flavors
-flavors:
+include_flavors:
   - macos
 
 requires:

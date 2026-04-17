@@ -44,12 +44,6 @@ requires:
   lbl: []  # uses system hwloc
   macos:
     - hwloc
-    - openblas
-    - scalapack
-  debug:
-    - blas
-    - lapack
-    - scalapack
 
 features:
   fortran: true
@@ -177,8 +171,9 @@ configure:
       - "--with-cuda=0"
       - "--with-blaslapack-include=%{mklroot}/include"
       - "--with-blaslapack-lib=%{mkl_linker_flags}"
-      - "--with-scalapack-include=%{mklroot}/include"
-      - "--with-scalapack-lib=%{mkl_mpi_linker_flags}"
+      # ScaLAPACK: stack-owned build, not MKL's (see math_common policy)
+      - "--with-scalapack-include=%{prefix}/include"
+      - "--with-scalapack-lib=%{prefix}/lib/libscalapack%{libext}"
       - "--with-mpi-include=%{prefix}/include"
       - "--with-mpi-lib=%{prefix}/lib/libmpi%{libext}"
       - "--with-mpiexec=%{prefix}/bin/mpiexec"
@@ -192,8 +187,9 @@ configure:
       - "--with-cuda=0"
       - "--with-blaslapack-include=%{mklroot}/include"
       - "--with-blaslapack-lib=%{mkl_linker_flags}"
-      - "--with-scalapack-include=%{mklroot}/include"
-      - "--with-scalapack-lib=%{mkl_mpi_linker_flags}"
+      # ScaLAPACK: stack-owned build, not MKL's (see math_common policy)
+      - "--with-scalapack-include=%{prefix}/include"
+      - "--with-scalapack-lib=%{prefix}/lib/libscalapack%{libext}"
       - "--with-mpi-include=%{prefix}/include"
       - "--with-mpi-lib=%{prefix}/lib/libmpi%{libext}"
       - "--with-mpiexec=%{prefix}/bin/mpiexec"
@@ -211,8 +207,9 @@ configure:
       - "--with-cuda-dir=%{cuda}"
       - "--with-blaslapack-include=%{mklroot}/include"
       - "--with-blaslapack-lib=%{mkl_linker_flags}"
-      - "--with-scalapack-include=%{mklroot}/include"
-      - "--with-scalapack-lib=%{mkl_mpi_linker_flags}"
+      # ScaLAPACK: stack-owned build, not MKL's (see math_common policy)
+      - "--with-scalapack-include=%{prefix}/include"
+      - "--with-scalapack-lib=%{prefix}/lib/libscalapack%{libext}"
       - "--with-mpi-include=%{prefix}/include"
       - "--with-mpi-lib=%{prefix}/lib/libmpi%{libext}"
       - "--with-mpiexec=%{prefix}/bin/mpiexec"

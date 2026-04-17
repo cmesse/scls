@@ -1,0 +1,46 @@
+name: cereal
+version: 1.3.2
+summary: A C++11 library for serialization
+homepage: https://uscilab.github.io/cereal/
+license: BSD-3-Clause
+
+# Niche; not part of the default distributions. Build via extra_packages in flavor.conf.
+include_flavors: []
+
+source:
+  url: https://github.com/USCiLab/cereal/archive/refs/tags/v%{version}.tar.gz
+
+update:
+  strategy: github_tag
+  repo: USCiLab/cereal
+  tag_prefix: "v"
+
+requires:
+  all:
+    - cmake
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: none
+
+configure:
+  type: cmake
+  args:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    # Header-only install: skip tests/sandbox/perf (which pull in Boost)
+    - "-DJUST_INSTALL_CEREAL=ON"
+    - "-DBUILD_TESTS=OFF"
+    - "-DBUILD_SANDBOX=OFF"
+    - "-DSKIP_PERFORMANCE_COMPARISON=ON"
+    - "-DSKIP_PORTABILITY_TEST=ON"
+  optimization:
+    O_level: 2
+
+build:
+  parallel: true
+
+registry:
+  cflags: "-I%{prefix}/include"

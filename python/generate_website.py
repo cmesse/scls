@@ -36,7 +36,7 @@ def load_all_recipes(recipes_dir):
                 'summary': recipe.get('summary', recipe.get('description', '')),
                 'homepage': recipe.get('homepage', ''),
                 'license': recipe.get('license', ''),
-                'flavors': recipe.get('flavors', []),  # Empty = all flavors
+                'include_flavors': recipe.get('include_flavors'),  # None = all flavors
                 'exclude_flavors': recipe.get('exclude_flavors', []),
                 'features': recipe.get('features', {})
             }
@@ -73,7 +73,7 @@ def load_all_flavors(flavors_dir, exclude_dev=True):
             print(f"Warning: Failed to load {yaml_file}: {e}")
 
     # Sort flavors in a logical order
-    flavor_order = ['gcc', 'debug', 'lbl', 'gcc-mkl', 'intel-mkl', 'gcc-mkl-cuda']
+    flavor_order = ['gcc', 'debug', 'lbl', 'mkl', 'intel', 'gcc-mkl-cuda']
     flavors.sort(key=lambda x: flavor_order.index(x['name']) if x['name'] in flavor_order else 999)
 
     return flavors
@@ -81,9 +81,11 @@ def load_all_flavors(flavors_dir, exclude_dev=True):
 
 def get_flavor_match_names(flavor_name):
     """Return list of names to match against for a flavor.
-    E.g., 'gcc-mkl-cuda' returns ['gcc-mkl-cuda', 'gcc', 'mkl', 'cuda']."""
+    Rightmost hyphen components win (most specific first), matching
+    build_common.get_flavor_names(). E.g., 'gcc-mkl-cuda' returns
+    ['gcc-mkl-cuda', 'cuda', 'mkl', 'gcc']."""
     names = [flavor_name]
-    for part in flavor_name.split('-'):
+    for part in reversed(flavor_name.split('-')):
         if part and part not in names:
             names.append(part)
     return names
@@ -96,11 +98,11 @@ def package_available_for_flavor(package, flavor_name):
     exclude = package.get('exclude_flavors', [])
     if any(n in exclude for n in names):
         return False
-    # If no flavors specified, available for all
-    if not package['flavors']:
+    # If no include_flavors specified, available for all
+    if package['include_flavors'] is None:
         return True
-    # Otherwise check if any name matches
-    return any(n in package['flavors'] for n in names)
+    # Otherwise check if any name matches (empty list = no flavor matches)
+    return any(n in package['include_flavors'] for n in names)
 
 
 def generate_flavor_descriptions(flavors):

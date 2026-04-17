@@ -16,12 +16,6 @@ requires:
     - cmake
     - blaspp
     - testsweeper
-  gcc:
-    - openblas
-  macos:
-    - openblas
-  debug:
-    - lapack
 
 features:
   fortran: false
@@ -71,18 +65,18 @@ configure:
   # LP64/ILP64 MKL library selection (interface inherited from blaspp)
   lp64_flavor_args:
     mkl:
-      - '-DBLAS_LIBRARIES=-lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
-      - '-DLAPACK_LIBRARIES=-lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+      - '-DBLAS_LIBRARIES=%{mkl_linker_flags}'
+      - '-DLAPACK_LIBRARIES=%{mkl_linker_flags}'
     cuda:
-      - '-DBLAS_LIBRARIES=-lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
-      - '-DLAPACK_LIBRARIES=-lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+      - '-DBLAS_LIBRARIES=%{mkl_linker_flags}'
+      - '-DLAPACK_LIBRARIES=%{mkl_linker_flags}'
   ilp64_flavor_args:
     mkl:
-      - '-DBLAS_LIBRARIES=-lmkl_gf_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
-      - '-DLAPACK_LIBRARIES=-lmkl_gf_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+      - '-DBLAS_LIBRARIES=%{mkl_linker_flags}'
+      - '-DLAPACK_LIBRARIES=%{mkl_linker_flags}'
     cuda:
-      - '-DBLAS_LIBRARIES=-lmkl_gf_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
-      - '-DLAPACK_LIBRARIES=-lmkl_gf_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
+      - '-DBLAS_LIBRARIES=%{mkl_linker_flags}'
+      - '-DLAPACK_LIBRARIES=%{mkl_linker_flags}'
   optimization:
     O_level: 3
 

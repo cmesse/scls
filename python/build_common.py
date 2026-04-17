@@ -200,8 +200,13 @@ def get_flavor_names(flavor) -> list:
     names = [name]
     if inherits:
         names.append(inherits)
-    # Add hyphen-separated components as fallbacks
-    for part in name.split('-'):
+    # Add hyphen-separated components as fallbacks, rightmost first.
+    # The rightmost component is the most specific modifier
+    # (e.g. in 'gcc-mkl-cuda' the math/accelerator modifiers 'cuda' and
+    # 'mkl' must take precedence over the compiler base 'gcc' so that
+    # recipes defining flavor_args for both 'gcc:' and 'mkl:'/'cuda:'
+    # apply the specialized block, not the generic one).
+    for part in reversed(name.split('-')):
         if part and part not in names:
             names.append(part)
     return names
@@ -463,9 +468,10 @@ def run_command(cmd: List[str], cwd: Path, env: Dict[str, str], phase: str) -> N
 def should_build_package(recipe: Dict, flavor: Dict) -> bool:
     """
     Check if a package should be built for a given flavor.
-    If no 'flavors' list in recipe, build for all flavors.
-    If 'flavors' list exists, only build if flavor is in the list.
-    'exclude_flavors' takes precedence over 'flavors'.
+    If no 'include_flavors' list in recipe, build for all flavors.
+    If 'include_flavors' list exists, only build if flavor is in the list
+    (an empty list means never build by default).
+    'exclude_flavors' takes precedence over 'include_flavors'.
     """
     names = get_flavor_names(flavor)
 
@@ -475,13 +481,13 @@ def should_build_package(recipe: Dict, flavor: Dict) -> bool:
             if name in recipe['exclude_flavors']:
                 return False
 
-    # No flavors specified = build for all
-    if 'flavors' not in recipe:
+    # No include_flavors specified = build for all
+    if 'include_flavors' not in recipe:
         return True
 
     # Check if current flavor or its parent is in the allowed list
     for name in names:
-        if name in recipe['flavors']:
+        if name in recipe['include_flavors']:
             return True
     return False
 
@@ -603,13 +609,11 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
         # cmake appends at the END of every link command (after target libs).
         # Putting them in CMAKE_EXE_LINKER_FLAGS doesn't work because cmake
         # 4.x strips -l flags from there (they're not "flags").
-        interface = flavor.get('math', {}).get('interface', 'lp64')
-        mkl_iface_lib = 'mkl_gf_ilp64' if interface == 'ilp64' else 'mkl_gf_lp64'
-        std_libs = (
-            f"-lmkl_intel_lp64 -l{mkl_iface_lib}"
-            f" -lmkl_gnu_thread -lmkl_core"
-            f" -lgomp -lpthread -ldl -lm"
-        )
+        # Single interface library, selected by Fortran ABI — see
+        # math_common.get_mkl_interface_lib for the rule. Mixing
+        # mkl_intel_* and mkl_gf_* in one link line is incorrect.
+        from math_common import get_mkl_serial_link_line
+        std_libs = get_mkl_serial_link_line(flavor)
         extra_link_dirs = (
             f" -L{mkl_root}/lib/intel64"
             f" -Wl,-rpath,{mkl_root}/lib/intel64"
@@ -1491,14 +1495,14 @@ def get_subpackages_for_flavor(recipe: Dict, flavor_name: str) -> List[Dict]:
         # List format: [{'name': 'foo', 'summary': '...'}, ...]
         for subpkg_config in recipe_subpackages:
             subpkg_name = subpkg_config.get('name', '')
-            allowed_flavors = subpkg_config.get('flavors', None)
+            allowed_flavors = subpkg_config.get('include_flavors', None)
 
             if allowed_flavors is None or any(n in allowed_flavors for n in (get_flavor_names(flavor_name))):
                 subpackages.append(subpkg_config)
     else:
         # Dictionary format: {'foo': {'summary': '...'}, ...}
         for subpkg_name, subpkg_config in recipe_subpackages.items():
-            allowed_flavors = subpkg_config.get('flavors', None)
+            allowed_flavors = subpkg_config.get('include_flavors', None)
 
             if allowed_flavors is None:
                 subpackages.append({

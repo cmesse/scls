@@ -6,7 +6,7 @@ license: GPLv3+
 bootstrap: true  # Build with system compiler before scls gcc is available
 
 # Only build for these flavors
-flavors:
+include_flavors:
   - macos
 
 source:

@@ -19,9 +19,9 @@ requires:
 
 features:
   fortran: true
-  mpi: false
+  mpi: true
   openmp: false
-  math: sequential
+  math: serial
 
 configure:
   type: cmake
@@ -39,6 +39,33 @@ configure:
     - "-DINTERFACE64=OFF"
   ilp64_args:
     - "-DINTERFACE64=ON"
+  flavor_args:
+    gcc:
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.so"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/libopenblas.so"
+    lbl:
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.so"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/libopenblas.so"
+    macos:
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/libopenblas.dylib"
+    debug:
+      - "-DBLAS_LIBRARIES=%{prefix}/lib/libblas.so"
+      - "-DLAPACK_LIBRARIES=%{prefix}/lib/liblapack.so"
+    # MKL-class flavors: build reference ScaLAPACK on top of MKL BLAS/LAPACK.
+    # We deliberately do NOT use libmkl_scalapack/libmkl_blacs because
+    # (a) some Intel oneAPI installs omit them, and (b) the BLACS variant
+    # is MPI-ABI-specific (openmpi vs intelmpi). Building our own gives a
+    # deterministic ScaLAPACK with MKL as the serial backend.
+    mkl:
+      - "-DBLAS_LIBRARIES=%{math_ldflags}"
+      - "-DLAPACK_LIBRARIES=%{math_ldflags}"
+    intel:
+      - "-DBLAS_LIBRARIES=%{math_ldflags}"
+      - "-DLAPACK_LIBRARIES=%{math_ldflags}"
+    cuda:
+      - "-DBLAS_LIBRARIES=%{math_ldflags}"
+      - "-DLAPACK_LIBRARIES=%{math_ldflags}"
   optimization:
     O_level: 2
     strict_aliasing: true

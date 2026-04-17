@@ -14,7 +14,7 @@ update:
   current: "100"
 
 # Only build for these flavors
-flavors:
+include_flavors:
   - macos
 
 # Platform-specific source and version

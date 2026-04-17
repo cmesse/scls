@@ -12,16 +12,6 @@ requires:
     - cmake
     - arpack-ng
     - openmpi
-  gcc:
-    - openblas
-    - scalapack
-  macos:
-    - openblas
-    - scalapack
-  debug:
-    - blas
-    - lapack
-    - scalapack
 
 features:
   fortran: true
@@ -60,9 +50,20 @@ configure:
       - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack%{libext}"
       - "-DTPL_ARPACK_LIBRARIES=%{prefix}/lib/libparpack%{libext};%{prefix}/lib/libarpack%{libext}"
     mkl:
-      - "-DTPL_BLAS_LIBRARIES=%{math_ldflags}"
-      - "-DTPL_LAPACK_LIBRARIES=%{math_ldflags}"
-      - "-DTPL_SCALAPACK_LIBRARIES=%{math_ldflags}"
+      # Serial MKL for BLAS/LAPACK; stack-owned ScaLAPACK for the parallel slot.
+      - "-DTPL_BLAS_LIBRARIES=%{mkl_linker_flags}"
+      - "-DTPL_LAPACK_LIBRARIES=%{mkl_linker_flags}"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack%{libext}"
+      - "-DTPL_ARPACK_LIBRARIES=%{prefix}/lib/libparpack%{libext};%{prefix}/lib/libarpack%{libext}"
+    intel:
+      - "-DTPL_BLAS_LIBRARIES=%{mkl_linker_flags}"
+      - "-DTPL_LAPACK_LIBRARIES=%{mkl_linker_flags}"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack%{libext}"
+      - "-DTPL_ARPACK_LIBRARIES=%{prefix}/lib/libparpack%{libext};%{prefix}/lib/libarpack%{libext}"
+    cuda:
+      - "-DTPL_BLAS_LIBRARIES=%{mkl_linker_flags}"
+      - "-DTPL_LAPACK_LIBRARIES=%{mkl_linker_flags}"
+      - "-DTPL_SCALAPACK_LIBRARIES=%{prefix}/lib/libscalapack%{libext}"
       - "-DTPL_ARPACK_LIBRARIES=%{prefix}/lib/libparpack%{libext};%{prefix}/lib/libarpack%{libext}"
   optimization:
     O_level: 2

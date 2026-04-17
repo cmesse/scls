@@ -42,7 +42,8 @@ from patch_common import (
     process_env_operations
 )
 
-from math_common import ( get_math_link_line, get_math_compile_flags )
+from math_common import ( get_math_link_line, get_math_compile_flags,
+                          get_mkl_serial_link_line, get_mkl_mpi_link_line )
 
 class UnixBuilder:
     def __init__(self, package: str, flavor: str = "macos"):
@@ -425,17 +426,11 @@ class UnixBuilder:
         cuda_archs = self.flavor.get('nvidia', {}).get('architectures', '')
         cmd = [s.replace('%{cuda}', cuda_path) for s in cmd]
         cmd = [s.replace('%{cuda_architectures}', cuda_archs) for s in cmd]
-        # MKL paths and linker flags
+        # MKL paths and linker flags (canonical definitions in math_common)
         mklroot = self.flavor.get('math', {}).get('mklroot', '/opt/intel/oneapi/mkl/latest')
         cmd = [s.replace('%{mklroot}', mklroot) for s in cmd]
-        # MKL linker flags (simplified - actual flags come from math_common)
-        interface = self.flavor.get('math', {}).get('interface', 'lp64')
-        if interface == 'ilp64':
-            mkl_lp = 'ilp64'
-        else:
-            mkl_lp = 'lp64'
-        mkl_linker = f'-lmkl_intel_{mkl_lp} -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
-        mkl_mpi_linker = f'-lmkl_scalapack_{mkl_lp} -lmkl_intel_{mkl_lp} -lmkl_gnu_thread -lmkl_core -lmkl_blacs_intelmpi_{mkl_lp} -lgomp -lpthread -lm -ldl'
+        mkl_linker = get_mkl_serial_link_line(self.flavor)
+        mkl_mpi_linker = get_mkl_mpi_link_line(self.flavor).replace('%{prefix}', str(self.prefix))
         cmd = [s.replace('%{mkl_linker_flags}', mkl_linker) for s in cmd]
         cmd = [s.replace('%{mkl_mpi_linker_flags}', mkl_mpi_linker) for s in cmd]
         # Platform (linux or macos)
@@ -1410,14 +1405,9 @@ class UnixBuilder:
         math_linalg = math_config.get('linalg', 'reference')
         if math_linalg == 'mkl':
             context['math_provider'] = 'mkl'
-            # Use correct LP64/ILP64 MKL library names
-            interface = context['interface']
-            if interface == 'ilp64':
-                mkl_interface = 'ilp64'
-            else:
-                mkl_interface = 'lp64'
-            context['mkl_linker_flags'] = f'-lmkl_intel_{mkl_interface} -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl'
-            context['mkl_mpi_linker_flags'] = f'-lmkl_scalapack_{mkl_interface} -lmkl_intel_{mkl_interface} -lmkl_gnu_thread -lmkl_core -lmkl_blacs_openmpi_{mkl_interface} -lgomp -lpthread -lm -ldl'
+            context['mkl_linker_flags'] = get_mkl_serial_link_line(self.flavor)
+            mkl_mpi = get_mkl_mpi_link_line(self.flavor)
+            context['mkl_mpi_linker_flags'] = mkl_mpi.replace('%{prefix}', str(self.prefix))
         else:
             context['math_provider'] = 'lapack'
             context['mkl_linker_flags'] = ''

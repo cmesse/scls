@@ -1,0 +1,30 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 8c6ca65..9227ba2 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -201,6 +201,12 @@ option(OPENBLAS_PROVIDES_LAPACK "Assume that OpenBLAS provides LAPACK functions"
+ ## Example use on the command line:
+ ## cmake -D OPENBLAS_PROVIDES_LAPACK=true .
+ 
++option(ALLOW_MKL_LINUX "Allow detection of Intel MKL on Linux" ON)
++# set(ALLOW_MKL_LINUX false)
++## uncomment the above line to disable the detection of MKL;
++## you can also disable MKL detection directly on the command line:
++## cmake -D ALLOW_MKL_LINUX=false .
++
+ option(ALLOW_FLEXIBLAS_LINUX "Allow detection of FlexiBLAS on Linux" ON)
+ # set(ALLOW_FLEXIBLAS_LINUX false)
+ ## uncomment the above line to disable the detection of FlexiBLAS;
+@@ -344,7 +350,11 @@ else()
+     set(FlexiBLAS_FOUND false)
+   endif()
+   
+-  include(ARMA_FindMKL)
++  if(ALLOW_MKL_LINUX)
++    include(ARMA_FindMKL)
++  else()
++    set(MKL_FOUND false)
++  endif()
+   include(ARMA_FindOpenBLAS)
+   include(ARMA_FindATLAS)     # TODO: remove support for ATLAS in next major version
+   include(ARMA_FindBLAS)

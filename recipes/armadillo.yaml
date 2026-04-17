@@ -7,6 +7,10 @@ license: Apache-2.0
 source:
   url: http://sourceforge.net/projects/arma/files/armadillo-%{version}.tar.xz
 
+patches:
+  all:
+    - armadillo-add-allow-mkl-option.patch
+
 update:
   strategy: html_regex
   url: https://arma.sourceforge.net/download.html
@@ -47,26 +51,66 @@ configure:
       - "-DBLAS_LIBRARY=%{prefix}/lib/libopenblas.dylib"
       - "-DLAPACK_LIBRARY=%{prefix}/lib/liblapack.dylib"
     debug:
+      - "-DALLOW_MKL_LINUX=OFF"
+      - "-DCMAKE_DISABLE_FIND_PACKAGE_MKL=TRUE"
       - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
       - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
       - "-DBLAS_LIBRARY=%{prefix}/lib/libblas.so"
       - "-DLAPACK_LIBRARY=%{prefix}/lib/liblapack.so"
+    gcc:
+      - "-DALLOW_MKL_LINUX=OFF"
+      # Pin to OpenBLAS and block find_package(MKL) so host-installed MKL
+      # doesn't get linked into libarmadillo.so
+      - "-DCMAKE_DISABLE_FIND_PACKAGE_MKL=TRUE"
+      - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
+      - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
+      - "-DBLAS_LIBRARY=%{prefix}/lib/libopenblas.so"
+      - "-DLAPACK_LIBRARY=%{prefix}/lib/libopenblas.so"
+    lbl:
+      - "-DALLOW_MKL_LINUX=OFF"
+      - "-DCMAKE_DISABLE_FIND_PACKAGE_MKL=TRUE"
+      - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
+      - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
+      - "-DBLAS_LIBRARY=%{prefix}/lib/libopenblas.so"
+      - "-DLAPACK_LIBRARY=%{prefix}/lib/libopenblas.so"
 
     mkl:
       - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
       - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
-      # MKL provides BLAS/LAPACK via environment
+      # Pin BLAS discovery to MKL so a host-installed OpenBLAS cannot
+      # sneak in via CMake's FindBLAS search order.
+      - "-DBLA_VENDOR=Intel10_64lp"
+      - "-DALLOW_MKL_LINUX=ON"
+    intel:
+      - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
+      - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
+      - "-DBLA_VENDOR=Intel10_64lp"
+      - "-DALLOW_MKL_LINUX=ON"
     cuda:
       - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
       - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
-      # MKL provides BLAS/LAPACK via environment
+      - "-DBLA_VENDOR=Intel10_64lp"
+      - "-DALLOW_MKL_LINUX=ON"
 
 build:
   parallel: true
 
 test:
   commands:
-    - "cd build && ctest --output-on-failure"
+    - |
+      cd build/tests1
+      case "$(uname -m)" in
+        x86_64) LOADER=/lib64/ld-linux-x86-64.so.2 ;;
+        aarch64)
+          LOADER=/lib/ld-linux-aarch64.so.1
+          [ -e "$LOADER" ] || LOADER=/lib64/ld-linux-aarch64.so.1
+          ;;
+        *)
+          echo "Unsupported architecture for Armadillo smoke test: $(uname -m)" >&2
+          exit 1
+          ;;
+      esac
+      "$LOADER" --library-path "$PWD/..:%{prefix}/lib" ./smoke_test
 
 registry:
   cflags: "-I%{prefix}/include"
