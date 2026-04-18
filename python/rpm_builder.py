@@ -162,6 +162,61 @@ def load_changelog(package_name: str, changelogs_dir: Path = Path("changelogs"))
     return ""
 
 
+def _partition_rpms_for_install(rpm_files):
+    """Split RPM files into (to_install, to_reinstall).
+
+    An RPM goes to `to_reinstall` only when its exact NVRA is already
+    installed — otherwise a plain `dnf install` will upgrade/downgrade as
+    needed. This lets `scls install` pick up rebuilds of the same version
+    instead of hitting the usual 'nothing to do' no-op.
+    """
+    to_install = []
+    to_reinstall = []
+    for rpm in rpm_files:
+        rpm = Path(rpm)
+        qp = subprocess.run(
+            ['rpm', '-qp', '--queryformat',
+             '%{NAME}\t%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}',
+             str(rpm)],
+            capture_output=True, text=True
+        )
+        if qp.returncode != 0 or '\t' not in qp.stdout:
+            to_install.append(rpm)
+            continue
+        name, nvra = qp.stdout.strip().split('\t', 1)
+        q = subprocess.run(
+            ['rpm', '-q', '--queryformat',
+             '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}', name],
+            capture_output=True, text=True
+        )
+        if q.returncode == 0 and q.stdout.strip() == nvra:
+            to_reinstall.append(rpm)
+        else:
+            to_install.append(rpm)
+    return to_install, to_reinstall
+
+
+def _dnf_install_rpms(rpm_files):
+    """Install or reinstall the given RPM files via dnf.
+
+    RPMs whose exact NVRA is already installed are passed to
+    `dnf reinstall`; the rest go to `dnf install`.
+    """
+    to_install, to_reinstall = _partition_rpms_for_install(rpm_files)
+    if to_reinstall:
+        cmd = ['sudo', 'dnf', 'reinstall', '-y'] + [str(r) for r in to_reinstall]
+        result = subprocess.run(cmd)
+        if result.returncode != 0:
+            raise BuildError(
+                f"RPM reinstallation failed with return code {result.returncode}")
+    if to_install:
+        cmd = ['sudo', 'dnf', 'install', '-y'] + [str(r) for r in to_install]
+        result = subprocess.run(cmd)
+        if result.returncode != 0:
+            raise BuildError(
+                f"RPM installation failed with return code {result.returncode}")
+
+
 class RPMBuilder:
     def __init__(self, package: str, flavor: str):
         self.package = package
@@ -1909,10 +1964,7 @@ fi
         for rpm in rpm_files:
             print(f"  {rpm}")
 
-        cmd = ['sudo', 'dnf', 'install', '-y'] + [str(r) for r in rpm_files]
-        result = subprocess.run(cmd)
-        if result.returncode != 0:
-            raise BuildError(f"RPM installation failed with return code {result.returncode}")
+        _dnf_install_rpms(rpm_files)
 
     def get_library_symlink_fixes(self) -> List[str]:
         """Get shell commands to fix library symlinks in RPM %post section"""
@@ -2316,10 +2368,7 @@ def main():
                 )
                 if not rpm_files:
                     raise BuildError(f"No built RPMs found for {scls_name}")
-                cmd = ['sudo', 'dnf', 'install', '-y'] + [str(r) for r in rpm_files]
-                result = subprocess.run(cmd)
-                if result.returncode != 0:
-                    raise BuildError(f"RPM installation failed with return code {result.returncode}")
+                _dnf_install_rpms(rpm_files)
             else:
                 build_flavor_meta_package(args.flavor, spec_only=args.spec_only)
             return

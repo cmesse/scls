@@ -7,6 +7,14 @@ license: BSD-3-Clause
 source:
   url: https://github.com/LLNL/sundials/releases/download/v%{version}/sundials-%{version}.tar.gz
 
+patches:
+  all:
+    - sundials-use-system-gtest.patch
+    # PETSc 3.25 changed the SNESMonitorSet destroy-callback signature from
+    # void**-taking to void*-taking (PetscCtxDestroyFn). Fix the outdated cast
+    # in the cv_petsc_ex7 example so it compiles against current PETSc.
+    - sundials-petsc-3.25-snesmonitorset.patch
+
 requires:
   all:
     - cmake
