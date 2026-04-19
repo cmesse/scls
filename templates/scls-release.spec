@@ -22,3 +22,7 @@ install -Dpm 644 %{SOURCE1} %{buildroot}/etc/pki/rpm-gpg/RPM-GPG-KEY-SCLS
 %files
 /etc/yum.repos.d/scls.repo
 /etc/pki/rpm-gpg/RPM-GPG-KEY-SCLS
+
+%changelog
+* Sat Apr 18 2026 Christian Messe <christian.messe@gmail.com> - 2026-1
+- Initial scls-release package: ships scls.repo and RPM-GPG-KEY-SCLS.
