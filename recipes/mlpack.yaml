@@ -13,6 +13,7 @@ source:
 update:
   strategy: github_tag
   repo: mlpack/mlpack
+  tag_prefix: ""  # upstream tags are bare N.N.N, no "v" prefix
 
 requires:
   all:
