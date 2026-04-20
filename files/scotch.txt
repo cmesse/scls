@@ -107,4 +107,5 @@
 %{prefix}/share/man/man1/mcv.1
 %{prefix}/share/man/man1/mmk_m2.1
 %{prefix}/share/man/man1/mord.1
+%{prefix}/share/licenses/scotch/LICENSE
 %{prefix}/share/man/man1/mtst.1

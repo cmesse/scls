@@ -3,14 +3,25 @@ version: 6.3.0
 summary: GNU arbitrary precision library
 homepage: https://gmplib.org/
 license: LGPLv3+ or GPLv2+
-# Note: GMP is built in-tree during GCC compilation, then rebuilt standalone with GCC
+# LGPL-3 / GPL-2 — not redistributed as an SCLS package on mainline Linux
+# flavors. petsc links against the system gmp-devel there, and GCC consumes
+# gmp via its `extra_sources:` block (in-tree build). Built in-stack only
+# on `macos` (no reliable system gmp-devel) and `lbl` (LBL HPC target that
+# maintains its own full toolchain).
 
 source:
   url: https://ftp.gnu.org/gnu/gmp/gmp-%{version}.tar.xz
 
+include_flavors:
+  - macos
+  - lbl
+
 requires:
+  # gmp is linked against libgcc_s; on every flavor where gmp is built
+  # (macos, lbl) the stack's GCC is available, so carry this in `all:`.
+  all:
+    - gcc
   macos:
-    - gcc  # Built after GCC so we can use GCC to compile
     - autoconf
     - automake
     - libtool

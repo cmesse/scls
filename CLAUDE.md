@@ -135,11 +135,17 @@ Flavors in `flavors/*.yaml` specify:
 - On macOS, `lib/` is used directly with no `lib64` split
 - All other packages install into `lib/` — the symlink handles the rest on Linux
 
+### Install hooks: `commands` vs `post`
+
+Two install hooks exist and they handle `%{buildroot}` / `%{prefix}` differently — a gotcha when adding install-time logic (e.g. shipping an upstream `LICENSE` into the RPM).
+
+- **`install.commands`** replaces the default install step. Write destinations as `%{buildroot}%{prefix}/…` explicitly. The RPM builder expands `%{prefix}` in place and leaves `%{buildroot}` alone; `unix_builder` handles `%{buildroot}` on its side. CWD is the source root.
+- **`install.post`** appends commands after the default install step. Write destinations as `%{prefix}/…` (no `%{buildroot}`) — the RPM builder's post-processor rewrites the literal prefix to `%{buildroot}%{prefix}` for you, so writing `%{buildroot}%{prefix}` yourself produces a double `%{buildroot}` in the generated spec. CWD depends on the configure type: for cmake out-of-source builds it's the `build/` subdirectory, so use `../` to reach source-root files (e.g. upstream `LICENSE_en.txt`).
+- `%{srcdir}` resolves to `$PWD` at spec-generation time. It's only safe in hooks where the shell's `$PWD` is the source root — e.g. `install.commands`, but *not* `install.post` for cmake recipes.
+
 ### Licensing
-- The project targets BSD-3 compatibility for distributed packages
-- GPL-3 licensed packages (binutils, make, sed, etc.) emit a build-time warning
-- GPL-3 libraries must NOT be distributed as part of the stack; local builds only
-- FFTW is excluded from the stack for this reason
+
+See [`LICENSE_POLICY.md`](LICENSE_POLICY.md) for the full package policy and rationale. Short version: distributed binary flavors avoid GPL-3 linkable libraries (FFTW is the canonical reason); GPL-3 build tools are fine when only executed during the build; GPL-2, LGPL, and CeCILL-C scientific libraries are allowed with source and notice compliance; GMP/MPFR/MPC use system `*-devel` packages on mainline Linux binary flavors and are built in-stack only on `lbl` and `macos`. Source RPMs and (on macOS) source-plus-binary DMGs are how SCLS satisfies the source-availability obligations.
 
 ### No Python / language bindings in the stack
 

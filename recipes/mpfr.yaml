@@ -3,10 +3,18 @@ version: 4.2.2
 summary: C library for multiple-precision floating-point computations
 homepage: https://www.mpfr.org/
 license: LGPL-3.0-or-later
-# Note: MPFR is built in-tree during GCC compilation, then rebuilt standalone with GCC
+# LGPL-3 — not redistributed as an SCLS package on mainline Linux flavors.
+# petsc links against the system mpfr-devel there, and GCC consumes mpfr
+# via its `extra_sources:` block (in-tree build). Built in-stack only on
+# `macos` (no reliable system mpfr-devel) and `lbl` (LBL HPC target that
+# maintains its own full toolchain).
 
 source:
   url: https://www.mpfr.org/mpfr-current/mpfr-%{version}.tar.xz
+
+include_flavors:
+  - macos
+  - lbl
 
 update:
   strategy: html_regex
@@ -15,6 +23,7 @@ update:
 
 requires:
   all:
+    - gcc  # libmpfr links libgcc_s; stack GCC is available on macos + lbl
     - gmp
   macos:
     - make

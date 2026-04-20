@@ -58,6 +58,16 @@ configure:
 build:
   parallel: true
 
+install:
+  post:
+    # Bundle CeCILL-C license text; upstream ships LICENSE_en.txt (English)
+    # and LICENSE_fr.txt (French) at the source root. install.post runs in
+    # the cmake build/ subdir (after `cd build && make install`), so the
+    # source-root license file is one level up. `%{prefix}` alone is correct
+    # here — the rpm_builder post-processor rewrites it to
+    # `%{buildroot}%{prefix}` automatically.
+    - "install -D -m 644 ../LICENSE_en.txt %{prefix}/share/licenses/scotch/LICENSE"
+
 test:
   commands:
     - "cd build && ctest --output-on-failure"

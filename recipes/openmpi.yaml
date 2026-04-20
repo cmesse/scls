@@ -26,10 +26,6 @@ flavor_overrides:
       url: https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-%{version}.tar.bz2
 
 requires:
-  all:
-    - gmp
-    - mpfr
-    - mpc
   gcc:
     - pmix
     - libevent

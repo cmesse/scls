@@ -2,7 +2,14 @@ name: suitesparse
 version: 7.12.2
 summary: A collection of sparse matrix libraries
 homepage: http://faculty.cse.tamu.edu/davis/suitesparse.html
-license: LGPL-2.1-or-later AND BSD-3-Clause AND GPL-2.0-or-later
+license: LGPL-2.1-or-later AND BSD-3-Clause AND GPL-2.0-or-later AND Apache-2.0
+# Module licenses in play (SuiteSparse 7.12):
+#   BSD-3-Clause: AMD, BTF, CAMD, CCOLAMD, COLAMD, SuiteSparse_config, LAGraph
+#   LGPL-2.1+:    CHOLMOD (core), CXSparse, KLU, LDL
+#   GPL-2.0+:     CHOLMOD (supernodal), ParU, RBio, SPEX, SPQR, UMFPACK
+#   Apache-2.0:   GraphBLAS
+# Mongoose (GPL-3.0+) is explicitly excluded via SUITESPARSE_ENABLE_PROJECTS
+# below — SCLS does not redistribute GPL-3 binaries.
 
 source:
   url: https://github.com/DrTimothyAldenDavis/SuiteSparse/archive/refs/tags/v%{version}.tar.gz
@@ -10,9 +17,45 @@ source:
 requires:
   all:
     - cmake
+    - metis
+
+# System gmp/mpfr on mainline Linux flavors.  SuiteSparse's SPEX component
+# needs these, but we do not redistribute SCLS-owned gmp/mpfr packages there.
+rpm_build_requires:
+  lbl: []
+  gcc:
+    - gmp-devel
+    - mpfr-devel
+  mkl:
+    - gmp-devel
+    - mpfr-devel
+  debug:
+    - gmp-devel
+    - mpfr-devel
+  intel:
+    - gmp-devel
+    - mpfr-devel
+  cuda:
+    - gmp-devel
+    - mpfr-devel
+
+rpm_requires:
+  lbl: []
+  gcc:
     - gmp
     - mpfr
-    - metis
+  mkl:
+    - gmp
+    - mpfr
+  debug:
+    - gmp
+    - mpfr
+  intel:
+    - gmp
+    - mpfr
+  cuda:
+    - gmp
+    - mpfr
 
 features:
   fortran: true
@@ -34,6 +77,9 @@ configure:
     - "-DBUILD_STATIC_LIBS=OFF"
     - "-DBLA_STATIC=OFF"
     - "-DBUILD_TESTING=ON"
+    # Explicit project allowlist: excludes Mongoose (GPL-3.0) and pins the
+    # shipped set so new upstream modules don't silently land in the RPM.
+    - '-DSUITESPARSE_ENABLE_PROJECTS=suitesparse_config;amd;btf;camd;ccolamd;cholmod;colamd;cxsparse;graphblas;klu;lagraph;ldl;paru;rbio;spex;spqr;umfpack'
   # LP64/ILP64 integer interface
   lp64_args:
     - "-DSUITESPARSE_USE_64BIT_BLAS=OFF"

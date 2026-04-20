@@ -13,3 +13,4 @@
 %{prefix}/lib/libmumps_common.so
 %{prefix}/lib/libpord.so
 %{prefix}/lib/libsmumps.so
+%{prefix}/share/licenses/mumps/LICENSE

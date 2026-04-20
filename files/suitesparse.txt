@@ -1,8 +1,6 @@
-%{prefix}/bin/suitesparse_mongoose
 %{prefix}/include/suitesparse/GraphBLAS.h
 %{prefix}/include/suitesparse/LAGraph.h
 %{prefix}/include/suitesparse/LAGraphX.h
-%{prefix}/include/suitesparse/Mongoose.hpp
 %{prefix}/include/suitesparse/ParU.h
 %{prefix}/include/suitesparse/RBio.h
 %{prefix}/include/suitesparse/SPEX.h
@@ -100,10 +98,6 @@
 %{prefix}/lib/cmake/SuiteSparse/check_mkl.c
 %{prefix}/lib/cmake/SuiteSparse/check_openblas_Apr2024.c
 %{prefix}/lib/cmake/SuiteSparse/check_openblas_Mar2015.c
-%{prefix}/lib/cmake/SuiteSparse_Mongoose/SuiteSparse_MongooseConfig.cmake
-%{prefix}/lib/cmake/SuiteSparse_Mongoose/SuiteSparse_MongooseConfigVersion.cmake
-%{prefix}/lib/cmake/SuiteSparse_Mongoose/SuiteSparse_MongooseTargets-release.cmake
-%{prefix}/lib/cmake/SuiteSparse_Mongoose/SuiteSparse_MongooseTargets.cmake
 %{prefix}/lib/cmake/SuiteSparse_config/SuiteSparse_configConfig.cmake
 %{prefix}/lib/cmake/SuiteSparse_config/SuiteSparse_configConfigVersion.cmake
 %{prefix}/lib/cmake/SuiteSparse_config/SuiteSparse_configTargets-release.cmake
@@ -148,8 +142,6 @@
 %{prefix}/lib/libspexpython.so.*
 %{prefix}/lib/libspqr.so
 %{prefix}/lib/libspqr.so.*
-%{prefix}/lib/libsuitesparse_mongoose.so
-%{prefix}/lib/libsuitesparse_mongoose.so.*
 %{prefix}/lib/libsuitesparseconfig.so
 %{prefix}/lib/libsuitesparseconfig.so.*
 %{prefix}/lib/libumfpack.so
@@ -170,6 +162,5 @@
 %{prefix}/lib/pkgconfig/RBio.pc
 %{prefix}/lib/pkgconfig/SPEX.pc
 %{prefix}/lib/pkgconfig/SPQR.pc
-%{prefix}/lib/pkgconfig/SuiteSparse_Mongoose.pc
 %{prefix}/lib/pkgconfig/SuiteSparse_config.pc
 %{prefix}/lib/pkgconfig/UMFPACK.pc

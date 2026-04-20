@@ -20,9 +20,6 @@ requires:
     - cmake
     # MPI
     - openmpi
-    # Math support
-    - gmp
-    - mpfr
     # Partitioners
     - metis
     - parmetis
@@ -41,9 +38,55 @@ requires:
     - googletest
   gcc:
     - hwloc
-  lbl: []  # uses system hwloc
+  lbl:  # uses system hwloc; gmp/mpfr built in-stack on LBL
+    - gmp
+    - mpfr
   macos:
     - hwloc
+    - gmp
+    - mpfr
+
+# System gmp/mpfr on mainline Linux flavors (LGPL-3 not redistributed by SCLS).
+# lbl builds its own gmp/mpfr in-stack; it inherits from `gcc`, so we must
+# override with an explicit empty list to suppress the system -devel deps.
+rpm_build_requires:
+  lbl: []
+  gcc:
+    - gmp-devel
+    - mpfr-devel
+  mkl:
+    - gmp-devel
+    - mpfr-devel
+  debug:
+    - gmp-devel
+    - mpfr-devel
+  intel:
+    - gmp-devel
+    - mpfr-devel
+  cuda:
+    - gmp-devel
+    - mpfr-devel
+
+# Runtime system gmp/mpfr on the same set of flavors. RPM auto-detection
+# picks up soname deps from ldd, but explicit package-level Requires match
+# the codebase's idiom (see libevent.yaml) and survive auto-detect tweaks.
+rpm_requires:
+  lbl: []
+  gcc:
+    - gmp
+    - mpfr
+  mkl:
+    - gmp
+    - mpfr
+  debug:
+    - gmp
+    - mpfr
+  intel:
+    - gmp
+    - mpfr
+  cuda:
+    - gmp
+    - mpfr
 
 features:
   fortran: true
@@ -82,10 +125,8 @@ configure:
     - "--with-cmake-exec=%{prefix}/bin/cmake"
     - "--with-ctest-exec=%{prefix}/bin/ctest"
     - "--with-cmake-dir=%{prefix}"
-    - "--with-gmp-dir=%{prefix}"
     - "--with-googletest-dir=%{prefix}"
     - "--with-hdf5-dir=%{prefix}"
-    - "--with-mpfr-dir=%{prefix}"
     # Partitioners
     - "--with-metis-include=%{prefix}/include"
     - "--with-metis-lib=%{prefix}/lib/libmetis%{libext}"
@@ -114,6 +155,8 @@ configure:
       - "--with-hwloc-dir=%{prefix}"
       - "--with-zlib-include=/usr/include"
       - "--with-zlib-lib=/usr/lib64/libz.so"
+      - "--with-gmp-dir=/usr"
+      - "--with-mpfr-dir=/usr"
       - "--with-blaslapack-lib=%{prefix}/lib/libopenblas%{libext}"
       - "--with-scalapack-include=%{prefix}/include"
       - "--with-scalapack-lib=%{prefix}/lib/libscalapack%{libext}"
@@ -128,6 +171,8 @@ configure:
       - "--with-hwloc-dir=/usr"
       - "--with-zlib-include=/usr/include"
       - "--with-zlib-lib=/usr/lib64/libz.so"
+      - "--with-gmp-dir=%{prefix}"
+      - "--with-mpfr-dir=%{prefix}"
       - "--with-blaslapack-lib=%{prefix}/lib/libopenblas%{libext}"
       - "--with-scalapack-include=%{prefix}/include"
       - "--with-scalapack-lib=%{prefix}/lib/libscalapack%{libext}"
@@ -140,6 +185,8 @@ configure:
     macos:
       - "--with-cuda=0"
       - "--with-hwloc-dir=%{prefix}"
+      - "--with-gmp-dir=%{prefix}"
+      - "--with-mpfr-dir=%{prefix}"
       - "--with-blas-lib=%{prefix}/lib/libopenblas%{libext}"
       - "--with-lapack-lib=%{prefix}/lib/liblapack%{libext}"
       - "--with-scalapack-include=%{prefix}/include"
@@ -154,6 +201,8 @@ configure:
       - "--with-openmp=1"
     debug:
       - "--with-cuda=0"
+      - "--with-gmp-dir=/usr"
+      - "--with-mpfr-dir=/usr"
       - "--with-blas-lib=%{prefix}/lib/libblas%{libext}"
       - "--with-lapack-lib=%{prefix}/lib/liblapack%{libext}"
       - "--with-scalapack-include=%{prefix}/include"
@@ -169,6 +218,8 @@ configure:
       - "--with-openmp-lib=/usr/lib64/libgomp.so.1"
     mkl:
       - "--with-cuda=0"
+      - "--with-gmp-dir=/usr"
+      - "--with-mpfr-dir=/usr"
       - "--with-blaslapack-include=%{mklroot}/include"
       - "--with-blaslapack-lib=%{mkl_linker_flags}"
       # ScaLAPACK: stack-owned build, not MKL's (see math_common policy)
@@ -185,6 +236,8 @@ configure:
       - "--with-openmp-lib=/usr/lib64/libgomp.so.1"
     intel:
       - "--with-cuda=0"
+      - "--with-gmp-dir=/usr"
+      - "--with-mpfr-dir=/usr"
       - "--with-blaslapack-include=%{mklroot}/include"
       - "--with-blaslapack-lib=%{mkl_linker_flags}"
       # ScaLAPACK: stack-owned build, not MKL's (see math_common policy)
@@ -205,6 +258,8 @@ configure:
       - "--CUDAFLAGS=-I%{prefix}/include -I%{cuda}/include"
       - "--with-cuda-arch=%{cuda_architectures}"
       - "--with-cuda-dir=%{cuda}"
+      - "--with-gmp-dir=/usr"
+      - "--with-mpfr-dir=/usr"
       - "--with-blaslapack-include=%{mklroot}/include"
       - "--with-blaslapack-lib=%{mkl_linker_flags}"
       # ScaLAPACK: stack-owned build, not MKL's (see math_common policy)
