@@ -6,6 +6,7 @@ rpmbuild/
 target/
 tmp/
 
+scls.html
 =======
 # Prerequisites
 *.d

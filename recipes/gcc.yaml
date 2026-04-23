@@ -2,7 +2,7 @@ name: gcc
 version: 15.2.0
 summary: The GNU Compiler Collection
 homepage: https://gcc.gnu.org/
-license: GPL-2.0
+license: GPL-3.0-or-later WITH GCC-exception-3.1
 bootstrap: true  # Build with system compilers (this IS the GCC we're building)
 
 source:

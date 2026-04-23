@@ -1,7 +1,7 @@
 name: sed
 version: 4.9
 summary: A GNU stream text editor
-homepage: http://sed.sourceforge.net/
+homepage: https://sed.sourceforge.net/
 license: GPL-3.0-or-later
 bootstrap: true  # Build with system Clang before GCC is available
 

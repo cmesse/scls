@@ -30,6 +30,9 @@ install:
     - src: scls-config.yaml.j2
       dest: share/scls/config.yaml
     - src: scls-activate.sh.j2
+      dest: share/scls/activate
+      mode: "0755"
+    - src: scls-activate.sh.j2
       dest: share/scls/activate.sh
       mode: "0755"
     - src: scls-deactivate.sh.j2

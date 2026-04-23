@@ -49,7 +49,7 @@ Available flavors and their install prefixes:
 | `debug`  | `/opt/scls/debug` | GCC      | Reference   |
 | `intel`  | `/opt/scls/intel` | Intel    | Intel MKL   |
 | `lbl`    | `/opt/scls/lbl`   | GCC      | OpenBLAS    |
-| `macos`  | `/opt/scls/macos` | GCC      | OpenBLAS    |
+| `macos`  | `/opt/scls`       | GCC      | OpenBLAS    |
 
 Commands:
 

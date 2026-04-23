@@ -117,7 +117,7 @@ A flavor defines the target platform, compilers, optimization flags, math backen
 | `debug`  | `/opt/scls/debug` | GCC      | Reference | `-Og -g`, for valgrind / sanitizers  |
 | `intel`  | `/opt/scls/intel` | Intel    | Intel MKL | Requires Intel oneAPI compilers      |
 | `lbl`    | `/opt/scls/lbl`   | GCC      | OpenBLAS  | LBL site-specific, builds own GCC    |
-| `macos`  | `/opt/scls/macos` | GCC      | OpenBLAS  | macOS (Intel + Apple Silicon)        |
+| `macos`  | `/opt/scls`       | GCC      | OpenBLAS  | macOS Intel (Apple Silicon planned)  |
 
 ## Quick Start
 

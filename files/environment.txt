@@ -1,4 +1,5 @@
 %{prefix}/share/scls/config.yaml
+%{prefix}/share/scls/activate
 %{prefix}/share/scls/activate.sh
 %{prefix}/share/scls/deactivate.sh
 %{prefix}/share/scls/registry/environment.yaml

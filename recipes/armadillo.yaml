@@ -1,7 +1,7 @@
 name: armadillo
 version: 15.2.6
 summary: Fast C++ matrix library with syntax similar to MATLAB and Octave
-homepage: http://arma.sourceforge.net/
+homepage: https://arma.sourceforge.net/
 license: Apache-2.0
 
 source:

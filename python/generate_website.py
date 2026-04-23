@@ -49,15 +49,17 @@ def load_all_recipes(recipes_dir):
     return recipes
 
 
-def load_all_flavors(flavors_dir, exclude_dev=True):
-    """Load all flavor YAML files"""
+PUBLIC_FLAVORS = ('gcc', 'mkl', 'debug')
+
+
+def load_all_flavors(flavors_dir):
+    """Load flavor YAML files for the publicly distributed binary flavors."""
     flavors = []
 
     for yaml_file in Path(flavors_dir).glob("*.yaml"):
         try:
             flavor = load_yaml(yaml_file)
-            # Skip development flavors if requested
-            if exclude_dev and flavor.get('platform') == 'macos':
+            if flavor.get('name') not in PUBLIC_FLAVORS:
                 continue
 
             flavor_info = {
@@ -72,10 +74,7 @@ def load_all_flavors(flavors_dir, exclude_dev=True):
         except Exception as e:
             print(f"Warning: Failed to load {yaml_file}: {e}")
 
-    # Sort flavors in a logical order
-    flavor_order = ['gcc', 'debug', 'lbl', 'mkl', 'intel', 'gcc-mkl-cuda']
-    flavors.sort(key=lambda x: flavor_order.index(x['name']) if x['name'] in flavor_order else 999)
-
+    flavors.sort(key=lambda x: PUBLIC_FLAVORS.index(x['name']))
     return flavors
 
 
@@ -106,65 +105,57 @@ def package_available_for_flavor(package, flavor_name):
 
 
 def generate_flavor_descriptions(flavors):
-    """Generate HTML descriptions for each flavor"""
+    """Generate display rows for each publicly distributed flavor package."""
+    by_name = {f['name']: f for f in flavors}
     descriptions = []
 
-    # Group flavors by category (each flavor goes into exactly one group)
-    gcc_flavors = []
-    debug_flavors = []
-    mkl_flavors = []
-    intel_flavors = []
-    cuda_flavors = []
-
-    for f in flavors:
-        name = f['name']
-        if 'cuda' in name:
-            cuda_flavors.append(f)
-        elif 'debug' in name:
-            debug_flavors.append(f)
-        elif name.startswith('intel'):
-            intel_flavors.append(f)
-        elif 'mkl' in name:
-            mkl_flavors.append(f)
-        else:
-            gcc_flavors.append(f)
-
-    if gcc_flavors:
+    if 'gcc' in by_name:
         descriptions.append({
-            'title': 'GCC + OpenBLAS',
-            'description': 'Default production flavors using the system GCC toolchain and OpenBLAS for linear algebra. Suitable for most scientific computing workloads.',
-            'flavors': gcc_flavors
+            'package': 'scls-gcc',
+            'label': 'GCC + OpenBLAS',
+            'description': 'Default production stack with GCC, OpenBLAS, OpenMPI, LP64 integers, and x86-64-v3 optimization flags.',
         })
 
-    if debug_flavors:
+    if 'mkl' in by_name:
         descriptions.append({
-            'title': 'Debug',
-            'description': 'Compiled with -Og -g and linked against reference BLAS/LAPACK. Designed for use with valgrind, address sanitizers, and debuggers. No SIMD optimizations that could confuse analysis tools.',
-            'flavors': debug_flavors
+            'package': 'scls-mkl',
+            'label': 'GCC + Intel MKL',
+            'description': 'Production stack for sites that use Intel oneAPI MKL for BLAS, LAPACK, and ScaLAPACK while compiling the rest with GCC.',
         })
 
-    if mkl_flavors:
+    if 'debug' in by_name:
         descriptions.append({
-            'title': 'GCC + Intel MKL',
-            'description': 'Uses the system GCC toolchain with Intel Math Kernel Library for optimized BLAS, LAPACK, and ScaLAPACK. Requires Intel oneAPI MKL.',
-            'flavors': mkl_flavors
-        })
-
-    if intel_flavors:
-        descriptions.append({
-            'title': 'Intel Compilers + MKL',
-            'description': 'Uses Intel oneAPI compilers (icx/icpx/ifx) with Intel MKL. Requires Intel oneAPI Base and HPC Toolkits.',
-            'flavors': intel_flavors
-        })
-
-    if cuda_flavors:
-        descriptions.append({
-            'title': 'GPU-accelerated with CUDA',
-            'description': 'Adds NVIDIA CUDA support for GPU-accelerated computing. Requires NVIDIA GPU hardware and CUDA toolkit.',
-            'flavors': cuda_flavors
+            'package': 'scls-debug',
+            'label': 'GCC + Reference BLAS/LAPACK',
+            'description': 'Diagnostic stack compiled with -Og -g and linked against Netlib reference BLAS/LAPACK for valgrind, sanitizers, and debuggers.',
         })
 
     return descriptions
+
+
+def is_gpl3_license(license_str):
+    """Return True if the license string indicates a GPL-3 / LGPL-3 component."""
+    if not license_str:
+        return False
+    s = license_str.upper().replace(' ', '')
+    return 'GPL-3' in s or 'GPLV3' in s
+
+
+def split_packages(packages, flavor_names, gpl3_flavor_name='macos'):
+    """Split packages into the main binary-distribution table and the GPL-3 table.
+
+    - main: non-GPL-3 packages available for at least one of the listed flavors.
+    - gpl3: GPL-3 / LGPL-3 packages selected by the macOS Unix build flavor.
+    """
+    main, gpl3 = [], []
+    for p in packages:
+        if is_gpl3_license(p.get('license', '')):
+            if package_available_for_flavor(p, gpl3_flavor_name):
+                gpl3.append(p)
+            continue
+        if any(package_available_for_flavor(p, name) for name in flavor_names):
+            main.append(p)
+    return main, gpl3
 
 
 def main():
@@ -206,9 +197,13 @@ def main():
         print(f"Error loading template: {e}")
         sys.exit(1)
 
+    flavor_names = [f['name'] for f in flavors]
+    main_packages, gpl3_packages = split_packages(packages, flavor_names)
+
     # Prepare context
     context = {
-        'packages': packages,
+        'packages': main_packages,
+        'gpl3_packages': gpl3_packages,
         'flavors': flavors,
         'flavor_groups': generate_flavor_descriptions(flavors),
         'release_version': args.release_version,
