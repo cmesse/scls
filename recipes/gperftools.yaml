@@ -8,6 +8,18 @@ source:
   url: https://github.com/gperftools/gperftools/releases/download/gperftools-%{version}/gperftools-%{version}.tar.gz
 
 requires:
+  gcc:
+    - libunwind
+  mkl:
+    - libunwind
+  debug:
+    - libunwind
+  intel:
+    - libunwind
+  lbl:
+    - libunwind
+  gcc-mkl-cuda:
+    - libunwind
   macos:
     - autoconf
     - automake
@@ -19,7 +31,6 @@ rpm_build_requires:
   - automake
   - libtool
   - make
-  - libunwind-devel
   - perl-generators
 
 features:

@@ -1,0 +1,43 @@
+name: libunwind
+version: 1.8.3
+summary: Portable C library for determining call-chains from a program's execution
+homepage: https://www.nongnu.org/libunwind/
+license: MIT
+
+# Architecture-dependent library names (libunwind-x86_64.so on x86-64,
+# libunwind-x86.so on i686). Auto-generate %files from BUILDROOT.
+rpm_files_auto: true
+
+# macOS ships Apple's own libunwind in /usr/lib/system/libunwind.dylib;
+# do not shadow it.
+exclude_flavors:
+  - macos
+
+source:
+  url: https://github.com/libunwind/libunwind/releases/download/v%{version}/libunwind-%{version}.tar.gz
+
+update:
+  strategy: github_release
+  repo: libunwind/libunwind
+  tag_prefix: v
+
+requires: []
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: autotools
+  args:
+    - "--disable-static"
+    - "--enable-shared"
+
+build:
+  parallel: true
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lunwind"
