@@ -3,6 +3,9 @@ high-performance multi-threaded malloc() implementation that works
 particularly well with threads and STL, a thread-friendly heap-checker,
 a heap profiler, and a cpu-profiler.
 
-This is a metapackage which pulls in all of the gperftools (and pprof)
-binaries, libraries, and development headers, so that you can use them.
+This package provides the gperftools shared libraries (tcmalloc,
+profiler) and development headers. Starting with gperftools 2.17 the
+bundled pprof analyzer was removed upstream; install Google's Go
+version separately (`go install github.com/google/pprof@latest`) to
+post-process profile output.
 
