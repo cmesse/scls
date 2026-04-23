@@ -87,6 +87,9 @@ if [ "$(uname)" = "Linux" ] && [ -f /etc/system-release ]; then
     if echo "$release" | grep -qiE '(Rocky|Red Hat|AlmaLinux|CentOS).* (9|10)\.'; then
         USE_RPM=true
     fi
+    if echo "$release" | grep -qiE '(Amazon).* (2023)\.'; then
+	USE_RPM=true
+    fi
 fi
 
 # Handle commands that don't need a package name
