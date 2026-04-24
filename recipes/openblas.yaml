@@ -40,6 +40,20 @@ build:
   parallel: true
   args:
     - "USE_OPENMP=1"
+    # NUM_THREADS sets the COMPILE-TIME maximum thread count, not the
+    # runtime count (that's controlled by OPENBLAS_NUM_THREADS /
+    # OMP_NUM_THREADS). Without this, OpenBLAS defaults NUM_THREADS to
+    # `getconf _NPROCESSORS_ONLN` at build time. In constrained build
+    # environments (mockbuild containers, CI runners with cgroup
+    # limits, some EC2 instance types) that probe can return 1, at
+    # which point OpenBLAS overrides USE_THREAD to 0 and silently
+    # disables OpenMP — producing a sequential libopenblas regardless
+    # of USE_OPENMP=1. STRUMPACK then calls non-thread-safe sequential
+    # GEMMs from concurrent OMP threads and corrupts results. Caught
+    # on Amazon Linux; fix applied universally for build-host
+    # independence. 256 covers any plausible HPC node; the cost is a
+    # few extra MB of static thread buffers in libopenblas.
+    - "NUM_THREADS=256"
     - "NO_LAPACK=0"
     - "NO_LAPACKE=0"
     - "NO_CBLAS=0"
