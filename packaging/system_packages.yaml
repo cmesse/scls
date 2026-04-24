@@ -39,6 +39,11 @@ ncurses:                  libncurses6
 openssl:                  libssl3
 python3:                  python3
 zlib:                     zlib1g
+# UCX runtime transports (declared explicitly so the installed package
+# pulls them in; UCX dlopen's transports at runtime and silently falls
+# back to TCP without them).
+libibverbs:               libibverbs1
+librdmacm:                librdmacm1
 
 # Development headers
 gmp-devel:                libgmp-dev
@@ -49,6 +54,17 @@ python3-devel:            python3-dev
 libXcursor-devel:         libxcursor-dev
 libXext-devel:            libxext-dev
 zlib-devel:               zlib1g-dev
+# OpenMPI lbl-flavor external deps. lbl builds against system PMIx /
+# hwloc / libevent / Slurm rather than the SCLS stack to maintain
+# Slurm compatibility on LBL HPC infrastructure.
+slurm-devel:              libslurm-dev
+pmix-devel:               libpmix-dev
+hwloc-devel:              libhwloc-dev
+libevent-devel:           libevent-dev
+# UCX HPC transports (verbs + rdmacm). Declared so configure fails
+# loudly if missing, instead of UCX silently skipping the transport.
+libibverbs-devel:         libibverbs-dev
+librdmacm-devel:          librdmacm-dev
 
 # Intel oneAPI (Intel's apt repo uses the same package names as the RPM repo)
 intel-oneapi-mkl:         intel-oneapi-mkl

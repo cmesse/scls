@@ -21,6 +21,25 @@ update:
 
 requires: []
 
+# UCX without explicit transport build deps would autodetect verbs/rdmacm
+# and silently fall back to TCP-only on hosts where libibverbs-devel /
+# librdmacm-devel aren't installed — producing a build-host-dependent
+# binary. SCLS targets HPC, so we declare these as required and pass
+# explicit --with-verbs / --with-rdmacm to make configure FAIL (rather
+# than silently skip) if the headers are missing. Runtime deps mirror
+# this so the installed package pulls in libibverbs/librdmacm — UCX
+# loads transports via dlopen at runtime; missing libs would silently
+# fall back to TCP at runtime too.
+rpm_build_requires:
+  all:
+    - libibverbs-devel
+    - librdmacm-devel
+
+rpm_requires:
+  all:
+    - libibverbs
+    - librdmacm
+
 features:
   fortran: false
   mpi: false
@@ -33,6 +52,8 @@ configure:
     - --enable-optimizations
     - --enable-mt
     - --enable-cma
+    - --with-verbs
+    - --with-rdmacm
     - --without-cuda
     - --without-rocm
     - --without-java

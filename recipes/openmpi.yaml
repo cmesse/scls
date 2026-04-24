@@ -48,6 +48,20 @@ requires:
     - pmix
     - libevent
     - hwloc
+
+# Build-host packages probed at configure time. Without these declared,
+# OpenMPI's autotools configure can silently disable Slurm support or
+# fall back to bundled implementations when system headers/libs aren't
+# present — making the produced binary depend on what the build host
+# happens to have installed. lbl uses --with-X=external for these, so
+# they must be the system packages, not SCLS stack deps.
+rpm_build_requires:
+  lbl:
+    - slurm-devel
+    - pmix-devel
+    - hwloc-devel
+    - libevent-devel
+
 features:
   fortran: yes
   mpi: false
@@ -103,6 +117,14 @@ configure:
       - --enable-mpi-ext=cuda
       - --with-cuda=%{cuda}
       - --with-cuda-libdir=%{cuda}/lib64
+  # Post-configure validation. OpenMPI's configure can succeed without
+  # actually compiling in CUDA support if the --with-cuda path layout
+  # doesn't match what's expected (different CUDA versions ship lib in
+  # different subdirs). Validate the generated opal_config.h instead of
+  # trusting configure exit code — fails loudly with a clear message.
+  flavor_post:
+    gcc-mkl-cuda:
+      - "grep -q '#define OPAL_CUDA_SUPPORT 1' opal/include/opal_config.h || { echo 'ERROR: CUDA MPI support missing despite --enable-mpi-ext=cuda --with-cuda=%{cuda}; check that %{cuda}/lib64 contains libcudart and that opal/include/opal_config.h was regenerated cleanly.'; exit 1; }"
   optimization:
     O_level: 2
     strict_aliasing: true

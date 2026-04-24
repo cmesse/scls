@@ -129,13 +129,7 @@ test:
     # matrix, ordering) combos, which is why the exclusion set has grown
     # as flavors were added. Not a regression — upstream CI runs a single
     # BLAS and doesn't see the full cliff.
-    # Amazon Linux's libgomp + OpenBLAS combo trips a numerical
-    # divergence in user_test_sparse_seq's second solve when nested
-    # OpenMP is on (factorization comes back with an effectively
-    # singular preconditioner). Rocky/RHEL doesn't see this with the
-    # same OpenBLAS version, so we scope the workaround to Amazon
-    # Linux only via /etc/os-release ID detection.
-    - "if grep -q '^ID=\"\\?amzn\"\\?' /etc/os-release 2>/dev/null; then export OMP_NESTED=false; fi && export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe && cd build && ctest --output-on-failure -E '(SPARSE_HODLR_mpi_1|SPARSE_mpi_16$|SPARSE_seq_77$|SPARSE_mpi_2$|user_test_HSS_mpi$|HSS_mpi_13$|SPARSE_seq_74$|SPARSE_seq_scotch_3$|SPARSE_HSS_mpi_1$)'"
+    - "export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe && cd build && ctest --output-on-failure -E '(SPARSE_HODLR_mpi_1|SPARSE_mpi_16$|SPARSE_seq_77$|SPARSE_mpi_2$|user_test_HSS_mpi$|HSS_mpi_13$|SPARSE_seq_74$|SPARSE_seq_scotch_3$|SPARSE_HSS_mpi_1$)'"
 
 registry:
   cflags: "-I%{prefix}/include"
