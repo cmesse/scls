@@ -163,6 +163,30 @@ def load_flavor(flavor_name: str, flavors_dir: Path = Path("flavors")) -> Dict:
     return load_yaml(flavor_path)
 
 
+def read_extra_packages(flavor: str) -> list:
+    """Return extra_packages from flavor.conf if its `flavor:` matches the
+    requested flavor, else [].
+
+    Used by both the RPM and DEB meta-package builders to include host-extra
+    foundation packages (e.g. gcc/binutils on RHEL 8) without making them
+    part of the recipe-level allowlist.
+    """
+    conf_path = Path(__file__).parent.parent / 'flavor.conf'
+    if not conf_path.exists():
+        return []
+    try:
+        data = yaml.safe_load(conf_path.read_text())
+    except yaml.YAMLError:
+        return []
+    if not isinstance(data, dict):
+        return []
+    if data.get('flavor') != flavor:
+        # Different flavor in flavor.conf — don't apply this host's overrides.
+        return []
+    extra = data.get('extra_packages') or []
+    return [str(p) for p in extra if isinstance(p, str)]
+
+
 def get_flavor_names(flavor) -> list:
     """
     Return a list of flavor names to check, in priority order.

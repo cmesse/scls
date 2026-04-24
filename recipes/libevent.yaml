@@ -30,6 +30,9 @@ rpm_build_requires:
   all:
       - openssl-devel
       - python3-devel
+      - autoconf      # pre: runs `autoreconf -f -i` to regenerate configure
+      - automake
+      - libtool
 
 rpm_requires:
   all:

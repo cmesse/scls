@@ -1,0 +1,60 @@
+# RHEL/Fedora -> Debian/Ubuntu system package name mapping.
+#
+# Consumed by python/deb_builder.py to translate recipe rpm_build_requires /
+# rpm_requires entries (and names auto-injected by the builder: bootstrap
+# compilers, make/git, intel-oneapi-mkl) into Debian Build-Depends / Depends
+# values. SCLS-internal package names (scls-<flavor>-<pkg>) are not translated
+# and pass through unchanged.
+#
+# Conventions
+# -----------
+# * Keys are RHEL names verbatim, preserving case (e.g. libXcursor-devel).
+# * A value of ~ (null) means "no Debian equivalent, drop from the deps list."
+# * Any RHEL name referenced by a recipe but missing from this file is a hard
+#   error in deb_builder -- add an explicit entry rather than guessing.
+# * Runtime library packages in Debian are soname-versioned (libgmp10,
+#   libmpfr6, libssl3, libncurses6). Values below are valid on Ubuntu 22.04+.
+#   When Debian bumps a soname, update the mapping rather than relying on
+#   transitional packages.
+# * cmake is intentionally absent: SCLS builds its own cmake from the cmake
+#   recipe, so it should never appear in rpm_build_requires.
+
+# Compilers (auto-injected by rpm_builder for bootstrap packages)
+gcc:                      gcc
+gcc-c++:                  g++
+gcc-gfortran:             gfortran
+
+# Build tools
+autoconf:                 autoconf
+automake:                 automake
+libtool:                  libtool
+make:                     make
+git:                      git
+sed:                      sed
+
+# Runtime libraries
+gmp:                      libgmp10
+mpfr:                     libmpfr6
+ncurses:                  libncurses6
+openssl:                  libssl3
+python3:                  python3
+zlib:                     zlib1g
+
+# Development headers
+gmp-devel:                libgmp-dev
+mpfr-devel:               libmpfr-dev
+ncurses-devel:            libncurses-dev
+openssl-devel:            libssl-dev
+python3-devel:            python3-dev
+libXcursor-devel:         libxcursor-dev
+libXext-devel:            libxext-dev
+zlib-devel:               zlib1g-dev
+
+# Intel oneAPI (Intel's apt repo uses the same package names as the RPM repo)
+intel-oneapi-mkl:         intel-oneapi-mkl
+intel-oneapi-mkl-devel:   intel-oneapi-mkl-devel
+
+# RPM-specific machinery with no Debian analogue. perl-generators drives
+# rpmbuild's automatic Perl module dep discovery; Debian handles that via
+# dh_perl at build time, so the package-level dep simply drops.
+perl-generators:          ~

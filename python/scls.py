@@ -137,6 +137,51 @@ def _rpm_installed_scls_packages(flavor: str) -> set:
     }
 
 
+def _deb_installed_scls_packages(flavor: str) -> set:
+    """dpkg analogue of _rpm_installed_scls_packages.
+
+    Queries dpkg-query for installed scls-<flavor>-* packages and returns
+    the bare recipe names. Only "installed" (ii) state counts; half-
+    configured / removed-but-not-purged packages are filtered out.
+    """
+    if shutil.which('dpkg-query') is None:
+        return set()
+    try:
+        result = subprocess.run(
+            ['dpkg-query', '-W', '-f', '${db:Status-Abbrev} ${Package}\n',
+             f'scls-{flavor}-*'],
+            capture_output=True, text=True, check=False,
+        )
+    except OSError:
+        return set()
+    # dpkg-query exits 1 when the pattern matches nothing; that's not an error.
+    if result.returncode not in (0, 1):
+        return set()
+
+    prefix = f'scls-{flavor}-'
+    installed = set()
+    for line in result.stdout.splitlines():
+        parts = line.split(None, 1)
+        if len(parts) != 2:
+            continue
+        status, name = parts
+        # Status-Abbrev is a 3-char field; "ii " means installed.
+        if not status.startswith('ii'):
+            continue
+        if name.startswith(prefix):
+            installed.add(name[len(prefix):])
+    return installed
+
+
+def _installed_scls_packages(flavor: str, pkg_format: str) -> set:
+    """Dispatch to the right backend for the active package format."""
+    if pkg_format == 'rpm':
+        return _rpm_installed_scls_packages(flavor)
+    if pkg_format == 'deb':
+        return _deb_installed_scls_packages(flavor)
+    return set()
+
+
 def resolve_next_package(flavor: str) -> Optional[str]:
     """Resolve 'next' to the next unbuilt package in build order."""
     try:
@@ -147,30 +192,38 @@ def resolve_next_package(flavor: str) -> Optional[str]:
         return None
 
     recipes_dir = str(SCRIPT_DIR.parent / 'recipes')
+    pkg_format = get_package_format(load_config())
 
-    # Cross-check rpm against the on-disk registry. A package whose RPM is
-    # installed but whose registry marker file is missing would otherwise
-    # cause "install next" to loop on it forever.
-    rpm_installed = _rpm_installed_scls_packages(flavor)
+    # Cross-check the system package manager against the on-disk registry. A
+    # package whose .rpm / .deb is installed but whose registry marker file
+    # is missing would otherwise cause "install next" to loop on it forever.
+    sys_installed = _installed_scls_packages(flavor, pkg_format)
     registry_dir = prefix / 'share' / 'scls' / 'registry'
     missing_registry = {
-        name for name in rpm_installed
+        name for name in sys_installed
         if not (registry_dir / f'{name}.yaml').exists()
     }
     if missing_registry:
         names = ', '.join(sorted(missing_registry))
+        if pkg_format == 'deb':
+            reinstall_hint = f"sudo apt-get install --reinstall scls-{flavor}-<name>"
+            tool_label = "DEB"
+        else:
+            reinstall_hint = f"sudo dnf reinstall scls-{flavor}-<name>"
+            tool_label = "RPM"
         print(
-            f"Warning: RPM installed but registry marker missing for: {names}.",
+            f"Warning: {tool_label} installed but registry marker missing for: "
+            f"{names}.",
             file=sys.stderr,
         )
         print(
             f"  Treating as installed. To restore the marker file, run: "
-            f"sudo dnf reinstall scls-{flavor}-<name>",
+            f"{reinstall_hint}",
             file=sys.stderr,
         )
 
     pkg = get_next_unbuilt_package(
-        recipes_dir, flavor, prefix, extra_installed=rpm_installed
+        recipes_dir, flavor, prefix, extra_installed=sys_installed
     )
     if pkg is None:
         print("All packages are already installed.")
@@ -205,8 +258,10 @@ def cmd_build(args, config: Dict) -> int:
     # Dispatch to appropriate builder
     if pkg_format == 'rpm':
         return _build_rpm(package, flavor)
+    elif pkg_format == 'deb':
+        return _build_deb(package, flavor)
     else:
-        # pkg, deb, tar.xz all use unix_builder for the build step
+        # pkg, tar.xz use unix_builder for the build step
         # build-only: don't install into the live prefix (use 'scls install' for that)
         return _build_unix(package, flavor, pkg_format, build_only=True)
 
@@ -215,6 +270,16 @@ def _build_rpm(package: str, flavor: str) -> int:
     """Build using rpm_builder."""
     cmd = [sys.executable, str(SCRIPT_DIR / 'rpm_builder.py'),
            '--package', package, '--flavor', flavor]
+    result = subprocess.run(cmd)
+    return result.returncode
+
+
+def _build_deb(package: str, flavor: str) -> int:
+    """Build a .deb using deb_builder. Stages install into a buildroot and
+    runs dpkg-deb --build; does not touch the live prefix."""
+    cmd = [sys.executable, str(SCRIPT_DIR / 'deb_builder.py'),
+           '--package', package, '--flavor', flavor,
+           'build', 'install', 'deb']
     result = subprocess.run(cmd)
     return result.returncode
 
@@ -314,22 +379,29 @@ def _install_rpm(package: str, flavor: str, prefix: Path, upgrade: bool) -> int:
 
 def _install_deb(package: str, flavor: str, prefix: Path, upgrade: bool) -> int:
     """Install via DEB/apt-get."""
-    # First build (we'd need a deb_builder, for now use unix and create tarball)
-    ret = _build_unix(package, flavor, 'deb')
+    ret = _build_deb(package, flavor)
     if ret != 0:
         return ret
 
-    # Find the built DEB (would need deb_builder to create this)
-    deb_dir = Path('work/packages')
-    debs = list(deb_dir.glob(f'{package}*.deb'))
+    # deb_builder writes into work/pkgs, named
+    # scls-<flavor>-<package>_<version>-<release>_<arch>.deb
+    scls_name = f'scls-{flavor}-{package}'
+    deb_dir = Path('work/pkgs')
+    debs = sorted(
+        deb_dir.glob(f'{scls_name}_*.deb'),
+        key=lambda p: p.stat().st_mtime, reverse=True,
+    )
     if not debs:
-        print(f"Note: DEB builder not yet implemented, falling back to direct install")
-        return _install_direct(package, flavor, prefix, upgrade)
+        print(f"Error: No DEB found for {scls_name} in {deb_dir}", file=sys.stderr)
+        return 1
 
     deb_file = debs[0]
     print(f"Installing {deb_file}")
 
-    cmd = ['sudo', 'apt-get', 'install', '-y', str(deb_file)]
+    # apt-get install ./path/to/pkg.deb pulls in missing deps automatically;
+    # passing the path (with ./ prefix) tells apt to treat it as a local file.
+    deb_arg = str(deb_file) if str(deb_file).startswith('/') else f'./{deb_file}'
+    cmd = ['sudo', 'apt-get', 'install', '-y', deb_arg]
     result = subprocess.run(cmd)
     return result.returncode
 

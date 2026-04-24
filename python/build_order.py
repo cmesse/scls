@@ -349,6 +349,106 @@ def get_ordered_package_list(directory, flavor=None):
     return ordered
 
 
+def _local_build_registry_dirs(directory, flavor):
+    """Return the set of local build-registry directories to scan.
+
+    rpm_builder writes markers under rpmbuild/registry/<flavor>/ and
+    deb_builder writes them under debbuild/registry/<flavor>/. A package
+    is considered "built" if a marker exists in EITHER location, so a host
+    that has produced some packages as RPMs and others as DEBs still gets
+    a coherent build-order view.
+    """
+    from pathlib import Path as _Path
+    root = _Path(directory).parent
+    return [
+        root / 'rpmbuild' / 'registry' / flavor,
+        root / 'debbuild' / 'registry' / flavor,
+    ]
+
+
+def _artifact_exists_for(root, flavor, pkg_name, kind):
+    """Return True if the built artifact for (pkg_name, flavor) still
+    exists on disk for the given backend.
+
+    Normal package artifacts:
+      'rpm' → rpmbuild/RPMS/**/scls-<flavor>-<pkg>-*.rpm
+      'deb' → work/pkgs/scls-<flavor>-<pkg>_*.deb
+
+    The flavor meta-package (FLAVOR_META, '_meta') is special-cased: its
+    artifact is named `scls-<flavor>` (no recipe suffix), since both
+    rpm_builder.build_flavor_meta_package and deb_builder.
+    build_flavor_meta_package produce a single package per flavor that
+    Depends on every recipe in the stack. Without this special case the
+    glob would look for `scls-<flavor>-_meta*` which never matches, and
+    _package_is_built_locally would delete the meta marker as stale —
+    making `scls install next` blind to a built-but-uninstalled meta.
+
+    The registry marker alone is unreliable: `rm -rf work/` or
+    `apt remove` can take out the artifact while the marker (which
+    lives outside work/, at the project root) persists. Callers should
+    trust the marker only when this returns True.
+    """
+    if pkg_name == FLAVOR_META:
+        scls_name = f'scls-{flavor}'
+    else:
+        scls_name = f'scls-{flavor}-{pkg_name}'
+    if kind == 'rpm':
+        rpms_dir = root / 'rpmbuild' / 'RPMS'
+        if not rpms_dir.exists():
+            return False
+        # RPMs live under arch subdirs (x86_64/, noarch/, ...). Meta
+        # packages are noarch. Use a name-and-version glob that matches
+        # either.
+        for _ in rpms_dir.rglob(f'{scls_name}-[0-9]*.rpm'):
+            return True
+        return False
+    if kind == 'deb':
+        pkgs_dir = root / 'work' / 'pkgs'
+        if not pkgs_dir.exists():
+            return False
+        # deb_builder names files <scls_name>_<ver>-<rel>_<arch>.deb; the
+        # meta-package uses arch 'all'.
+        for _ in pkgs_dir.glob(f'{scls_name}_*.deb'):
+            return True
+        return False
+    return False
+
+
+def _package_is_built_locally(directory, flavor, pkg_name):
+    """True if pkg_name has a valid build marker + artifact.
+
+    We intentionally cross-check the marker against the artifact.
+    A marker without its .rpm/.deb is stale (common after
+    `rm -rf work/` or `apt remove`) and actively misleading: next-
+    resolution would skip the package, even though there's nothing
+    to install. When we find a stale marker here, delete it so the
+    state converges — the only information it carried was "there
+    was once an artifact," which is no longer true.
+    """
+    from pathlib import Path as _Path
+    root = _Path(directory).parent
+
+    rpm_marker = root / 'rpmbuild' / 'registry' / flavor / f'{pkg_name}.yaml'
+    if rpm_marker.exists():
+        if _artifact_exists_for(root, flavor, pkg_name, 'rpm'):
+            return True
+        try:
+            rpm_marker.unlink()
+        except OSError:
+            pass
+
+    deb_marker = root / 'debbuild' / 'registry' / flavor / f'{pkg_name}.yaml'
+    if deb_marker.exists():
+        if _artifact_exists_for(root, flavor, pkg_name, 'deb'):
+            return True
+        try:
+            deb_marker.unlink()
+        except OSError:
+            pass
+
+    return False
+
+
 def get_next_unbuilt_package(directory, flavor, prefix, extra_installed=None):
     """Find the next package in build order that is not yet installed.
 
@@ -373,13 +473,13 @@ def get_next_unbuilt_package(directory, flavor, prefix, extra_installed=None):
 
     extra_installed = extra_installed or set()
 
-    # Check registry for each package in order
-    # Look in both the installed prefix registry and the local RPM build registry
+    # Check registry for each package in order. A package is treated as
+    # done if it's installed in the prefix OR built locally in either
+    # rpmbuild/registry or debbuild/registry.
     registry_dir = _Path(prefix) / 'share' / 'scls' / 'registry'
-    local_registry_dir = _Path(directory).parent / 'rpmbuild' / 'registry' / flavor
     for pkg_name in ordered:
         installed = (registry_dir / f'{pkg_name}.yaml').exists()
-        built = (local_registry_dir / f'{pkg_name}.yaml').exists()
+        built = _package_is_built_locally(directory, flavor, pkg_name)
         if not installed and not built and pkg_name not in extra_installed:
             return pkg_name
 
@@ -399,8 +499,9 @@ def get_flavor_package_list(directory, flavor):
 def get_next_uninstalled_package(directory, flavor, prefix):
     """Find the next package that has been built but not yet installed.
 
-    Checks for packages that have a local RPM build registry marker
-    but no installed registry entry at the prefix.
+    Checks for packages that have a local build marker (under either
+    rpmbuild/registry or debbuild/registry) but no installed registry
+    entry at the prefix.
 
     Args:
         directory: Path to the recipes directory.
@@ -417,10 +518,9 @@ def get_next_uninstalled_package(directory, flavor, prefix):
         return None
 
     registry_dir = _Path(prefix) / 'share' / 'scls' / 'registry'
-    local_registry_dir = _Path(directory).parent / 'rpmbuild' / 'registry' / flavor
     for pkg_name in ordered:
         installed = (registry_dir / f'{pkg_name}.yaml').exists()
-        built = (local_registry_dir / f'{pkg_name}.yaml').exists()
+        built = _package_is_built_locally(directory, flavor, pkg_name)
         if built and not installed:
             return pkg_name
 

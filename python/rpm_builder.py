@@ -27,6 +27,7 @@ from build_common import (
     get_subpackages_for_flavor,
     get_subpackage_dependencies,
     get_interface_args,
+    read_extra_packages,
     resolve_flavor_key
 )
 from patch_common import (
@@ -252,7 +253,7 @@ class RPMBuilder:
         # building gcc/binutils for the gcc flavor on RHEL 8). Listing them in
         # extra_packages is the only supported override path — there is no
         # CLI flag, since the flavor.conf entry is trackable per-host.
-        is_extra = package in _read_extra_packages(flavor)
+        is_extra = package in read_extra_packages(flavor)
 
         # Check if package should be built
         if not should_build_package(self.recipe, self.flavor):
@@ -2113,28 +2114,6 @@ def list_installed_packages(flavor_name: str) -> None:
     print(f"\n{count} packages installed.")
 
 
-def _read_extra_packages(flavor: str) -> list:
-    """Return extra_packages from flavor.conf if its `flavor:` matches the
-    requested flavor, else []. Used by the meta-package builder to include
-    host-extra foundation packages (e.g. gcc/binutils on RHEL 8) without
-    making them part of the recipe-level allowlist.
-    """
-    conf_path = Path(__file__).parent.parent / 'flavor.conf'
-    if not conf_path.exists():
-        return []
-    try:
-        data = yaml.safe_load(conf_path.read_text())
-    except yaml.YAMLError:
-        return []
-    if not isinstance(data, dict):
-        return []
-    if data.get('flavor') != flavor:
-        # Different flavor in flavor.conf — don't apply this host's overrides.
-        return []
-    extra = data.get('extra_packages') or []
-    return [str(p) for p in extra if isinstance(p, str)]
-
-
 def build_flavor_meta_package(flavor: str, spec_only: bool = False) -> None:
     """Build the flavor meta-package (e.g. scls-gcc) that depends on all
     packages in the flavor.  Installing it via dnf pulls in the entire stack.
@@ -2157,7 +2136,7 @@ def build_flavor_meta_package(flavor: str, spec_only: bool = False) -> None:
     # Add any host-extra packages (e.g. gcc/binutils on RHEL 8) so they
     # become Requires of the meta package and get installed alongside the
     # rest of the stack.
-    extra = _read_extra_packages(flavor)
+    extra = read_extra_packages(flavor)
     for pkg in extra:
         if pkg not in packages:
             packages.insert(0, pkg)  # foundation packages first

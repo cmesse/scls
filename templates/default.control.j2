@@ -1,0 +1,14 @@
+Package: {{ scls_name }}
+Version: {{ version }}-{{ release }}
+Section: science
+Priority: optional
+Architecture: {{ architecture }}
+Maintainer: {{ maintainer }}
+{% if depends %}
+Depends: {{ depends | join(', ') }}
+{% endif %}
+Homepage: {{ homepage }}
+Description: {{ summary }}
+{% for line in description_lines %}
+ {{ line if line else '.' }}
+{% endfor %}

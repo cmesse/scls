@@ -5,6 +5,7 @@ work/
 rpmbuild/
 target/
 tmp/
+debbuild/
 
 scls.html
 =======

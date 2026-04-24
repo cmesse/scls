@@ -396,6 +396,14 @@ class UnixBuilder:
         cmd = [s.replace('%{sdk}', self.sdk) for s in cmd]
         cmd = [s.replace('%{host}', self.host) for s in cmd]
         cmd = [s.replace('%{nprocs}', str(self.nprocs)) for s in cmd]
+        # RPM's parallel-make macro. rpmbuild expands this inside the
+        # spec; we're outside rpmbuild's rendering pipeline, so expand
+        # it ourselves whenever a recipe uses it (test commands in
+        # blaze, etc.). Both forms (%{_smp_mflags} and %{?_smp_mflags})
+        # map to `-j<nprocs>`; the `?` is RPM's "expand if defined"
+        # operator and is moot once we substitute unconditionally.
+        cmd = [s.replace('%{?_smp_mflags}', f'-j{self.nprocs}') for s in cmd]
+        cmd = [s.replace('%{_smp_mflags}', f'-j{self.nprocs}') for s in cmd]
         cmd = [s.replace('%{srcdir}', str(self.source_dir)) for s in cmd]
         cmd = [s.replace('%{cflags}', str(self.cflags)) for s in cmd]
         cmd = [s.replace('%{cxxflags}', str(self.cxxflags)) for s in cmd]
@@ -939,6 +947,12 @@ class UnixBuilder:
 
         print("\n=== Installing generated package ===")
 
+        # Where generated files get written. Subclasses (e.g. DebBuilder)
+        # override _generated_install_root() to redirect to a staging
+        # buildroot. The template context below keeps self.prefix so
+        # rendered file contents always carry the real install prefix.
+        install_root = self._generated_install_root()
+
         # Setup Jinja2 environment
         templates_dir = self.project_root / "templates"
         jinja_env = Environment(
@@ -978,7 +992,7 @@ class UnixBuilder:
                 raise BuildError(f"Failed to render template {src_template}: {e}")
 
             # Determine full destination path
-            full_dest = self.prefix / dest_path
+            full_dest = install_root / dest_path
 
             # Create parent directories
             full_dest.parent.mkdir(parents=True, exist_ok=True)
@@ -1006,7 +1020,7 @@ class UnixBuilder:
                 print(f"  Warning: source file not found: {src_path}")
                 continue
 
-            full_dest = self.prefix / dest_path
+            full_dest = install_root / dest_path
             full_dest.parent.mkdir(parents=True, exist_ok=True)
 
             import shutil
@@ -1020,8 +1034,8 @@ class UnixBuilder:
         # macOS uses lib directly with no lib64 split
         import platform
         if platform.system() == 'Linux':
-            lib64_dir = self.prefix / 'lib64'
-            lib_link = self.prefix / 'lib'
+            lib64_dir = install_root / 'lib64'
+            lib_link = install_root / 'lib'
             lib64_dir.mkdir(parents=True, exist_ok=True)
             if not lib_link.exists():
                 lib_link.symlink_to('lib64')
@@ -1030,10 +1044,10 @@ class UnixBuilder:
         print(f"\nInstalled {len(self.installed_files)} files")
 
         # Write registry entry
-        write_registry_entry(self.prefix, self.recipe, self.flavor_name)
+        write_registry_entry(install_root, self.recipe, self.flavor_name)
 
         # Add registry file to installed files
-        registry_file = self.prefix / "share" / "scls" / "registry" / f"{self.recipe['name']}.yaml"
+        registry_file = install_root / "share" / "scls" / "registry" / f"{self.recipe['name']}.yaml"
         if registry_file.exists():
             self.installed_files.append(registry_file)
 
@@ -1049,15 +1063,46 @@ class UnixBuilder:
         source = self.recipe.get('source', {})
         return source.get('type') == 'generated'
 
+    def _generated_install_root(self) -> Path:
+        """Destination root for install_generated() file writes.
+
+        Defaults to the live prefix. Packaging subclasses (DebBuilder) override
+        this to redirect file writes into a staging buildroot while leaving
+        self.prefix — and therefore the template context — pointing at the
+        real install prefix.
+        """
+        return self.prefix
+
     def check_dependencies(self) -> None:
-        """Check that all required dependencies are installed before building."""
+        """Check that all required dependencies are installed before building.
+
+        Deps whose recipe is not built for the active flavor are skipped
+        silently: they come from `get_package_dependencies`'s implicit
+        injection (notably `gcc`) and are satisfied by the host on flavors
+        that don't ship them (e.g. `gcc` is in the stack only on `lbl` and
+        `macos`; on `gcc`/`mkl`/`debug`/`intel` it's the system compiler).
+        This matches the filtering `build_order.py` already does at the
+        graph level.
+        """
         deps = get_package_dependencies(self.recipe, self.flavor_name)
 
         if not deps:
             return
 
         missing = []
+        skipped_not_in_flavor = []
         for dep in deps:
+            # Is this dep actually part of the build set for the active flavor?
+            try:
+                dep_recipe = load_recipe(dep)
+            except Exception:
+                # No recipe on disk — treat as a system-provided name and
+                # skip the prefix-registry check.
+                skipped_not_in_flavor.append(dep)
+                continue
+            if not should_build_package(dep_recipe, self.flavor):
+                skipped_not_in_flavor.append(dep)
+                continue
             if not check_package_installed(self.prefix, dep):
                 missing.append(dep)
 
@@ -1065,10 +1110,15 @@ class UnixBuilder:
             missing_list = ', '.join(missing)
             raise BuildError(
                 f"Package '{self.package}' has missing dependencies: {missing_list}\n"
-                f"Install them first with: python python/mac_builder.py -p <package> build install"
+                f"Install them first with: scls install <package>"
             )
 
-        print(f"All dependencies satisfied: {', '.join(deps)}")
+        satisfied = [d for d in deps if d not in skipped_not_in_flavor]
+        if satisfied:
+            print(f"All dependencies satisfied: {', '.join(satisfied)}")
+        if skipped_not_in_flavor:
+            print(f"Skipping system-provided deps for flavor "
+                  f"'{self.flavor_name}': {', '.join(skipped_not_in_flavor)}")
 
     def check_host_tools(self) -> None:
         """Verify that required host tools are available before starting a build.
@@ -1094,7 +1144,14 @@ class UnixBuilder:
         if features.get('fortran', False):
             base_tools.append('gfortran')
 
-        missing = [tool for tool in base_tools if shutil.which(tool) is None]
+        # Include the SCLS prefix's bin/ in the lookup so tools installed by
+        # the stack (scls-<flavor>-cmake, openmpi wrappers, scls-built
+        # gfortran on lbl/macos, ...) are discoverable even when the user
+        # hasn't sourced the activation script. Matches what
+        # setup_environment does at command-execution time for PATH.
+        extended_path = f"{self.prefix}/bin:{os.environ.get('PATH', '')}"
+        missing = [tool for tool in base_tools
+                   if shutil.which(tool, path=extended_path) is None]
         if missing:
             raise BuildError(
                 f"Missing required host tools: {', '.join(missing)}\n"

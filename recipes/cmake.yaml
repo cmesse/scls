@@ -17,12 +17,14 @@ requires:
 rpm_build_requires:
     - ncurses-devel
     - openssl-devel
+    - zlib-devel      # --system-zlib requires libz headers; macOS builds its own zlib
 
 rpm_requires:
     - sed
     - git
     - ncurses
     - openssl
+    - zlib
 
 features:
   fortran: false

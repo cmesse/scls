@@ -92,6 +92,21 @@ if [ "$(uname)" = "Linux" ] && [ -f /etc/system-release ]; then
     fi
 fi
 
+# Determine if DEB mode applies. Check /etc/os-release (standard on Debian
+# family) rather than /etc/debian_version alone so we also catch derivatives
+# that set ID_LIKE=debian (Mint, Pop!_OS, elementary, etc.). RPM mode wins
+# if both somehow match.
+USE_DEB=false
+if [ "$USE_RPM" != true ] && [ "$(uname)" = "Linux" ] && [ -f /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    case ":${ID:-}:${ID_LIKE:-}:" in
+        *:debian:*|*:ubuntu:*)
+            USE_DEB=true
+            ;;
+    esac
+fi
+
 # Handle commands that don't need a package name
 case "$1" in
     list)
@@ -135,6 +150,7 @@ esac
 if [ -z "$2" ]; then
     echo "Usage: scls <command> <package>"
     echo "       scls <command> next        (build/install next unbuilt package)"
+    echo "       scls build all             (build+install every package for the flavor)"
     echo "       scls list"
     echo ""
     echo "Active flavor: $FLAVOR"
@@ -143,9 +159,105 @@ fi
 
 PACKAGE="$2"
 
+# `scls build all` — build+install every package for the active flavor in
+# dependency order. Stops on the first failure. Prompts for sudo once and
+# keeps the credential warm via a background `sudo -v` refresher so the
+# per-install apt-get / dnf call never prompts mid-loop.
+if [ "$1" = "build" ] && [ "$PACKAGE" = "all" ]; then
+    if [ "$USE_DEB" = true ] || [ "$USE_RPM" = true ]; then
+        echo "Refreshing sudo credentials (required for per-package install)..."
+        if ! sudo -v; then
+            echo "Error: could not acquire sudo credentials." >&2
+            exit 1
+        fi
+        # Background keepalive: refresh every 60s, exit quietly once the
+        # cache can't be refreshed non-interactively (shouldn't happen
+        # while the parent is alive, but belt-and-braces for shell exit).
+        ( while true; do
+              sudo -n -v 2>/dev/null || exit 0
+              sleep 60
+          done ) &
+        KEEPALIVE_PID=$!
+        # Clean up on any exit path: success, build error, Ctrl-C, SIGTERM.
+        # shellcheck disable=SC2064
+        trap "kill $KEEPALIVE_PID 2>/dev/null; wait $KEEPALIVE_PID 2>/dev/null" EXIT INT TERM
+    fi
+
+    # Loop order: install-before-build. On each iteration we first ask
+    # for any package that is built-but-not-installed (e.g. a prior run
+    # aborted mid-install) and install it; only when nothing is pending
+    # install do we fall through to build the next unbuilt package. This
+    # lets `scls build all` resume cleanly after a failed install step,
+    # where get_next_unbuilt_package would otherwise skip the package
+    # because its local marker + artifact still exist.
+    STEPS=0
+    while :; do
+        NEXT=$($PYTHON -c "
+import sys; sys.path.insert(0, '$SCLS_DIR/python')
+from build_order import (
+    get_next_uninstalled_package, get_next_unbuilt_package
+)
+from build_common import load_flavor
+prefix = load_flavor('$FLAVOR')['prefix']
+# Priority: finish installing anything that's been built first. If
+# nothing is pending install, advance to the next unbuilt package.
+pkg = get_next_uninstalled_package('$SCLS_DIR/recipes', '$FLAVOR', prefix)
+if pkg:
+    print('install', pkg)
+    sys.exit(0)
+pkg = get_next_unbuilt_package('$SCLS_DIR/recipes', '$FLAVOR', prefix)
+if pkg:
+    print('build', pkg)
+    sys.exit(0)
+sys.exit(1)
+" 2>/dev/null)
+        if [ $? -ne 0 ] || [ -z "$NEXT" ]; then
+            break
+        fi
+        ACTION=$(echo "$NEXT" | awk '{print $1}')
+        PKG=$(echo "$NEXT" | awk '{print $2}')
+        N=$((STEPS + 1))
+
+        if [ "$ACTION" = "build" ]; then
+            echo ""
+            echo "================================================================"
+            echo "  [$N] build: $PKG (flavor=$FLAVOR)"
+            echo "================================================================"
+            if ! "$SCLS_DIR/scls" build "$PKG"; then
+                echo "" >&2
+                echo "Error: 'scls build $PKG' failed after $STEPS successful steps." >&2
+                echo "Fix the issue and re-run 'scls build all' to resume." >&2
+                exit 1
+            fi
+            # Falls through to the next iteration, which will see this
+            # package as built-but-uninstalled and install it.
+        else  # install
+            echo ""
+            echo "================================================================"
+            echo "  [$N] install: $PKG"
+            echo "================================================================"
+            if ! "$SCLS_DIR/scls" install "$PKG"; then
+                echo "" >&2
+                echo "Error: 'scls install $PKG' failed after $STEPS successful steps." >&2
+                echo "Package artifact is in work/pkgs (deb) or rpmbuild/RPMS (rpm);" >&2
+                echo "inspect the apt/dnf output, fix, and re-run 'scls build all'." >&2
+                exit 1
+            fi
+        fi
+
+        STEPS=$((STEPS + 1))
+    done
+
+    echo ""
+    echo "================================================================"
+    echo "  Done. Completed $STEPS build/install steps for flavor '$FLAVOR'."
+    echo "================================================================"
+    exit 0
+fi
+
 # Resolve "next" to the appropriate next package
 if [ "$PACKAGE" = "next" ]; then
-    if [ "$1" = "install" ] && [ "$USE_RPM" = true ]; then
+    if [ "$1" = "install" ] && { [ "$USE_RPM" = true ] || [ "$USE_DEB" = true ]; }; then
         # For "install next": find the next built-but-not-installed package
         PACKAGE=$($PYTHON -c "
 import sys; sys.path.insert(0, '$SCLS_DIR/python')
@@ -196,6 +308,38 @@ if [ "$USE_RPM" = true ]; then
     # (extra_packages override and gcc-toolset are read from flavor.conf
     # by rpm_builder itself, no CLI plumbing required.)
     $PYTHON python/rpm_builder.py --package "$PACKAGE" --flavor "$FLAVOR" $RPM_EXTRA_ARGS "${@:3}"
+elif [ "$USE_DEB" = true ]; then
+    # Translate subcommands into deb_builder.py flags. deb_builder's default
+    # (no positional args) is the full build/install/deb pipeline, matching
+    # what rpm_builder's bare invocation does.
+    #
+    # We build an explicit EXTRA array from "${@:3}" because bash's slice
+    # expansion emits a single empty-string argument when nothing follows,
+    # which argparse then rejects against the choices= list.
+    EXTRA=()
+    if [ $# -gt 2 ]; then
+        EXTRA=( "${@:3}" )
+    fi
+    case "$1" in
+        build)
+            $PYTHON python/deb_builder.py --package "$PACKAGE" --flavor "$FLAVOR" "${EXTRA[@]}"
+            ;;
+        install)
+            $PYTHON python/deb_builder.py --package "$PACKAGE" --flavor "$FLAVOR" --install "${EXTRA[@]}"
+            ;;
+        spec)
+            echo "Error: 'scls spec' has no DEB equivalent. The control file"
+            echo "       is rendered into the staged buildroot during a full"
+            echo "       build; run 'scls build <pkg>' and inspect"
+            echo "       work/build/destdir/DEBIAN/control."
+            exit 1
+            ;;
+        *)
+            # Pass through unrecognized subcommands as positional pipeline
+            # steps so e.g. 'scls deb <pkg>' or 'scls test <pkg>' still work.
+            $PYTHON python/deb_builder.py --package "$PACKAGE" --flavor "$FLAVOR" "$1" "${EXTRA[@]}"
+            ;;
+    esac
 else
     $PYTHON python/unix_builder.py --package "$PACKAGE" --flavor "$FLAVOR" $1 "${@:3}"
 fi
