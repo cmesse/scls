@@ -12,6 +12,11 @@ update:
   strategy: github_commit
   repo: KarypisLab/ParMETIS
 
+patches:
+  all:
+    - parmetis_min_cmake_3.10.patch
+    - parmetis_use_installed_metis.patch
+
 requires:
   all:
     - cmake

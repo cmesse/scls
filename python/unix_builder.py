@@ -96,7 +96,7 @@ class UnixBuilder:
         self.rpms_dir = self.rpmbuild / "pkgs"
         self.srpms_dir = self.rpmbuild / "spkgs"
         self.specs_dir = self.rpmbuild / "specs"
-        self.patch_dir = self.project_root / "patches" / package
+        self.patches_root = self.project_root / "patches"
 
         # this is set in run after extracting the package
         self.source_dir = ""
@@ -1252,7 +1252,7 @@ class UnixBuilder:
                 source_dir = source_dir / 'zlib'
 
             # Apply patches
-            apply_patches(source_dir, self.recipe, self.package, self.patch_dir, self.flavor)
+            apply_patches(source_dir, self.recipe, self.package, self.patches_root, self.flavor)
 
             # Setup environment (pass recipe for bootstrap compiler detection
             # and legacy configure.env handling)

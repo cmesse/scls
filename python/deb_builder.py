@@ -992,20 +992,21 @@ class DebBuilder(UnixBuilder):
         # debian/patches/ with a series file; dpkg-source -x will re-
         # apply them on extraction.
         patches = get_all_patches(
-            self.recipe, self.package, self.patch_dir, self.flavor
+            self.recipe, self.package, self.patches_root, self.flavor
         )
         if not patches:
             return
         patches_dir = debian / 'patches'
         patches_dir.mkdir()
         series_lines = []
+        package_patches_dir = self.patches_root / self.package
         for p in patches:
             patch_file = p['file'] if isinstance(p, dict) else p
             # Honor non-default strip level (quilt series line syntax
             # accepts ' -pN' options). patch_common exposes this via the
             # 'strip' key; default is -p1, so we only annotate otherwise.
             strip = p.get('strip', 1) if isinstance(p, dict) else 1
-            src_patch = self.patch_dir / patch_file
+            src_patch = package_patches_dir / patch_file
             if not src_patch.exists():
                 # Hard-fail: producing a .dsc that silently drops a patch
                 # the binary build applied would ship broken "source"
