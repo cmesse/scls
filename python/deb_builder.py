@@ -91,6 +91,70 @@ def detect_architecture() -> str:
         }.get(machine, machine)
 
 
+def _read_deb_package_version(deb_path: Path) -> Tuple[str, str]:
+    """Return (Package, Version) from the control metadata of a .deb.
+
+    Returns (None, None) on any failure so the caller can fall back
+    to a plain `apt-get install`.
+    """
+    result = subprocess.run(
+        ['dpkg-deb', '-f', str(deb_path), 'Package', 'Version'],
+        capture_output=True, text=True, check=False,
+    )
+    if result.returncode != 0:
+        return (None, None)
+    fields = {}
+    for line in result.stdout.splitlines():
+        key, sep, val = line.partition(':')
+        if sep and key.strip():
+            fields[key.strip()] = val.strip()
+    return fields.get('Package'), fields.get('Version')
+
+
+def _deb_is_already_installed_at_version(name: str, version: str) -> bool:
+    """True if package `name` is currently installed with exactly `version`.
+
+    Uses dpkg-query to inspect the local dpkg database. Only an "ii"
+    (fully installed) status counts — half-configured/removed-but-not-
+    purged states don't; those need a fresh install anyway.
+    """
+    if not name or not version:
+        return False
+    result = subprocess.run(
+        ['dpkg-query', '-W', '-f', '${db:Status-Abbrev}\t${Version}', name],
+        capture_output=True, text=True, check=False,
+    )
+    # dpkg-query exits 1 when the package isn't known; that's not an error.
+    if result.returncode not in (0, 1):
+        return False
+    parts = result.stdout.split('\t', 1)
+    if len(parts) != 2:
+        return False
+    status, installed_version = parts
+    return status.startswith('ii') and installed_version.strip() == version
+
+
+def _apt_install_deb(deb_path: Path, label: str = "apt-get install") -> None:
+    """Install a single .deb, routing to --reinstall when its exact
+    Package+Version is already installed.
+
+    Mirrors rpm_builder._dnf_install_rpms's partition-and-dispatch
+    semantics: a rebuild of the same version reinstalls (overwrites
+    files) rather than hitting apt's "already the newest version"
+    no-op; a different version goes through plain install which
+    handles upgrade/downgrade naturally.
+    """
+    deb_arg = str(deb_path) if deb_path.is_absolute() else f"./{deb_path}"
+    name, version = _read_deb_package_version(deb_path)
+    if _deb_is_already_installed_at_version(name, version):
+        print(f"Reinstalling {deb_path} ({name}={version} already installed)")
+        cmd = ['sudo', 'apt-get', 'install', '--reinstall', '-y', deb_arg]
+    else:
+        print(f"Installing {deb_path}")
+        cmd = ['sudo', 'apt-get', 'install', '-y', deb_arg]
+    run_command(cmd, PROJECT_ROOT, os.environ, label)
+
+
 class DebBuilder(UnixBuilder):
     def __init__(self, package: str, flavor: str):
         super().__init__(package, flavor)
@@ -1063,13 +1127,13 @@ class DebBuilder(UnixBuilder):
         return dsc
 
     def install_deb(self) -> None:
-        """Install the most-recently-built .deb for this package via apt-get.
+        """Install (or reinstall) the most-recently-built .deb via apt-get.
 
-        Mirrors RPMBuilder.install_rpm semantically: finds the newest .deb
-        matching scls-<flavor>-<package>_*.deb under work/pkgs/ and hands
-        it to `sudo apt-get install -y ./path.deb`. Using apt-get (vs a
-        bare dpkg -i) lets the package manager resolve system dependencies
-        declared in the control file.
+        Mirrors RPMBuilder.install_rpm semantically, including its
+        reinstall-when-exact-version-is-already-installed behavior (see
+        rpm_builder._partition_rpms_for_install). A rebuild of the same
+        version overwrites the installed files instead of apt-get's
+        "already the newest version" no-op.
         """
         pattern = f"{self.scls_name}_*_{self.architecture}.deb"
         candidates = sorted(
@@ -1080,13 +1144,7 @@ class DebBuilder(UnixBuilder):
             raise BuildError(
                 f"No built .deb found for {self.scls_name} in {self.deb_out_dir}"
             )
-        deb_path = candidates[0]
-        print(f"Installing {deb_path}")
-        # Prefix with ./ when not absolute so apt-get treats it as a local
-        # file rather than a package name lookup.
-        deb_arg = str(deb_path) if deb_path.is_absolute() else f"./{deb_path}"
-        cmd = ['sudo', 'apt-get', 'install', '-y', deb_arg]
-        run_command(cmd, PROJECT_ROOT, os.environ, "apt-get install")
+        _apt_install_deb(candidates[0], label="apt-get install")
 
     def check_system_build_deps(self) -> None:
         """Verify non-SCLS entries in Build-Depends are installed on the host.
@@ -1396,10 +1454,7 @@ def install_flavor_meta_package(flavor: str) -> None:
             f"Run `scls build _meta` (or `scls build next` once the stack "
             f"is fully built) first."
         )
-    deb_path = candidates[0]
-    deb_arg = str(deb_path) if deb_path.is_absolute() else f"./{deb_path}"
-    cmd = ['sudo', 'apt-get', 'install', '-y', deb_arg]
-    run_command(cmd, PROJECT_ROOT, os.environ, "apt-get install meta")
+    _apt_install_deb(candidates[0], label="apt-get install meta")
 
 
 def main():

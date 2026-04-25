@@ -32,6 +32,7 @@ This is not a general-purpose meta-build framework. It makes choices so the resu
 - Python is not part of the stack. Interpreter choice is too site- and user-specific (system, pyenv, conda, spack, modules), so SCLS does not ship a Python and recipes disable Python (and other language) bindings by default. Users bring their own interpreter and bind against the installed C/C++ libraries themselves.
 - Boost is not part of the stack. Modern C++ (C++17/20) has absorbed most of what scientific code historically needed from Boost (`filesystem`, `optional`, `variant`, `any`, `string_view`), and the libraries SCLS cares about (cereal, ensmallen, mlpack 4.x, etc.) either never required Boost or have dropped the dependency. Adding Boost would mean pulling in a very large, slow-to-build tree of sublibraries to satisfy a shrinking set of optional features. Where a recipe offers a "build tests with Boost" switch, SCLS disables it.
 - SCLS avoids GPL-3 linkable libraries in distributed binary flavors. GPL-3 build tools are acceptable because they are executed during the build, not linked into the delivered libraries. GPL-2, LGPL, and CeCILL-C scientific libraries may be included when their source and redistribution obligations are practical for SCLS to satisfy. See [`LICENSE_POLICY.md`](LICENSE_POLICY.md) for the package policy and rationale.
+- Binaries depend only on what the recipe declares, not on what the build host happens to have. Autodetection at configure or Makefile time is a silent-failure pattern: a missing probe produces a binary that quietly lacks features the recipe claimed it would have. OpenBLAS's OpenMP support is the canonical case — when `getconf _NPROCESSORS_ONLN` returns 1 on a single-CPU build host (mockbuild container, CI runner with cgroup limits, small VM), OpenBLAS silently builds sequential regardless of `USE_OPENMP=1`. Recipes therefore declare explicit caps and build dependencies so the same recipe produces the same binary across build hosts.
 
 The bias is toward a curated stack rather than an infinitely configurable one. If the requirement is "I need exactly seventeen custom feature toggles for one package," this is the wrong tool. If the requirement is "I need PETSc, HDF5, OpenBLAS, NetCDF, MUMPS, and friends to build and coexist sanely," this is exactly the kind of tool that helps.
 
@@ -58,7 +59,11 @@ SCLS supports multiple delivery paths built from the same recipe and flavor mode
 
 On RPM-oriented Linux systems, SCLS can generate SPEC files and build RPMs. This is the preferred route when the target system supports it, because it gives you normal package-manager installation and removal semantics.
 
-### 2. Generic Unix-style installs
+### 2. DEB-based Linux builds
+
+On Debian/Ubuntu hosts SCLS produces `.deb` packages from the same recipes and flavors. The builder stages into a DESTDIR buildroot and wraps it with `dpkg-deb --build`, the DEB analogue of the RPM path. A 3.0 (quilt) source-package triplet (`.dsc` + `.orig.tar.<ext>` + `.debian.tar.xz`) is produced alongside the binary for license-compliance parity with source RPMs. Recipe `rpm_build_requires` and `rpm_requires` are translated to Debian names via [`packaging/system_packages.yaml`](packaging/system_packages.yaml); any unknown RHEL name is a hard error, not a silent fallback.
+
+### 3. Generic Unix-style installs
 
 SCLS also supports a direct Unix builder for environments where native packaging is not realistic or not desirable. This is useful for:
 
@@ -67,7 +72,7 @@ SCLS also supports a direct Unix builder for environments where native packaging
 - distributions outside the RPM path
 - "Linux From Scratch"-style deployment into a controlled prefix
 
-### 3. Native macOS builds
+### 4. Native macOS builds
 
 SCLS supports direct builds on macOS as well. That includes older Intel Macs and should also extend to Apple Silicon through the same general recipe and flavor machinery.
 
@@ -88,6 +93,7 @@ The project is built around three core concepts.
 [`python/`](python) contains the code that turns recipes and flavors into actual builds:
 
 - [`python/rpm_builder.py`](python/rpm_builder.py): RPM-oriented Linux packaging
+- [`python/deb_builder.py`](python/deb_builder.py): Debian/Ubuntu `.deb` packaging, including 3.0 (quilt) source packages
 - [`python/unix_builder.py`](python/unix_builder.py): direct Unix-style builds and installs
 - [`python/build_common.py`](python/build_common.py): shared build logic
 - [`python/build_order.py`](python/build_order.py): dependency ordering
@@ -99,12 +105,14 @@ The project is built around three core concepts.
 - [`recipes/`](recipes): package definitions
 - [`flavors/`](flavors): compiler/platform/math configurations
 - [`patches/`](patches): package patches
-- [`templates/`](templates): SPEC and related templates
+- [`templates/`](templates): SPEC, DEBIAN/control, and related templates
+- [`packaging/`](packaging): cross-distribution packaging data (e.g. RHEL→Debian system-package name mapping)
 - [`python/`](python): builder implementation
 - [`files/`](files): tracked install manifests
-- [`changelogs/`](changelogs): RPM changelog sources
+- [`changelogs/`](changelogs): package changelog sources (used by both RPM and DEB builders)
 - [`rpmbuild/`](rpmbuild): local RPM build tree
-- [`work/`](work): downloaded sources and build artifacts
+- [`debbuild/`](debbuild): local DEB build tracking (marker files for build-order resolution)
+- [`work/`](work): downloaded sources and build artifacts (including `work/pkgs` for binary `.deb` output and `work/spkgs` for source packages)
 
 ## Flavors
 
@@ -118,6 +126,30 @@ A flavor defines the target platform, compilers, optimization flags, math backen
 | `intel`  | `/opt/scls/intel` | Intel    | Intel MKL | Requires Intel oneAPI compilers      |
 | `lbl`    | `/opt/scls/lbl`   | GCC      | OpenBLAS  | LBL site-specific, builds own GCC    |
 | `macos`  | `/opt/scls`       | GCC      | OpenBLAS  | macOS Intel (Apple Silicon planned)  |
+
+### Deployment Targets
+
+Flavors map to distinct deployment classes. The target informs which external dependencies are built against the system vs. supplied by the SCLS stack, and which schedulers and fabrics are pulled in.
+
+| Flavor | Install target | Hardware / environment assumption |
+|---|---|---|
+| `lbl` | LBL HPC compute nodes | InfiniBand fabric and Slurm workload manager; builds against system PMIx, hwloc, libevent, and Slurm to stay binary-compatible with site infrastructure |
+| `gcc` / `mkl` / `debug` | Cloud VMs (AWS, Azure, GCP), workstations, non-LBL HPC clusters — distributed via RPM/DEB repos | Mixed: TCP-only on commodity VMs and desktops through RDMA-capable fabric on cloud HPC instances and generic on-prem HPC clusters |
+| `macos` | Developer workstation | TCP-only; macOS has no RDMA story |
+
+Two policies follow from this table, and they're worth stating explicitly because the reasoning isn't symmetric.
+
+**Slurm is scoped strictly to `lbl`.** Workstation and cloud installs of `gcc`/`mkl`/`debug` do not pull in a workload manager. Slurm is LBL-specific site infrastructure, not a general assumption — a researcher on an AWS instance or a laptop should not be forced to install `libslurm-dev` to get OpenMPI working.
+
+**High-performance fabrics are supported universally**, except macOS where UCX isn't built at all. UCX in `gcc`/`mkl`/`debug` is configured with `--with-verbs` and `--with-rdmacm`. This matters for more than just on-prem HPC: AWS EFA (Elastic Fabric Adapter, available on `hpc7a`/`p5`/etc.) exposes itself through the libibverbs API, as do Azure HPC Mellanox SKUs. The runtime cost on a host with no fabric is ~500 KB of unused libraries that UCX dlopens and gracefully skips when no hardware is present; the cost of *not* supporting them universally is a ~10× MPI performance cliff on any cloud HPC or non-LBL HPC deployment of `gcc`/`mkl`/`debug`.
+
+Slurm and RDMA fabric are correlated on traditional HPC clusters but not coupled. AWS HPC instances have EFA but no Slurm by default; the policies above handle that case correctly.
+
+### Build host vs. install host
+
+SCLS distinguishes the machine that *produces* packages from the machine that *consumes* them. RPMs and DEBs are typically produced once on a centralized build host (mock/pbuilder container, CI runner, maintainer workstation) and then distributed via a package repository or shared storage to many install hosts. Recipe `rpm_build_requires` / `rpm_requires` declarations describe the build host's and install host's needs respectively; the SCLS `requires:` field describes inter-package dependencies inside the stack.
+
+The practical consequence: installing `libibverbs-dev` on your build host to compile `scls-gcc-ucx` does not mean the resulting package will require `libibverbs-dev` at install time. It requires only `libibverbs1` (the runtime soname package), which is tiny and harmless on machines without IB hardware.
 
 ## Quick Start
 
