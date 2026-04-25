@@ -242,8 +242,9 @@ def apply_patches(source_dir: Path, recipe: Dict, package_name: str, patches_dir
 
         print(f"[{i}/{len(patches)}] Applying {patch_file} (-p{strip_level}) [{patch_source}]")
 
-        # Look for patch file in current directory (copied by copy_patches_to_sources)
-        patch_path = patches_dir / patch_file
+        # Resolve patch location: auto-discovered patches carry an absolute
+        # full_path; recipe-specified patches live under <patches_dir>/<package>/.
+        patch_path = patch.get('full_path') or (patches_dir / package_name / patch_file)
 
         # Check if this patch is allowed to fail (opt-in via recipe)
         allow_failure = patch.get('allow_failure', False)
