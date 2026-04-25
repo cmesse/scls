@@ -4,6 +4,7 @@ Enhanced RPM builder with release tags, proper parallel builds, and changelog lo
 FIXED: Direct configure call instead of %configure macro to avoid unwanted arguments
 """
 
+import copy
 import os
 import sys
 import argparse
@@ -28,7 +29,8 @@ from build_common import (
     get_subpackage_dependencies,
     get_interface_args,
     read_extra_packages,
-    resolve_flavor_key
+    resolve_flavor_key,
+    apply_flavor_overrides
 )
 from patch_common import (
     copy_patches_to_sources,
@@ -223,9 +225,11 @@ class RPMBuilder:
         self.package = package
         self.flavor_name = flavor
 
-        # Load configurations
-        self.recipe = load_recipe(package)
-        self.flavor = load_flavor(flavor)
+        # Load configurations. Deepcopy both so platform/flavor/MPI overrides
+        # below don't mutate cached recipe/flavor dicts that other builders
+        # (or future load_recipe caching) might share.
+        self.recipe = copy.deepcopy(load_recipe(package))
+        self.flavor = copy.deepcopy(load_flavor(flavor))
 
         # Platform is always linux for RPM builder
         self.platform = 'linux'
@@ -242,6 +246,12 @@ class RPMBuilder:
                 if 'source' not in self.recipe:
                     self.recipe['source'] = {}
                 self.recipe['source'].update(platform_section['source'])
+
+        # Apply flavor-specific overrides (e.g. lbl pinning openmpi to 4.1.6).
+        # Must run after the platform merge so platform-level fields are in
+        # place, and before downstream code reads recipe['version'] or the
+        # source URL. Mirrors unix_builder.__init__.
+        self.recipe = apply_flavor_overrides(self.recipe, self.flavor)
 
         # Validate platform
         if self.flavor.get('platform') != 'linux':
@@ -1086,8 +1096,22 @@ SCLS_EOF
 # clean up the entire flavor prefix tree.  The environment package is the
 # base of the stack — if it is gone, nothing else under this prefix can
 # function, so removing the tree avoids leaving stale directories behind.
+#
+# Defensive guards: only clean up paths under /opt/scls, and only if the
+# environment marker is actually present. Anything else is a misconfigured
+# prefix that we refuse to touch — refusing rather than silently rm -rf'ing
+# protects users who customized their prefix to e.g. /opt or $HOME.
 if [ "$1" -eq 0 ]; then
-    rm -rf %{{prefix}} 2>/dev/null || true
+    case "%{{prefix}}" in
+        /opt/scls/*|/opt/scls)
+            if [ -f "%{{prefix}}/share/scls/registry/environment.yaml" ]; then
+                rm -rf -- "%{{prefix}}" 2>/dev/null || true
+            fi
+            ;;
+        *)
+            echo "scls-environment %postun: refusing to remove non-SCLS prefix: %{{prefix}}" >&2
+            ;;
+    esac
 fi
 
 %files
@@ -1154,8 +1178,11 @@ fi
                 print(f"Warning: Template '{template_name}' not found, using default.spec.j2")
             template = self.jinja_env.get_template('default.spec.j2')
 
-        # Get optimization flags
-        self.cflags, self.cxxflags, self.fflags = get_optimization_flags(
+        # Get optimization flags. Use self.fcflags as the single source of
+        # truth for Fortran flags; the SPEC template still emits both
+        # FFLAGS and FCFLAGS, fed from the same value via the context
+        # dict below.
+        self.cflags, self.cxxflags, self.fcflags = get_optimization_flags(
             self.recipe, self.flavor, self.flavor['compilers']['cc']
         )
 
@@ -1174,7 +1201,7 @@ fi
             if self.math_flags :
                 self.cflags += f" {self.math_flags}"
                 self.cxxflags += f" {self.math_flags}"
-                self.fflags += f" {self.math_flags}"
+                self.fcflags += f" {self.math_flags}"
 
         # For the mkl flavor, every package may need MKL headers (e.g. C++
         # bindings, headers that #include <mkl.h> transitively), regardless
@@ -1197,8 +1224,8 @@ fi
                     self.cflags += f" {flag}"
                 if flag not in self.cxxflags:
                     self.cxxflags += f" {flag}"
-                if flag not in self.fflags:
-                    self.fflags += f" {flag}"
+                if flag not in self.fcflags:
+                    self.fcflags += f" {flag}"
 
         # Get requirements
         build_requires, requires = self.get_rpm_requires()
@@ -1264,8 +1291,9 @@ fi
         # Get Intel OneAPI setup
         intel_oneapi_setup = self.get_intel_oneapi_setup()
 
-        # Sync derived flag attributes used by get_cmake_args_with_paths()
-        self.fcflags = self.fflags
+        # Set ldflags so get_cmake_args_with_paths() and downstream
+        # check_args calls see them. self.fcflags is already populated by
+        # the math/MKL injection above; no resync needed.
         self.ldflags = add_rpath_for_libdirs(self.flavor['flags'].get('ldflags', ''), 'linux')
 
         # Get cmake args if needed
@@ -1284,6 +1312,21 @@ fi
         # Get install args
         install_args = self.get_install_args()
 
+        # Compute registry cflags/ldflags using the same precedence as
+        # build_common.write_registry_entry: recipe override (if any) > the
+        # generic -I/-L defaults. The pkg-config layer runs in %post and may
+        # override these at install time. Keeping the %{prefix} macro literal
+        # lets RPM expand it at spec-parse time, so the on-disk YAML still
+        # ends up with the absolute prefix path — matching what
+        # build_common emits for the DEB/unix paths.
+        recipe_registry = self.recipe.get('registry', {}) or {}
+        registry_cflags = recipe_registry.get(
+            'cflags', '-I%{prefix}/include'
+        )
+        registry_ldflags = recipe_registry.get(
+            'ldflags', '-L%{prefix}/lib -Wl,-rpath,%{prefix}/lib'
+        )
+
         # Prepare template variables
         context = {
             'flavor': self.flavor,
@@ -1298,15 +1341,17 @@ fi
             'homepage': self.recipe.get('homepage', ''),
             'license': self.recipe.get('license', ''),
             'summary': self.recipe.get('summary', ''),
-            'source_url': self.recipe['source']['url'],
+            'source_url': self.recipe['source'].get(
+                'source0', self.recipe['source']['url']
+            ).replace('%{version}', self.recipe['version']),
             'build_requires': build_requires,
             'requires': requires,
             'prefix': str(self.prefix),
             'sources': str(self.sources_dir),  # For extra sources (e.g., gmp/mpfr/mpc for GCC)
             'cflags': self.cflags,
             'cxxflags': self.cxxflags,
-            'fflags': self.fflags,
-            'fcflags': self.fflags,
+            'fflags': self.fcflags,
+            'fcflags': self.fcflags,
             'ldflags': add_rpath_for_libdirs(self.flavor['flags'].get('ldflags', ''), 'linux'),
             'files': files,
             'changelog_date': datetime.now().strftime('%a %b %d %Y'),
@@ -1346,7 +1391,9 @@ fi
             'library_symlink_fixes': self.get_library_symlink_fixes(),
             'extra_source_info': self.extra_source_info,  # For recipe-referenced sources
             'package_dependencies': get_package_dependencies(self.recipe, self.flavor),
-            'subpackages': self.get_subpackages_for_spec()
+            'subpackages': self.get_subpackages_for_spec(),
+            'registry_cflags': registry_cflags,
+            'registry_ldflags': registry_ldflags,
         }
 
         # Add extra source info as individual variables (e.g., gmp_version, gmp_tarball)
@@ -1511,30 +1558,28 @@ fi
         if 'requires' in self.recipe:
             recipe_requires = self.recipe['requires']
 
-            # Handle flavor-sensitive requires
-            if isinstance(recipe_requires, dict):
-                # Flavor-specific format
-                flavor_specific = resolve_flavor_key(self.flavor, recipe_requires)
-                if flavor_specific:
-                    for req in flavor_specific:
-                        scls_req = f"scls-{self.flavor_name}-{req}"
-                        build_requires.append(scls_req)
-                        requires.append(scls_req)
-                # Also add 'all' flavors requirements if present
-                if 'all' in recipe_requires:
-                    for req in recipe_requires['all']:
-                        scls_req = f"scls-{self.flavor_name}-{req}"
-                        build_requires.append(scls_req)
-                        requires.append(scls_req)
-            elif isinstance(recipe_requires, list):
-                # Simple list format (applies to all flavors)
-                # Build tools that are only needed at build time, not runtime
-                build_only_tools = {'cmake', 'autoconf', 'automake', 'libtool', 'pkg-config'}
-                for req in recipe_requires:
+            # Build tools that are only needed at build time, not runtime.
+            # Apply this filter to both the dict and list forms — most
+            # recipes declare cmake under `requires: {all: [cmake, ...]}`
+            # and we don't want to pull cmake into every package's runtime
+            # closure.
+            build_only_tools = {'cmake', 'autoconf', 'automake', 'libtool', 'pkg-config'}
+
+            def _add_recipe_reqs(names):
+                for req in names:
                     scls_req = f"scls-{self.flavor_name}-{req}"
                     build_requires.append(scls_req)
                     if req not in build_only_tools:
                         requires.append(scls_req)
+
+            if isinstance(recipe_requires, dict):
+                flavor_specific = resolve_flavor_key(self.flavor, recipe_requires)
+                if flavor_specific:
+                    _add_recipe_reqs(flavor_specific)
+                if 'all' in recipe_requires:
+                    _add_recipe_reqs(recipe_requires['all'])
+            elif isinstance(recipe_requires, list):
+                _add_recipe_reqs(recipe_requires)
 
         # Math library requirements based on flavor.
         # The flavor file expresses the math provider via `math.linalg`

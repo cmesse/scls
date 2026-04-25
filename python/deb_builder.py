@@ -164,6 +164,20 @@ class DebBuilder(UnixBuilder):
                 f"deb_builder requires a linux flavor; got platform={self.platform}"
             )
 
+        # DEB does not yet split subpackages (the RPM path does, e.g.
+        # -examples). Without this guard the recipe's subpackage layout
+        # would silently collapse into a single monolithic .deb.
+        from build_common import get_subpackages_for_flavor
+        if get_subpackages_for_flavor(self.recipe, self.flavor_name):
+            raise BuildError(
+                f"Recipe {self.package} declares subpackages: which is not "
+                f"yet supported by deb_builder. The RPM path produces split "
+                f"packages for these (e.g. -examples); the DEB path would "
+                f"silently produce a single monolithic .deb. Add DEB "
+                f"subpackage support before shipping this recipe through "
+                f"the DEB pipeline."
+            )
+
         self.system_package_map = load_system_package_map()
         self.architecture = detect_architecture()
         self.scls_name = f"scls-{self.flavor_name}-{self.package}"
@@ -344,16 +358,11 @@ class DebBuilder(UnixBuilder):
     def _collect_recipe_scls_deps(self) -> Tuple[List[str], List[str]]:
         """Recipe `requires:` list, transformed to scls-<flavor>-<name>.
 
-        Matches rpm_builder's asymmetric behavior deliberately: for the
-        plain-list form, BUILD_ONLY_TOOLS (cmake, autoconf, automake, libtool,
-        pkg-config) are build-time only and omitted from runtime Depends. For
-        the dict form, every entry goes to BOTH build and runtime. That
-        asymmetry looks accidental — a recipe that declares
-        `requires: {gcc: [cmake, ...]}` will currently pull cmake into
-        runtime deps in both builders — but parity with rpm_builder is what
-        existing recipes are written against, so we mirror the quirk rather
-        than silently diverging. Fixing it should happen in both builders at
-        once, not just here.
+        BUILD_ONLY_TOOLS (cmake, autoconf, automake, libtool, pkg-config) are
+        treated as build-time only and omitted from runtime Depends in both
+        the list and dict forms. Most recipes declare cmake under
+        `requires: {all: [cmake, ...]}` and we don't want to pull cmake into
+        every package's runtime closure.
         """
         build_requires = []
         requires = []
@@ -361,13 +370,7 @@ class DebBuilder(UnixBuilder):
         if recipe_requires is None:
             return build_requires, requires
 
-        def add_unfiltered(names):
-            for req in names:
-                scls_req = f"scls-{self.flavor_name}-{req}"
-                build_requires.append(scls_req)
-                requires.append(scls_req)
-
-        def add_list_form(names):
+        def add(names):
             for req in names:
                 scls_req = f"scls-{self.flavor_name}-{req}"
                 build_requires.append(scls_req)
@@ -377,11 +380,11 @@ class DebBuilder(UnixBuilder):
         if isinstance(recipe_requires, dict):
             flavor_specific = resolve_flavor_key(self.flavor, recipe_requires)
             if flavor_specific:
-                add_unfiltered(flavor_specific)
+                add(flavor_specific)
             if 'all' in recipe_requires:
-                add_unfiltered(recipe_requires['all'])
+                add(recipe_requires['all'])
         elif isinstance(recipe_requires, list):
-            add_list_form(recipe_requires)
+            add(recipe_requires)
         return build_requires, requires
 
     def get_deb_depends(self) -> Tuple[List[str], List[str]]:
@@ -435,9 +438,59 @@ class DebBuilder(UnixBuilder):
         and pre/post hooks, then stops. We write the registry entry INTO
         the destdir so it ships inside the .deb.
         """
+        # Hard-fail if the recipe declares final-post hooks. UnixBuilder
+        # runs these from run_final_post_install_commands() AFTER files
+        # have been copied from destdir into the live prefix; deb_builder
+        # stops at staging, so there is no equivalent point in the .deb
+        # build flow. The only recipe using final_post today is gcc on
+        # macOS (Mach-O install_name fixups), which is not a DEB target.
+        # Refuse to silently drop the hook for any future Linux consumer
+        # rather than producing a .deb that diverges from RPM behavior.
+        # Use resolve_flavor_key so inheritance/component fallbacks are
+        # respected — an exact-key membership test would miss a hook
+        # inherited from a parent flavor.
+        install_section = self.recipe.get('install', {}) or {}
+        flavor_final = install_section.get('flavor_final_post', {}) or {}
+        flavor_final_resolved = (
+            resolve_flavor_key(self.flavor, flavor_final)
+            if flavor_final else None
+        )
+        if install_section.get('final_post') or flavor_final_resolved:
+            raise BuildError(
+                f"Recipe {self.package} declares install.final_post or "
+                f"install.flavor_final_post matching flavor "
+                f"'{self.flavor_name}' (possibly via inheritance), which "
+                "is not yet implemented in deb_builder. Add a Debian-side "
+                "final-post step before relying on this hook."
+            )
+
         if self.destdir.exists():
             shutil.rmtree(self.destdir)
         self.destdir.mkdir(parents=True)
+
+        # Stage lib -> lib64 in the destdir up-front so the package's
+        # `make install DESTDIR=...` lands files in the same layout we ship
+        # at the live prefix (Linux From Scratch convention; the environment
+        # package owns the symlink on the installed system). Without this,
+        # an autotools package whose libdir resolves to lib/ would stage
+        # into <destdir>/<prefix>/lib while one whose libdir resolves to
+        # lib64/ would stage into <destdir>/<prefix>/lib64, and
+        # write_registry_entry's pkg-config probe (which only looks at
+        # lib/pkgconfig) would miss the latter. We drop the staging symlink
+        # before dpkg-deb wraps the destdir so non-environment .debs don't
+        # claim ownership of the symlink.
+        destdir_prefix = self.destdir / str(self.prefix).lstrip('/')
+        destdir_prefix.mkdir(parents=True, exist_ok=True)
+        is_environment = self.package == 'environment'
+        staging_lib_symlink: Path | None = None
+        if platform.system() == 'Linux':
+            lib_link = destdir_prefix / 'lib'
+            lib64_dir = destdir_prefix / 'lib64'
+            if not lib_link.exists() and not lib_link.is_symlink():
+                lib64_dir.mkdir(parents=True, exist_ok=True)
+                lib_link.symlink_to('lib64')
+                if not is_environment:
+                    staging_lib_symlink = lib_link
 
         # Pre-install commands
         if 'install' in self.recipe and 'pre' in self.recipe['install']:
@@ -451,14 +504,21 @@ class DebBuilder(UnixBuilder):
         if not build_dir.exists():
             raise BuildError(f"Build directory does not exist: {build_dir}")
 
-        # Custom vs default install
+        # Custom vs default install. install.commands run from the source
+        # root, matching templates/default.spec.j2's %install section
+        # (CLAUDE.md documents this contract). For autotools and
+        # custom_makefile recipes build_dir == source_dir, but for cmake
+        # recipes build_dir is <source>/build, which would break
+        # commands like `install -m 644 lib/* ...` and `%{srcdir}/LICENSE`
+        # references. self.source_dir is set in the parent's run().
+        custom_install_cwd = self.source_dir if self.source_dir else build_dir
         if 'install' in self.recipe and 'commands' in self.recipe['install']:
             for cmd in self.recipe['install']['commands']:
                 cmd = cmd.replace('%{buildroot}', str(self.destdir))
                 cmd = cmd.replace('%{prefix}', str(self.prefix))
                 cmd = cmd.replace('%{libext}', self.lib_ext)
                 expanded = self.check_args([cmd])[0]
-                run_command(['sh', '-c', expanded], build_dir, env, "install")
+                run_command(['sh', '-c', expanded], custom_install_cwd, env, "install")
         else:
             install_cmd = ['make', 'install', f'DESTDIR={self.destdir}']
             if 'install' in self.recipe:
@@ -474,8 +534,6 @@ class DebBuilder(UnixBuilder):
 
         # Post-install hooks. Three variants (post / flavor_post / platform_post)
         # all use the same %{...} substitution conventions as UnixBuilder.
-        destdir_prefix = self.destdir / str(self.prefix).lstrip('/')
-
         def run_post(cmds, label):
             for cmd in cmds:
                 cmd = cmd.replace('%{buildroot}', str(self.destdir))
@@ -514,6 +572,13 @@ class DebBuilder(UnixBuilder):
             destdir_prefix, self.recipe, self.flavor_name,
             install_prefix=self.prefix,
         )
+
+        # Drop the staging-only lib -> lib64 symlink so non-environment
+        # .debs don't ship a duplicate of the symlink that the environment
+        # package owns. Files staged under it remain at lib64/ where they
+        # already live.
+        if staging_lib_symlink is not None and staging_lib_symlink.is_symlink():
+            staging_lib_symlink.unlink()
 
         print(f"Staged install under {self.destdir}")
 
@@ -561,6 +626,51 @@ class DebBuilder(UnixBuilder):
         control_path = debian_dir / "control"
         control_path.write_text(rendered)
         print(f"Wrote {control_path}")
+
+        self._write_postinst(debian_dir)
+
+    def _write_postinst(self, debian_dir: Path) -> None:
+        """Emit DEBIAN/postinst with the same fixups RPM runs in %post.
+
+        Mirrors rpm_builder.get_library_symlink_fixes(): some upstreams
+        produce hard copies instead of symlinks for `libfoo.so` ->
+        `libfoo.so.N`, which breaks the loader when the unversioned link
+        is the build-time linkage target. We also refresh the loader
+        cache for the SCLS prefix so consumers don't need
+        LD_LIBRARY_PATH at runtime.
+
+        We bake the literal install prefix in here because dpkg does not
+        substitute spec-style macros the way rpmbuild does for the spec
+        %post section.
+        """
+        prefix = str(self.prefix)
+        script = f"""#!/bin/sh
+# Auto-generated by scls deb_builder for {self.package}.
+set -e
+
+# Convert any hard-copied unversioned .so files into symlinks pointing at
+# the versioned sibling — same fixup rpm_builder applies in %post.
+if [ -d {prefix}/lib ]; then
+    cd {prefix}/lib
+    for lib in *.so.*; do
+        [ -f "$lib" ] || continue
+        base="${{lib%%.*}}.so"
+        if [ -f "$base" ] && [ ! -L "$base" ]; then
+            if [ "$(stat -c %i "$lib")" = "$(stat -c %i "$base")" ]; then
+                rm -f "$base"
+                ln -s "$lib" "$base"
+            fi
+        fi
+    done
+    /sbin/ldconfig {prefix}/lib 2>/dev/null || true
+fi
+
+exit 0
+"""
+        postinst = debian_dir / "postinst"
+        postinst.write_text(script)
+        postinst.chmod(0o755)
+        print(f"Wrote {postinst}")
 
     def create_deb(self) -> Path:
         """Package self.destdir into a .deb via dpkg-deb --build."""
@@ -1108,6 +1218,30 @@ class DebBuilder(UnixBuilder):
         # Produce the triplet.
         cmd = ['dpkg-source', '-b', str(src_dir)]
         run_command(cmd, staging, os.environ, "dpkg-source -b")
+
+        # Validate the .dsc by round-tripping it: extract into a fresh
+        # directory and let dpkg-source replay debian/patches/series.
+        # dpkg-source -x fails non-zero if any patch in the quilt stack
+        # does not apply, so a bad strip level / path / hunk that survived
+        # _write_debian_dir's per-file copy gets caught here instead of
+        # showing up downstream when a consumer extracts the source
+        # package.
+        produced_dsc = next(staging.glob(f"{self.scls_name}_*.dsc"), None)
+        if produced_dsc is None:
+            raise BuildError(
+                "dpkg-source -b completed but no .dsc file was produced "
+                f"(expected under {staging})."
+            )
+        verify_dir = staging / "verify"
+        if verify_dir.exists():
+            shutil.rmtree(verify_dir)
+        verify_dir.mkdir()
+        run_command(
+            ['dpkg-source', '-x', str(produced_dsc),
+             str(verify_dir / 'extracted')],
+            verify_dir, os.environ, "dpkg-source -x (patch replay check)",
+        )
+        shutil.rmtree(verify_dir)
 
         # Move outputs into the permanent source-package directory.
         out_dir = PROJECT_ROOT / 'work' / 'spkgs'

@@ -34,11 +34,16 @@ for f in "$REGISTRY"/*.yaml; do
             license:*) license="${line#license: }" ;;
         esac
     done < "$f"
-    # Strip surrounding quotes
-    name="${name%\"}" ; name="${name#\"}"
-    version="${version%\"}" ; version="${version#\"}"
-    version="${version%\'}" ; version="${version#\'}"
-    license="${license%\"}" ; license="${license#\"}"
+    # Strip surrounding quotes (PyYAML may emit either '...' or "..." for
+    # values that need quoting — version strings starting with a digit are a
+    # common case). Apply both styles to every field for consistency with
+    # scls info.
+    for var in name version license; do
+        val="${!var}"
+        val="${val%\"}" ; val="${val#\"}"
+        val="${val%\'}" ; val="${val#\'}"
+        printf -v "$var" '%s' "$val"
+    done
     # Shorten overly long combined license strings for display
     if [[ "$license" == *" AND "* ]]; then
         short=""

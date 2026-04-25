@@ -40,7 +40,7 @@ from build_order import get_next_unbuilt_package
 # =============================================================================
 
 DEFAULT_CONFIG = {
-    'flavor': 'macos' if platform.system() == 'Darwin' else 'gcc-mkl',
+    'flavor': 'macos' if platform.system() == 'Darwin' else 'gcc',
     'package_format': 'auto',
 }
 

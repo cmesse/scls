@@ -1,5 +1,8 @@
 # Openblas Changelog
 
+## Version 0.3.33-1 - Sat Apr 25 2026
+- Updated to version 0.3.33
+
 ## Version 0.3.32-1 - Thu Apr 02 2026
 - Updated to version 0.3.32
 

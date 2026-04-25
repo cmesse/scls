@@ -8,6 +8,11 @@ license: BSD
 source:
   url: https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5_%{version}.tar.gz
 
+update:
+  # Pin to the 1.x line — hdf5 2.x is a major API/ABI break; netcdf and
+  # petsc need to be re-validated against it before we follow.
+  max_major: 1
+
 requires:
   all:
     - openmpi

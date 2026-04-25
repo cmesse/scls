@@ -1,5 +1,5 @@
 name: sed
-version: 4.9
+version: "4.10"
 summary: A GNU stream text editor
 homepage: https://sed.sourceforge.net/
 license: GPL-3.0-or-later

@@ -8,6 +8,11 @@ bootstrap: true
 source:
   url: https://github.com/openssl/openssl/releases/download/openssl-%{version}/openssl-%{version}.tar.gz
 
+update:
+  # Pin to the 3.x line — openssl 4 is a major API/ABI change; downstream
+  # consumers (cmake, curl-using tools) need to be re-validated first.
+  max_major: 3
+
 include_flavors:
   - macos
 

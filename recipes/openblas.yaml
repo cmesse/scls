@@ -1,5 +1,5 @@
 name: openblas
-version: 0.3.32
+version: 0.3.33
 summary: An optimized BLAS library based on GotoBLAS2
 homepage: https://github.com/OpenMathLib/OpenBLAS
 license: BSD-3-Clause

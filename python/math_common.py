@@ -120,9 +120,12 @@ def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
         args.append('-lpthread -lm -ldl')
 
     elif linalg == 'accelerate':
-        # ScaLAPACK if parallel (must be built against Accelerate)
+        # ScaLAPACK if parallel (must be built against Accelerate).
+        # Mirror the prefix/lib -L + rpath dance used by the other branches
+        # so produced binaries can resolve libscalapack at runtime without
+        # relying on LIBRARY_PATH from the build host.
         if needs_scalapack:
-            args.append('-lscalapack')
+            args.append('-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib -lscalapack')
 
         # Apple Accelerate framework
         args.append('-framework Accelerate')

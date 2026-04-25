@@ -57,7 +57,8 @@ class UpdateResult:
                  source_type: str = "",
                  download_url: Optional[str] = None,
                  download_ok: Optional[bool] = None,
-                 reason: Optional[str] = None):
+                 reason: Optional[str] = None,
+                 blocked_version: Optional[str] = None):
         self.name = name
         self.current_version = current_version
         self.latest_version = latest_version
@@ -66,6 +67,10 @@ class UpdateResult:
         self.download_url = download_url
         self.download_ok = download_ok
         self.reason = reason
+        # A higher-major release that exists upstream but is held back by
+        # the recipe's update.max_major pin. None when no pin is active or
+        # no higher major has been released yet.
+        self.blocked_version = blocked_version
 
     def to_dict(self) -> Dict:
         d = {
@@ -81,6 +86,8 @@ class UpdateResult:
             d["download_ok"] = self.download_ok
         if self.reason:
             d["reason"] = self.reason
+        if self.blocked_version:
+            d["blocked_version"] = self.blocked_version
         return d
 
 
@@ -153,6 +160,19 @@ def is_prerelease(tag_name: str) -> bool:
         r'(alpha|beta|rc\d|dev|pre|snapshot|nightly|canary|branch|amzn|'
         r'ubuntu|debian|fedora|suse)',
         lower))
+
+
+def major_of(version: str) -> Optional[int]:
+    """Return the integer major version (first numeric component), or None.
+
+    Used by max_major filtering — recipes can pin to their current major to
+    avoid being prompted to take an API-breaking upstream bump.
+    """
+    parts = parse_version(version)
+    if not parts:
+        return None
+    flag, val = parts[0]
+    return val if flag == 0 else None
 
 
 # ---------------------------------------------------------------------------
@@ -392,12 +412,19 @@ def check_github_release_latest(owner: str, repo: str,
                                 tag_prefix: str = "v",
                                 tag_suffix: str = "",
                                 version_transform: Optional[str] = None,
-                                token: Optional[str] = None) -> str:
+                                max_major: Optional[int] = None,
+                                token: Optional[str] = None
+                                ) -> Tuple[str, Optional[str]]:
     """Check GitHub /releases/latest endpoint — a single API call.
 
     GitHub's `/releases/latest` returns the most recent non-draft,
     non-prerelease release, filtered server-side. Much cheaper than fetching
     all tags: 1 request per package instead of up to 5.
+
+    Returns (latest_within_max_major, blocked_higher_major_or_None). When
+    max_major is set and /releases/latest exceeds it, this falls back to a
+    tag scan to find the highest within-constraint version, and reports the
+    higher upstream version separately.
     """
     headers = _github_headers(token)
     url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
@@ -426,7 +453,20 @@ def check_github_release_latest(owner: str, repo: str,
         raise UpdateCheckError(
             f"Could not extract version from tag {tag_name!r} for "
             f"{owner}/{repo} (prefix={tag_prefix!r}, suffix={tag_suffix!r})")
-    return ver
+
+    if max_major is not None:
+        ver_major = major_of(ver)
+        if ver_major is not None and ver_major > max_major:
+            # /releases/latest is past our pin — scan tags for the highest
+            # within-constraint version and report the latest as blocked.
+            constrained, _ = check_github_tags(
+                owner, repo,
+                tag_prefix=tag_prefix, tag_suffix=tag_suffix,
+                version_transform=version_transform,
+                max_major=max_major, token=token,
+            )
+            return constrained, ver
+    return ver, None
 
 
 def check_github_tags(owner: str, repo: str,
@@ -434,8 +474,9 @@ def check_github_tags(owner: str, repo: str,
                       tag_suffix: str = "",
                       version_transform: Optional[str] = None,
                       exclude_pattern: Optional[str] = None,
+                      max_major: Optional[int] = None,
                       token: Optional[str] = None,
-                      max_pages: int = 3) -> str:
+                      max_pages: int = 3) -> Tuple[str, Optional[str]]:
     """Check GitHub tags API for latest version.
 
     Fetches tags with pagination (up to max_pages * 100 tags), filters by
@@ -443,6 +484,8 @@ def check_github_tags(owner: str, repo: str,
     Pagination is necessary for repos like CMake or OpenSSL that have >100
     tags, where the newest release may be on the first page but related
     stable tags for comparison may be further back.
+
+    Returns (latest_within_max_major, blocked_higher_major_or_None).
     """
     headers = _github_headers(token)
     versions = []
@@ -504,17 +547,33 @@ def check_github_tags(owner: str, repo: str,
 
     # Sort by parsed version and return highest
     versions.sort(key=parse_version, reverse=True)
-    return versions[0]
+    unconstrained_latest = versions[0]
+    if max_major is None:
+        return unconstrained_latest, None
+
+    constrained = [v for v in versions
+                   if (m := major_of(v)) is not None and m <= max_major]
+    if not constrained:
+        raise UpdateCheckError(
+            f"No tags within max_major={max_major} for {owner}/{repo}")
+    unc_major = major_of(unconstrained_latest)
+    blocked = unconstrained_latest if (
+        unc_major is not None and unc_major > max_major) else None
+    return constrained[0], blocked
 
 
 def check_gnu_ftp(ftp_path: str,
                   filename_pattern: str,
-                  dir_pattern: Optional[str] = None) -> str:
+                  dir_pattern: Optional[str] = None,
+                  max_major: Optional[int] = None
+                  ) -> Tuple[str, Optional[str]]:
     """Check GNU FTP directory listing for latest version.
 
     For most packages, scans the flat directory listing.
     For GCC-style packages with subdirectories, uses dir_pattern to scan
     subdirectory names first.
+
+    Returns (latest_within_max_major, blocked_higher_major_or_None).
     """
     base_url = f"https://ftp.gnu.org{ftp_path}"
 
@@ -535,7 +594,19 @@ def check_gnu_ftp(ftp_path: str,
     # Deduplicate and sort
     versions = list(set(versions))
     versions.sort(key=parse_version, reverse=True)
-    return versions[0]
+    unconstrained_latest = versions[0]
+    if max_major is None:
+        return unconstrained_latest, None
+    constrained = [v for v in versions
+                   if (m := major_of(v)) is not None and m <= max_major]
+    if not constrained:
+        raise UpdateCheckError(
+            f"No versions within max_major={max_major} at "
+            f"https://ftp.gnu.org{ftp_path}")
+    unc_major = major_of(unconstrained_latest)
+    blocked = unconstrained_latest if (
+        unc_major is not None and unc_major > max_major) else None
+    return constrained[0], blocked
 
 
 def check_html_regex(url: str, pattern: str) -> str:
@@ -634,17 +705,21 @@ def resolve_strategy(recipe: Dict) -> Tuple[str, Dict]:
     Returns (strategy_name, config_dict).
 
     Priority:
-    1. Explicit 'update:' section in recipe
-    2. Auto-detect from source URL (GitHub, GNU FTP)
-    3. Return ('undetermined', {})
+    1. If 'update.strategy' is explicit, use it as-is.
+    2. Otherwise auto-detect from source URL (GitHub, GNU FTP) and merge any
+       user-supplied keys from 'update:' (e.g. max_major) into the config.
+    3. Return ('undetermined', ...) when neither path applies.
     """
-    # 1. Explicit update section
-    update = recipe.get('update')
-    if update and isinstance(update, dict):
-        strategy = update.get('strategy', 'undetermined')
-        return strategy, update
+    user_update = recipe.get('update') or {}
+    if not isinstance(user_update, dict):
+        user_update = {}
 
-    # 2. Auto-detect from source URL
+    # 1. Explicit strategy: user fully owns the config.
+    if 'strategy' in user_update:
+        return user_update['strategy'], dict(user_update)
+
+    # 2. Auto-detect from source URL, then layer user keys on top so
+    # constraints like max_major work without forcing a full update block.
     # The build system (unix_builder.py, rpm_builder.py) prefers source0 over
     # url when both are present, treating url as a project page in that case.
     # Mirror that priority here so auto-detection targets the real tarball.
@@ -652,27 +727,32 @@ def resolve_strategy(recipe: Dict) -> Tuple[str, Dict]:
     if isinstance(source, dict):
         url = source.get('source0') or source.get('url', '')
     else:
-        return 'undetermined', {'reason': 'No source URL'}
+        return 'undetermined', {'reason': 'No source URL', **user_update}
 
     if not url or source.get('type') == 'generated':
-        return 'undetermined', {'reason': 'No external source'}
+        return 'undetermined', {'reason': 'No external source', **user_update}
 
     # Try GitHub
     gh = extract_github_info(url)
     if gh:
         strategy = 'github_release' if gh['use_releases'] else 'github_tag'
-        return strategy, {
+        config = {
             'repo': f"{gh['owner']}/{gh['repo']}",
             'tag_prefix': gh['tag_prefix'],
             'tag_suffix': gh['tag_suffix'],
         }
+        config.update(user_update)
+        return strategy, config
 
     # Try GNU FTP
     gnu = extract_gnu_ftp_info(url)
     if gnu:
-        return 'gnu_ftp', gnu
+        config = dict(gnu)
+        config.update(user_update)
+        return 'gnu_ftp', config
 
-    return 'undetermined', {'reason': 'No updater strategy configured'}
+    return 'undetermined', {'reason': 'No updater strategy configured',
+                            **user_update}
 
 
 def predict_download_url(recipe: Dict, new_version: str) -> Optional[str]:
@@ -728,7 +808,9 @@ def check_package(package_name: str,
 
     # Discover latest version
     latest = None
+    blocked_higher = None
     source_type = strategy
+    max_major = config.get('max_major') if isinstance(config, dict) else None
     try:
         if strategy in ('github_release', 'github_tag'):
             repo = config.get('repo', '')
@@ -741,11 +823,12 @@ def check_package(package_name: str,
                 # Use /releases/latest — 1 API call, server-side filtering
                 # of drafts and prereleases.
                 try:
-                    latest = check_github_release_latest(
+                    latest, blocked_higher = check_github_release_latest(
                         owner, repo_name,
                         tag_prefix=config.get('tag_prefix', 'v'),
                         tag_suffix=config.get('tag_suffix', ''),
                         version_transform=config.get('version_transform'),
+                        max_major=max_major,
                         token=github_token,
                     )
                 except UpdateCheckError as e:
@@ -753,30 +836,33 @@ def check_package(package_name: str,
                     # /releases/latest returns 404 when no release is flagged
                     # "latest". Fall back to scanning tags.
                     if '404' in str(e):
-                        latest = check_github_tags(
+                        latest, blocked_higher = check_github_tags(
                             owner, repo_name,
                             tag_prefix=config.get('tag_prefix', 'v'),
                             tag_suffix=config.get('tag_suffix', ''),
                             version_transform=config.get('version_transform'),
                             exclude_pattern=config.get('exclude_pattern'),
+                            max_major=max_major,
                             token=github_token,
                         )
                     else:
                         raise
             else:
-                latest = check_github_tags(
+                latest, blocked_higher = check_github_tags(
                     owner, repo_name,
                     tag_prefix=config.get('tag_prefix', 'v'),
                     tag_suffix=config.get('tag_suffix', ''),
                     version_transform=config.get('version_transform'),
                     exclude_pattern=config.get('exclude_pattern'),
+                    max_major=max_major,
                     token=github_token,
                 )
         elif strategy == 'gnu_ftp':
-            latest = check_gnu_ftp(
+            latest, blocked_higher = check_gnu_ftp(
                 config['ftp_path'],
                 config.get('filename_pattern', ''),
                 dir_pattern=config.get('dir_pattern'),
+                max_major=max_major,
             )
         elif strategy == 'html_regex':
             latest = check_html_regex(
@@ -838,7 +924,8 @@ def check_package(package_name: str,
         return UpdateResult(package_name, current,
                             latest_version=latest,
                             status=UP_TO_DATE,
-                            source_type=source_type)
+                            source_type=source_type,
+                            blocked_version=blocked_higher)
 
     # Update available — optionally verify download URL
     download_url = predict_download_url(recipe, latest)
@@ -854,14 +941,16 @@ def check_package(package_name: str,
                                 source_type=source_type,
                                 download_url=download_url,
                                 download_ok=False,
-                                reason=f"HTTP {status_code}")
+                                reason=f"HTTP {status_code}",
+                                blocked_version=blocked_higher)
 
     return UpdateResult(package_name, current,
                         latest_version=latest,
                         status=UPDATE_AVAILABLE,
                         source_type=source_type,
                         download_url=download_url,
-                        download_ok=download_ok)
+                        download_ok=download_ok,
+                        blocked_version=blocked_higher)
 
 
 def check_all(recipes_dir: Path = Path("recipes"),
@@ -889,6 +978,8 @@ def format_report(results: List[UpdateResult]) -> str:
     updates = [r for r in results if r.status == UPDATE_AVAILABLE]
     url_failed = [r for r in results if r.status == UPDATE_URL_FAILED]
     up_to_date = [r for r in results if r.status == UP_TO_DATE]
+    blocked = [r for r in up_to_date if r.blocked_version]
+    up_to_date_clean = [r for r in up_to_date if not r.blocked_version]
     skipped = [r for r in results if r.status == SKIP]
     undetermined = [r for r in results if r.status == UNDETERMINED]
     errors = [r for r in results if r.status == ERROR]
@@ -905,9 +996,12 @@ def format_report(results: List[UpdateResult]) -> str:
             dl = ""
             if r.download_ok is True:
                 dl = "  [download verified]"
+            blocked_note = ""
+            if r.blocked_version:
+                blocked_note = f"  [major {r.blocked_version} blocked by pin]"
             lines.append(f"  {r.name:<20s} {r.current_version:>12s}"
                          f"  ->  {r.latest_version:<12s}"
-                         f"  ({r.source_type}){dl}")
+                         f"  ({r.source_type}){dl}{blocked_note}")
         lines.append("")
 
     # URL verification failures
@@ -923,11 +1017,20 @@ def format_report(results: List[UpdateResult]) -> str:
                 lines.append(f"    {r.reason}")
         lines.append("")
 
+    # Major version blocked by max_major pin (no in-range update available)
+    if blocked:
+        lines.append(f"Major version blocked by pin ({len(blocked)}):")
+        for r in blocked:
+            lines.append(f"  {r.name:<20s} {r.current_version:>12s}"
+                         f"  ->  {r.blocked_version:<12s}"
+                         f"  (held back by max_major)")
+        lines.append("")
+
     # Up to date
-    if up_to_date:
-        lines.append(f"Up to date ({len(up_to_date)}):")
+    if up_to_date_clean:
+        lines.append(f"Up to date ({len(up_to_date_clean)}):")
         # Compact format — multiple per line
-        items = [f"{r.name} {r.current_version}" for r in up_to_date]
+        items = [f"{r.name} {r.current_version}" for r in up_to_date_clean]
         line = "  "
         for item in items:
             if len(line) + len(item) + 2 > 78:
@@ -970,8 +1073,10 @@ def format_report(results: List[UpdateResult]) -> str:
     ]
     if url_failed:
         summary_parts.append(f"{len(url_failed)} url-failed")
+    if blocked:
+        summary_parts.append(f"{len(blocked)} major-blocked")
     summary_parts += [
-        f"{len(up_to_date)} up-to-date",
+        f"{len(up_to_date_clean)} up-to-date",
         f"{len(skipped)} skipped",
         f"{len(undetermined)} undetermined",
         f"{len(errors)} errors",
@@ -986,6 +1091,7 @@ def format_json(results: List[UpdateResult]) -> str:
     updates = [r for r in results if r.status == UPDATE_AVAILABLE]
     url_failed = [r for r in results if r.status == UPDATE_URL_FAILED]
     up_to_date = [r for r in results if r.status == UP_TO_DATE]
+    blocked = [r for r in up_to_date if r.blocked_version]
     skipped = [r for r in results if r.status == SKIP]
     undetermined = [r for r in results if r.status == UNDETERMINED]
     errors = [r for r in results if r.status == ERROR]
@@ -997,6 +1103,7 @@ def format_json(results: List[UpdateResult]) -> str:
             "updates": len(updates),
             "url_failed": len(url_failed),
             "up_to_date": len(up_to_date),
+            "major_blocked": len(blocked),
             "skipped": len(skipped),
             "undetermined": len(undetermined),
             "errors": len(errors),

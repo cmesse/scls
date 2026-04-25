@@ -41,21 +41,34 @@ def add_rpath_for_libdirs(ldflags: str, platform: str = 'linux') -> str:
     if not ldflags:
         return ldflags
 
-    # Collect existing rpaths to avoid duplicates
+    import shlex
+    try:
+        tokens = shlex.split(ldflags)
+    except ValueError:
+        tokens = ldflags.split()
+
+    # Collect every rpath we can recognize, including the bare `-rpath /foo`
+    # two-token form and the `-Xlinker -rpath -Xlinker /foo` four-token form.
+    # Without these, the dedup pass below misses them and the forward pass
+    # adds duplicate rpath entries that produce linker warnings.
     existing_rpaths = set()
-    for token in ldflags.split():
-        if '-rpath' in token:
-            # Extract path from -Wl,-rpath,/path or -Wl,-rpath=/path
-            if ',' in token:
-                parts = token.split(',')
-                for part in parts:
-                    if part.startswith('/') or part.startswith('='):
-                        existing_rpaths.add(part.lstrip('='))
-            elif '=' in token:
-                existing_rpaths.add(token.split('=')[-1])
+    i = 0
+    while i < len(tokens):
+        t = tokens[i]
+        if t.startswith('-Wl,'):
+            for part in t.split(','):
+                if part.startswith('/'):
+                    existing_rpaths.add(part)
+                elif part.startswith('rpath='):
+                    existing_rpaths.add(part[len('rpath='):])
+        elif t == '-rpath' and i + 1 < len(tokens):
+            existing_rpaths.add(tokens[i + 1])
+        elif (t == '-Xlinker' and i + 3 < len(tokens)
+              and tokens[i + 1] == '-rpath' and tokens[i + 2] == '-Xlinker'):
+            existing_rpaths.add(tokens[i + 3])
+        i += 1
 
     # Process tokens and insert rpath after each -L
-    tokens = ldflags.split()
     result_tokens = []
 
     i = 0
@@ -87,19 +100,19 @@ def add_rpath_for_libdirs(ldflags: str, platform: str = 'linux') -> str:
 
 
 def load_yaml(filepath: Path) -> Dict:
-    """Load a YAML file"""
+    """Load a YAML file.
+
+    Note: %{version} substitution in source URLs is intentionally deferred
+    to download time. apply_flavor_overrides may change recipe['version']
+    after load, and substituting too early would freeze in the original
+    version, causing flavor-overridden builds to fetch the wrong tarball.
+    """
     with open(filepath, 'r') as f:
         data = yaml.safe_load(f)
 
     # Force version to be a string if present at top level
     if isinstance(data, dict) and 'version' in data:
         data['version'] = str(data['version'])
-
-    # Also handle version in source URLs
-    if isinstance(data, dict) and 'source' in data and 'url' in data['source']:
-        # Store original version as string for URL substitution
-        if 'version' in data:
-            data['source']['url'] = data['source']['url'].replace('%{version}', str(data['version']))
 
     return data
 
@@ -141,16 +154,13 @@ def apply_flavor_overrides(recipe: Dict, flavor: Dict) -> Dict:
         recipe['version'] = str(overrides['version'])
         print(f"  Version: {old_version} -> {recipe['version']}")
 
-    # Override source URL
+    # Override source URL. Keep %{version} as a literal here; it is
+    # substituted at download time using the post-override recipe['version'],
+    # so version-only flavor overrides also point at the right tarball.
     if 'source' in overrides and 'url' in overrides['source']:
         recipe['source'] = dict(recipe.get('source', {}))
-        recipe['source']['url'] = overrides['source']['url'].replace(
-            '%{version}', str(recipe['version']))
+        recipe['source']['url'] = overrides['source']['url']
         print(f"  Source URL: {recipe['source']['url']}")
-    elif 'version' in overrides and 'source' in recipe and 'url' in recipe['source']:
-        # Version changed but no explicit URL override — re-substitute %{version}
-        # Only works if the original URL template is still usable
-        pass  # URL was already substituted by load_yaml, can't re-substitute
 
     return recipe
 
@@ -426,6 +436,39 @@ def detect_source_directory(tarball: Path) -> Optional[str]:
     return None
 
 
+def _safe_extract_tar(tar: tarfile.TarFile, dest: Path) -> None:
+    """Validate tar members before extraction (Python < 3.12 fallback).
+
+    Rejects:
+      - absolute paths
+      - paths containing '..' components after normalization
+      - device nodes, FIFOs, character/block special files
+    Symlinks and hardlinks are allowed only if their resolved target stays
+    inside dest.
+    """
+    dest_abs = dest.resolve()
+    for member in tar.getmembers():
+        if member.isdev() or member.ischr() or member.isblk() or member.isfifo():
+            raise BuildError(f"Refusing to extract special file: {member.name}")
+        target = (dest / member.name).resolve()
+        try:
+            target.relative_to(dest_abs)
+        except ValueError:
+            raise BuildError(
+                f"Tar member escapes destination: {member.name} -> {target}"
+            )
+        if member.issym() or member.islnk():
+            link_target = ((dest / member.name).parent / member.linkname).resolve()
+            try:
+                link_target.relative_to(dest_abs)
+            except ValueError:
+                raise BuildError(
+                    f"Tar link target escapes destination: "
+                    f"{member.name} -> {member.linkname}"
+                )
+    tar.extractall(dest)
+
+
 def extract_source(tarball: Path, work_dir: Path, package_name: str, version: str) -> Path:
     """Extract source tarball and return the extracted directory"""
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -435,7 +478,7 @@ def extract_source(tarball: Path, work_dir: Path, package_name: str, version: st
         if sys.version_info >= (3, 12):
             tar.extractall(work_dir, filter='data')
         else:
-            tar.extractall(work_dir)
+            _safe_extract_tar(tar, work_dir)
 
     # Find the extracted directory
     # Usually it's package-version, but we should check
@@ -458,6 +501,8 @@ def extract_source(tarball: Path, work_dir: Path, package_name: str, version: st
 
 def run_command(cmd: List[str], cwd: Path, env: Dict[str, str], phase: str) -> None:
     """Run a command with proper error handling"""
+    from collections import deque
+
     print(f"\n=== Running {phase} ===")
     print(f"Command: {' '.join(cmd)}")
     print(f"Directory: {cwd}")
@@ -474,19 +519,28 @@ def run_command(cmd: List[str], cwd: Path, env: Dict[str, str], phase: str) -> N
         universal_newlines=True
     )
 
-    # Read output line by line
+    # Read output line by line, retaining the tail for failure reporting so
+    # the actual error survives a long build log scroll.
+    tail = deque(maxlen=40)
     while True:
         line = process.stdout.readline()
         if not line and process.poll() is not None:
             break
         if line:
-            print(line.rstrip())
+            stripped = line.rstrip()
+            print(stripped)
+            tail.append(stripped)
 
     # Get the return code
     returncode = process.poll()
 
     if returncode != 0:
-        raise BuildError(f"{phase} failed with return code {returncode}")
+        tail_str = '\n'.join(tail)
+        raise BuildError(
+            f"{phase} failed with return code {returncode}\n"
+            f"Command: {' '.join(cmd)}\n"
+            f"Last {len(tail)} lines of output:\n{tail_str}"
+        )
 
 
 def should_build_package(recipe: Dict, flavor: Dict) -> bool:
@@ -773,6 +827,30 @@ def setup_environment(flavor: Dict, prefix: Path, srcdir: Path, recipe: Dict = N
     env['LIBRARY_PATH'] = f"{prefix}/lib:{env.get('LIBRARY_PATH', '')}"
     env['CPATH'] = f"{prefix}/include:{env.get('CPATH', '')}"
 
+    # MKL and CUDA flavor environment. Mirrors rpm_builder's
+    # get_intel_oneapi_setup() and get_path_setup() so direct unix builds
+    # and DEB builds see the same env that rpmbuild's %build/%check
+    # sections export. Without these, MKL flavors would fail cmake's BLAS
+    # finder (no MKLROOT/CPATH) and CUDA flavors would not find nvcc.
+    if 'mkl' in flavor_name:
+        mkl_root = os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
+        env['MKLROOT'] = mkl_root
+        env['LD_LIBRARY_PATH'] = (
+            f"{mkl_root}/lib/intel64:{env.get('LD_LIBRARY_PATH', '')}"
+        )
+        env['LIBRARY_PATH'] = (
+            f"{mkl_root}/lib/intel64:{env['LIBRARY_PATH']}"
+        )
+        env['CPATH'] = f"{mkl_root}/include:{env['CPATH']}"
+
+    if flavor.get('nvidia'):
+        try:
+            from math_common import nv_hpc_compiler_path
+            nv_compilers = nv_hpc_compiler_path(flavor)
+            env['PATH'] = f"{nv_compilers}/bin:{env['PATH']}"
+        except Exception as e:
+            print(f"Warning: NVHPC PATH setup failed: {e}")
+
     # Add recipe-specific environment variables (legacy support - FIXED)
     if recipe and 'configure' in recipe and 'env' in recipe['configure']:
         env_config = recipe['configure']['env']
@@ -981,7 +1059,7 @@ def get_package_dependencies(recipe: Dict, flavor_name = None) -> List[str]:
     return unique_deps
 
 
-def parse_pc_file(pc_file: Path, prefix: Path) -> tuple[Optional[str], Optional[str]]:
+def parse_pc_file(pc_file: Path, prefix: Path) -> Tuple[Optional[str], Optional[str]]:
     """
     Parse a .pc file directly to extract Cflags and Libs.
 
@@ -1116,7 +1194,11 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None,
         pc_cflags = get_package_cflags(prefix, package_name)
         pc_ldflags = get_package_libs(prefix, package_name)
 
-        # If pkg-config failed, try parsing .pc file directly
+        # If pkg-config failed, try parsing .pc file directly. The lib ->
+        # lib64 symlink (created by the environment package on the live
+        # prefix and by deb_builder/unix_builder in their staging
+        # buildroots) means lib/pkgconfig/ resolves regardless of which
+        # libdir the package's build system targeted.
         pkgconfig_dir = prefix / "lib" / "pkgconfig"
         pc_file = pkgconfig_dir / f"{package_name}.pc"
 
@@ -1137,6 +1219,37 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None,
                 pc_cflags = pc_cflags.replace(stage_str, inst_str)
             if pc_ldflags:
                 pc_ldflags = pc_ldflags.replace(stage_str, inst_str)
+            # Also try stripping the destdir ancestor, computed by removing
+            # install_prefix's tail from the staging prefix. This catches
+            # paths that embed the destdir root without the install prefix
+            # suffix (rare, but seen in hand-rolled Makefiles that bake
+            # ${DESTDIR} into generated config bits).
+            try:
+                inst_tail = str(install_prefix).lstrip('/')
+                if inst_tail and stage_str.endswith(inst_tail):
+                    destdir_root = stage_str[: -len(inst_tail)].rstrip('/')
+                    if destdir_root:
+                        if pc_cflags:
+                            pc_cflags = pc_cflags.replace(destdir_root, '')
+                        if pc_ldflags:
+                            pc_ldflags = pc_ldflags.replace(destdir_root, '')
+            except Exception:
+                pass
+
+        # Sanity: in staged-install mode only, if either flag still contains
+        # a staging marker after the rewrites above, fall back to the
+        # generic defaults rather than shipping a broken path in the
+        # registry. We restrict this to staged builds because a legitimate
+        # live prefix may itself contain substrings like /work/ — applying
+        # the filter unconditionally would clobber valid pkg-config output.
+        if prefix != install_prefix:
+            bad_markers = ('BUILDROOT/', '/work/', '.destdir/')
+            if pc_cflags and any(m in pc_cflags for m in bad_markers):
+                print(f"Warning: dropping leaked staging path from cflags for {package_name}: {pc_cflags}")
+                pc_cflags = None
+            if pc_ldflags and any(m in pc_ldflags for m in bad_markers):
+                print(f"Warning: dropping leaked staging path from ldflags for {package_name}: {pc_ldflags}")
+                pc_ldflags = None
     except Exception as e:
         print(f"Warning: Failed to get pkg-config flags for {package_name}: {e}")
 
@@ -1153,7 +1266,9 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None,
     default_cflags = f"-I{install_prefix}/include"
     default_ldflags = f"-L{install_prefix}/lib -Wl,-rpath,{install_prefix}/lib"
 
-    # Check if this is a library
+    # Check if this is a library. lib/ resolves through the lib -> lib64
+    # symlink on Linux (in both live prefixes and staging buildroots), so
+    # globbing lib/ alone is sufficient.
     is_library = False
     try:
         lib_dir = prefix / "lib"

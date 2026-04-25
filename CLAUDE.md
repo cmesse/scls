@@ -182,6 +182,8 @@ Supported strategies (set under `update:` in the recipe):
 - `html_regex` — scrape any page with a regex (`url:`, `pattern:` with a single capture group for the version)
 - `skip` — explicitly do not check (pair with a `reason:`)
 
+`max_major: N` is an orthogonal constraint: the checker filters out releases whose major component exceeds `N` and reports the highest within-pin version as the latest, surfacing the higher major separately as "blocked by pin". Use it to hold back ABI-breaking upstream bumps until downstreams have been re-validated. It can be combined with an explicit `strategy:` or layered on top of auto-detection (just `update: { max_major: N }`).
+
 When bumping a version, also update `changelogs/<package>.md`, and re-check `files/<package>.txt` and any patches for drift (patch hunks, hard-coded version directories like `lib/cmake/<pkg>-<x.y.z>/`, new installed files). Prefer `%{version}` in file manifests when a directory embeds the upstream version.
 
 ## Testing

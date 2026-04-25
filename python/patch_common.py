@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from build_common import BuildError
+from build_common import BuildError, resolve_flavor_key
 
 
 def get_patches_from_recipe(recipe: Dict, flavor: Dict = None) -> List[Dict]:
@@ -71,11 +71,19 @@ def get_patches_from_recipe(recipe: Dict, flavor: Dict = None) -> List[Dict]:
             for patch_entry in patch_config['lp64']:
                 add_patch_entry(patch_entry)
 
-        # Apply flavor-specific patches
-        if flavor_name and flavor_name in patch_config:
-            print(f"Applying {flavor_name}-specific patches")
-            for patch_entry in patch_config[flavor_name]:
-                add_patch_entry(patch_entry)
+        # Apply flavor-specific patches. Use resolve_flavor_key so a recipe
+        # with patches: {mkl: [...]} also matches concrete flavors like
+        # 'gcc-mkl' / 'gcc-mkl-cuda', mirroring how flavor_args resolves.
+        # Filter out the reserved keys (handled above) so resolve_flavor_key
+        # can't double-apply them via the hyphen-component fallback.
+        reserved = {'all', 'lp64', 'ilp64'}
+        flavor_only = {k: v for k, v in patch_config.items() if k not in reserved}
+        if flavor and flavor_only:
+            flavor_patches = resolve_flavor_key(flavor, flavor_only)
+            if flavor_patches:
+                print(f"Applying flavor-specific patches for {flavor_name}")
+                for patch_entry in flavor_patches:
+                    add_patch_entry(patch_entry)
 
     # Handle simple list format (legacy)
     elif isinstance(patch_config, list):
@@ -184,10 +192,14 @@ def get_all_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("p
 
         additional_patches = [p for p in discovered_patches if p['file'] not in all_recipe_patch_files]
         if additional_patches:
-            print(f"Found {len(additional_patches)} additional patches not specified in recipe:")
-            for patch in additional_patches:
-                print(f"  - {patch['file']} (-p{patch['strip']})")
-            patches.extend(additional_patches)
+            extras = ', '.join(p['file'] for p in additional_patches)
+            raise BuildError(
+                f"patches/{package_name}/ contains files not declared in the "
+                f"recipe: {extras}. Either declare them in the recipe's "
+                f"patches: section or remove them from the directory. "
+                f"Silent auto-discovery is disabled to prevent stray files "
+                f"from changing the build output."
+            )
 
     return patches
 
@@ -407,10 +419,13 @@ def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict,
                 processed_env[var] = val
             env = process_env_operations(env, processed_env)
 
-    # Apply flavor-specific configure environment
-    if 'flavor_env' in configure_config and flavor_name in configure_config['flavor_env']:
-        flavor_env = configure_config['flavor_env'][flavor_name]
-
+    # Apply flavor-specific configure environment. Use resolve_flavor_key
+    # so 'mkl:' / 'gcc:' keys also match hyphenated flavors like
+    # 'gcc-mkl-cuda', matching the rest of the flavor_args lookup paths.
+    flavor_env = None
+    if 'flavor_env' in configure_config:
+        flavor_env = resolve_flavor_key(flavor, configure_config['flavor_env'])
+    if flavor_env:
         # Handle both dict and list formats for flavor_env
         if isinstance(flavor_env, dict):
             # Dictionary format: {"VAR": "value"}

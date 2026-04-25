@@ -314,8 +314,8 @@ dependencies:
 {% for dep in package_dependencies %}
   - {{ dep }}
 {% endfor %}
-cflags: -I%{prefix}/include
-ldflags: -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib
+cflags: {{ registry_cflags }}
+ldflags: {{ registry_ldflags }}
 features:
   fortran: {{ 'true' if features.fortran else 'false' }}
   openmp: {{ 'true' if features.openmp else 'false' }}
@@ -340,13 +340,53 @@ find %{buildroot}%{prefix}/share -mindepth 1 -maxdepth 1 -type d -not -name scls
 {{ cmd }}
 {% endfor %}
 
-# Update registry with pkg-config flags if .pc file exists
-if pkg-config --exists {{ package_name }} 2>/dev/null; then
-    PC_CFLAGS=$(pkg-config --cflags {{ package_name }} 2>/dev/null || echo "")
-    PC_LDFLAGS=$(pkg-config --libs {{ package_name }} 2>/dev/null || echo "")
-    sed -i "s|^cflags:.*|cflags: $PC_CFLAGS|" %{prefix}/share/scls/registry/{{ package_name }}.yaml
-    sed -i "s|^ldflags:.*|ldflags: $PC_LDFLAGS|" %{prefix}/share/scls/registry/{{ package_name }}.yaml
-    sed -i "s|^has_pc_file:.*|has_pc_file: true|" %{prefix}/share/scls/registry/{{ package_name }}.yaml
+# Update registry with pkg-config flags if .pc file exists. Scope
+# PKG_CONFIG_PATH to the SCLS prefix so we don't pick up host-system .pc
+# files that happen to share a name. lib/pkgconfig resolves through the
+# lib -> lib64 symlink owned by the environment package.
+SCLS_PCPATH="%{prefix}/lib/pkgconfig"
+if PKG_CONFIG_PATH="$SCLS_PCPATH" pkg-config --exists {{ package_name }} 2>/dev/null; then
+    PC_CFLAGS=$(PKG_CONFIG_PATH="$SCLS_PCPATH" pkg-config --cflags {{ package_name }} 2>/dev/null || echo "")
+    PC_LDFLAGS=$(PKG_CONFIG_PATH="$SCLS_PCPATH" pkg-config --libs {{ package_name }} 2>/dev/null || echo "")
+    # Sanity: if the upstream .pc baked the rpmbuild BUILDROOT path,
+    # don't propagate it into the registry — leave the spec-time defaults
+    # already written above in place. We only check for BUILDROOT/ here
+    # because %post runs at the live install prefix on the target host,
+    # so substrings like /work/ or .destdir/ would be the user's real
+    # prefix, not staging leakage. (build_common.write_registry_entry
+    # applies a wider marker set, gated on staging mode, for the DEB and
+    # unix-install paths.)
+    case "$PC_CFLAGS$PC_LDFLAGS" in
+        *BUILDROOT/*)
+            echo "scls: dropping leaked BUILDROOT path from {{ package_name }} pkg-config flags" >&2
+            PC_CFLAGS=""
+            PC_LDFLAGS=""
+            ;;
+    esac
+    if [ -n "$PC_CFLAGS" ] || [ -n "$PC_LDFLAGS" ]; then
+        # Mirror build_common.add_rpath_for_libdirs: every -L<dir> gets a
+        # matching -Wl,-rpath,<dir> so binaries linking against this
+        # package don't need LD_LIBRARY_PATH at runtime.
+        PC_LDFLAGS_AUG="$PC_LDFLAGS"
+        for libdir in $(echo "$PC_LDFLAGS" | tr ' ' '\n' | sed -n 's/^-L//p'); do
+            case " $PC_LDFLAGS_AUG " in
+                *" -Wl,-rpath,$libdir "*) ;;
+                *) PC_LDFLAGS_AUG="$PC_LDFLAGS_AUG -Wl,-rpath,$libdir" ;;
+            esac
+        done
+        # Rewrite cflags/ldflags/has_pc_file in the registry YAML using
+        # awk (POSIX, always available — avoids adding a python3 runtime
+        # dep, and sidesteps sed delimiter escaping for | & / in flags).
+        REG=%{prefix}/share/scls/registry/{{ package_name }}.yaml
+        TMP=$(mktemp) && \
+        PC_CFLAGS="$PC_CFLAGS" PC_LDFLAGS="$PC_LDFLAGS_AUG" \
+            awk '
+                /^cflags:/      { print "cflags: " ENVIRON["PC_CFLAGS"]; next }
+                /^ldflags:/     { print "ldflags: " ENVIRON["PC_LDFLAGS"]; next }
+                /^has_pc_file:/ { print "has_pc_file: true"; next }
+                { print }
+            ' "$REG" > "$TMP" && mv "$TMP" "$REG"
+    fi
 fi
 
 {% if rpm_files_auto %}

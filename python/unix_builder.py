@@ -12,6 +12,7 @@ import argparse
 import platform
 import shutil
 import subprocess
+import tarfile
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List
@@ -43,16 +44,18 @@ from patch_common import (
 )
 
 from math_common import ( get_math_link_line, get_math_compile_flags,
-                          get_mkl_serial_link_line, get_mkl_mpi_link_line )
+                          get_mkl_serial_link_line, get_mkl_mpi_link_line,
+                          get_cuda_path )
 
 class UnixBuilder:
     def __init__(self, package: str, flavor: str = "macos"):
         self.package = package
         self.flavor_name = flavor
 
-        # Load configurations
-        self.recipe = load_recipe(package)
-        self.flavor = load_flavor(flavor)
+        # Load configurations. Deepcopy both so platform/flavor/MPI overrides
+        # below don't mutate cached dicts shared with other builders.
+        self.recipe = copy.deepcopy(load_recipe(package))
+        self.flavor = copy.deepcopy(load_flavor(flavor))
 
         # Detect and validate platform from flavor
         self.platform = self.flavor.get('platform', 'linux')
@@ -70,11 +73,10 @@ class UnixBuilder:
                     self.recipe['source'] = {}
                 self.recipe['source'].update(platform_section['source'])
 
-        # Apply flavor-specific overrides (e.g., version, source URL)
-        # Deepcopy first so overrides from one flavor don't bleed into
-        # another if the same recipe dict is reused across calls.
+        # Apply flavor-specific overrides (e.g., version, source URL).
+        # self.recipe was deepcopied at load time, so mutations here are safe.
         from build_common import apply_flavor_overrides
-        self.recipe = apply_flavor_overrides(copy.deepcopy(self.recipe), self.flavor)
+        self.recipe = apply_flavor_overrides(self.recipe, self.flavor)
 
         # Validate platform
         supported_platforms = ['macos', 'linux']
@@ -235,7 +237,7 @@ class UnixBuilder:
         if self.math:
             self.math_flags = get_math_compile_flags(self.flavor, self.recipe)
             self.math_ldflags = get_math_link_line(self.flavor, self.recipe)
-            mklroot = getattr(self, 'mklroot', '/opt/intel/oneapi/mkl/latest')
+            mklroot = os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
             self.math_ldflags = self.math_ldflags.replace('%{mklroot}', mklroot)
 
         # Resolve install_prefix (shared across all types)
@@ -429,13 +431,21 @@ class UnixBuilder:
         cmd = [s.replace('%{mpifort}', 'mpifort') for s in cmd]
         # Library extension
         cmd = [s.replace('%{libext}', self.lib_ext) for s in cmd]
-        # CUDA paths and architectures
-        cuda_path = self.flavor.get('nvidia', {}).get('cuda_path', '')
+        # CUDA paths and architectures. Use math_common.get_cuda_path so the
+        # unix path matches rpm_builder's substitution; the legacy
+        # nvidia.cuda_path key is not present in any flavor YAML.
+        if self.flavor.get('nvidia'):
+            cuda_path = get_cuda_path(self.flavor)
+        else:
+            cuda_path = ''
         cuda_archs = self.flavor.get('nvidia', {}).get('architectures', '')
         cmd = [s.replace('%{cuda}', cuda_path) for s in cmd]
         cmd = [s.replace('%{cuda_architectures}', cuda_archs) for s in cmd]
-        # MKL paths and linker flags (canonical definitions in math_common)
-        mklroot = self.flavor.get('math', {}).get('mklroot', '/opt/intel/oneapi/mkl/latest')
+        # MKL paths and linker flags (canonical definitions in math_common).
+        # MKLROOT comes from the environment, not from flavor YAML — no flavor
+        # carries a 'mklroot' key, so the previous flavor-dict lookup always
+        # fell through to the default. Aligns with rpm_builder.__init__.
+        mklroot = os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
         cmd = [s.replace('%{mklroot}', mklroot) for s in cmd]
         mkl_linker = get_mkl_serial_link_line(self.flavor)
         mkl_mpi_linker = get_mkl_mpi_link_line(self.flavor).replace('%{prefix}', str(self.prefix))
@@ -540,6 +550,37 @@ class UnixBuilder:
 
         print("\n=== Running tests ===")
 
+        # Extract test.sources tarballs into <source>/build/test/ to match
+        # the %check section in templates/default.spec.j2, which does
+        # `mkdir -p build/test; tar -xf SOURCE -C build/test/` from the
+        # source root. Anchoring on self.source_dir (not the build_dir
+        # argument) keeps the extraction location stable when subclasses
+        # change the test cwd — DebBuilder.test() runs tests from the
+        # source root rather than the cmake build dir, but recipes still
+        # reference matrix data at build/test/<file>.
+        test_sources = self.recipe.get('test', {}).get('sources', [])
+        if test_sources:
+            source_root = (
+                Path(self.source_dir) if self.source_dir else build_dir
+            )
+            test_data_dir = source_root / 'build' / 'test'
+            test_data_dir.mkdir(parents=True, exist_ok=True)
+            for tsrc in test_sources:
+                tarball_name = tsrc['url'].split('/')[-1]
+                tarball_path = self.sources_dir / tarball_name
+                if not tarball_path.exists():
+                    raise BuildError(
+                        f"Test source {tarball_path} not found. Run "
+                        "'build' before 'test' so the tarball is "
+                        "downloaded."
+                    )
+                with tarfile.open(tarball_path, 'r:*') as tar:
+                    if sys.version_info >= (3, 12):
+                        tar.extractall(test_data_dir, filter='data')
+                    else:
+                        from build_common import _safe_extract_tar
+                        _safe_extract_tar(tar, test_data_dir)
+
         # Add prefix lib directory to library path so test executables
         # can find shared libraries without requiring rpath in test binaries
         # On macOS, use DYLD_FALLBACK_LIBRARY_PATH (not stripped by SIP)
@@ -556,7 +597,8 @@ class UnixBuilder:
         # Run any pre-test commands
         if 'pre' in self.recipe['test']:
             for cmd in self.recipe['test']['pre']:
-                run_command(cmd.split(), build_dir, env, "pre-test")
+                cmd = self.check_args([cmd])[0]
+                run_command(['sh', '-c', cmd], build_dir, env, "pre-test")
 
         # Collect build args string if test.inherit_build_args is set
         build_args_str = ''
@@ -1043,8 +1085,15 @@ class UnixBuilder:
 
         print(f"\nInstalled {len(self.installed_files)} files")
 
-        # Write registry entry
-        write_registry_entry(install_root, self.recipe, self.flavor_name)
+        # Write registry entry. Pass install_prefix=self.prefix so that on
+        # packaging subclasses (DebBuilder) where install_root is a destdir
+        # buildroot, recorded cflags/ldflags get the live prefix rather
+        # than the staging path. For direct unix installs install_root
+        # equals self.prefix, so this is a no-op there.
+        write_registry_entry(
+            install_root, self.recipe, self.flavor_name,
+            install_prefix=self.prefix,
+        )
 
         # Add registry file to installed files
         registry_file = install_root / "share" / "scls" / "registry" / f"{self.recipe['name']}.yaml"
@@ -1235,6 +1284,17 @@ class UnixBuilder:
                             extra.get('extract_to', 'extra'), '0'
                         )
 
+            # Download test.sources (e.g. matrix data for STRUMPACK tests).
+            # Mirrors rpm_builder.download_sources so the unix and DEB
+            # paths can run the same recipe-defined tests as rpmbuild's
+            # %check; without this, recipes like strumpack would silently
+            # skip data-driven tests when built outside RPM mode.
+            for tsrc in self.recipe.get('test', {}).get('sources', []):
+                download_source(
+                    tsrc['url'], self.sources_dir,
+                    self.package, 'test'
+                )
+
             # Copy patches to sources directory
             copy_patches_to_sources(self.recipe, Path("patches"), self.sources_dir, self.package, self.flavor)
 
@@ -1376,7 +1436,6 @@ class UnixBuilder:
         context.update({
             'cflags': cflags,
             'cxxflags': cxxflags,
-            'fcflags': fcflags,
             'fcflags': fcflags,
             'ldflags': env['LDFLAGS'],
         })

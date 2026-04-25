@@ -11,6 +11,11 @@ exclude_flavors:
 source:
   url: https://github.com/pmix/pmix/releases/download/v%{version}/pmix-%{version}.tar.bz2
 
+update:
+  # Pin to the 5.x line — pmix 6 changes ABI and openmpi compatibility needs
+  # to be re-validated before we accept it.
+  max_major: 5
+
 requires:
   all:
     - libevent
