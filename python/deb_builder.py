@@ -507,8 +507,13 @@ class DebBuilder(UnixBuilder):
         # Write the SCLS registry entry INTO the destdir so it gets packaged
         # alongside the rest of the install tree. write_registry_entry places
         # the file at <prefix>/share/scls/registry/<name>.yaml, so passing
-        # destdir_prefix as "prefix" stages it correctly.
-        write_registry_entry(destdir_prefix, self.recipe, self.flavor_name)
+        # destdir_prefix as "prefix" stages it correctly. install_prefix is
+        # the clean target path that gets embedded in the recorded
+        # cflags/ldflags — without it, the destdir would leak through.
+        write_registry_entry(
+            destdir_prefix, self.recipe, self.flavor_name,
+            install_prefix=self.prefix,
+        )
 
         print(f"Staged install under {self.destdir}")
 

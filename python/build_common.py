@@ -1043,7 +1043,8 @@ def parse_pc_file(pc_file: Path, prefix: Path) -> tuple[Optional[str], Optional[
         return None, None
 
 
-def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None) -> None:
+def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None,
+                         install_prefix: Path = None) -> None:
     """
     Write a registry entry for an installed package.
 
@@ -1054,13 +1055,23 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None) ->
     a minimal registry entry with name and version.
 
     Args:
-        prefix: The installation prefix
+        prefix: Where to write the registry file and where to look for staged
+                build artifacts (e.g. .pc files). For direct installs this is
+                the final install prefix; for staged builds (deb destdir) this
+                is the staging root.
         recipe: The package recipe
         flavor_name: Optional flavor name for flavor-specific settings
+        install_prefix: Final installation prefix to embed in recorded
+                        cflags/ldflags. Defaults to `prefix`. Pass the clean
+                        install prefix here for staged builds so destdir paths
+                        do not leak into the recorded flags.
     """
     # Extract essential info first - these should never fail
     package_name = recipe.get('name', 'unknown')
     version = str(recipe.get('version', '0.0.0'))
+
+    if install_prefix is None:
+        install_prefix = prefix
 
     # Create registry directory
     registry_dir = prefix / "share" / "scls" / "registry"
@@ -1110,12 +1121,22 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None) ->
         pc_file = pkgconfig_dir / f"{package_name}.pc"
 
         if pc_cflags is None and pc_ldflags is None and pc_file.exists():
-            pc_cflags, pc_ldflags = parse_pc_file(pc_file, prefix)
+            pc_cflags, pc_ldflags = parse_pc_file(pc_file, install_prefix)
             if pc_cflags is not None or pc_ldflags is not None:
                 has_pc_file = True
                 print(f"Registry: Parsed .pc file directly for {package_name}")
         elif pc_cflags is not None or pc_ldflags is not None:
             has_pc_file = True
+
+        # If staging != install, rewrite any staging paths that leaked through
+        # pkg-config (some upstreams bake the build-time prefix into .pc files).
+        if prefix != install_prefix:
+            stage_str = str(prefix)
+            inst_str = str(install_prefix)
+            if pc_cflags:
+                pc_cflags = pc_cflags.replace(stage_str, inst_str)
+            if pc_ldflags:
+                pc_ldflags = pc_ldflags.replace(stage_str, inst_str)
     except Exception as e:
         print(f"Warning: Failed to get pkg-config flags for {package_name}: {e}")
 
@@ -1124,13 +1145,13 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None) ->
     recipe_ldflags = None
     if 'registry' in recipe:
         if 'cflags' in recipe['registry']:
-            recipe_cflags = recipe['registry']['cflags'].replace('%{prefix}', str(prefix))
+            recipe_cflags = recipe['registry']['cflags'].replace('%{prefix}', str(install_prefix))
         if 'ldflags' in recipe['registry']:
-            recipe_ldflags = recipe['registry']['ldflags'].replace('%{prefix}', str(prefix))
+            recipe_ldflags = recipe['registry']['ldflags'].replace('%{prefix}', str(install_prefix))
 
-    # Default flags based on prefix
-    default_cflags = f"-I{prefix}/include"
-    default_ldflags = f"-L{prefix}/lib -Wl,-rpath,{prefix}/lib"
+    # Default flags based on the final install prefix
+    default_cflags = f"-I{install_prefix}/include"
+    default_ldflags = f"-L{install_prefix}/lib -Wl,-rpath,{install_prefix}/lib"
 
     # Check if this is a library
     is_library = False

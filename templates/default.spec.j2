@@ -349,10 +349,6 @@ if pkg-config --exists {{ package_name }} 2>/dev/null; then
     sed -i "s|^has_pc_file:.*|has_pc_file: true|" %{prefix}/share/scls/registry/{{ package_name }}.yaml
 fi
 
-%postun
-# Remove SCLS registry entry on uninstall
-rm -f %{prefix}/share/scls/registry/{{ package_name }}.yaml 2>/dev/null || true
-
 {% if rpm_files_auto %}
 %files -f %{_builddir}/filelist.txt
 {% else %}
