@@ -385,7 +385,7 @@ if PKG_CONFIG_PATH="$SCLS_PCPATH" pkg-config --exists {{ package_name }} 2>/dev/
                 /^ldflags:/     { print "ldflags: " ENVIRON["PC_LDFLAGS"]; next }
                 /^has_pc_file:/ { print "has_pc_file: true"; next }
                 { print }
-            ' "$REG" > "$TMP" && mv "$TMP" "$REG"
+            ' "$REG" > "$TMP" && mv "$TMP" "$REG" && chmod 0644 "$REG"
     fi
 fi
 

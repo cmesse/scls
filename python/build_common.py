@@ -387,6 +387,15 @@ def get_interface_args(recipe: Dict, flavor: Dict, section: str = 'configure') -
     return args
 
 
+def _validate_source_archive(path: Path) -> None:
+    """Raise BuildError if path is not a readable tar archive."""
+    try:
+        with tarfile.open(path, 'r:*') as tar:
+            tar.next()
+    except (tarfile.TarError, OSError) as e:
+        raise BuildError(f"Invalid source archive {path}: {e}")
+
+
 def download_source(url: str, dest_dir: Path, package_name: str, version: str) -> Path:
     """Download source tarball if not already present"""
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -395,17 +404,34 @@ def download_source(url: str, dest_dir: Path, package_name: str, version: str) -
     dest_path = dest_dir / filename
 
     if dest_path.exists():
-        print(f"Source already downloaded: {dest_path}")
-        return dest_path
+        try:
+            _validate_source_archive(dest_path)
+            print(f"Source already downloaded: {dest_path}")
+            return dest_path
+        except BuildError as e:
+            print(f"Discarding invalid cached source: {e}")
+            dest_path.unlink()
 
     print(f"Downloading {url}...")
+    tmp_path = dest_path.with_name(f"{dest_path.name}.part")
+    if tmp_path.exists():
+        tmp_path.unlink()
     try:
-        #urllib.request.urlretrieve(url, dest_path)
-        cmd = ['curl', '-O', '-L', url]
+        cmd = [
+            'curl', '-fL',
+            '--retry', '3',
+            '--retry-delay', '2',
+            '-o', tmp_path.name,
+            url,
+        ]
         run_command(cmd, cwd=dest_dir, env={}, phase="Download source")
+        _validate_source_archive(tmp_path)
+        shutil.move(str(tmp_path), str(dest_path))
         print(f"Downloaded to {dest_path}")
         return dest_path
     except Exception as e:
+        if tmp_path.exists():
+            tmp_path.unlink()
         raise BuildError(f"Failed to download source: {e}")
 
 
