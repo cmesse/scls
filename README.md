@@ -2,7 +2,7 @@
 
 SCLS, the Scientific Core Library Stack, is an opinionated build and packaging system for scientific computing libraries.
 
-The project exists to solve a specific problem: getting a consistent, usable stack of numerical libraries built and installed across real machines, not idealized ones. That includes modern Linux systems with RPM packaging, older or awkward Linux environments where native packaging is not an option, and macOS on both Intel and Apple Silicon.
+The project exists to solve a specific problem: getting a consistent, usable stack of numerical libraries built and installed across real machines, not idealized ones. That includes modern Enterprise Linux systems with RPM packaging, Debian/Ubuntu systems with DEB packaging, older or awkward Linux environments where native packaging is not an option, and macOS on Intel — with Apple Silicon untested so far, but expected to work after minimal fixes.
 
 ## What SCLS Is For
 
@@ -55,13 +55,15 @@ SCLS exists for the cases where you still need a real stack, and you want one bu
 
 SCLS supports multiple delivery paths built from the same recipe and flavor model.
 
-### 1. RPM-based Linux builds
+### 1. RPM-based Enterprise Linux builds
 
-On RPM-oriented Linux systems, SCLS can generate SPEC files and build RPMs. This is the preferred route when the target system supports it, because it gives you normal package-manager installation and removal semantics.
+On RHEL-family Enterprise Linux systems such as RHEL, Rocky Linux, AlmaLinux, CentOS Stream, and Amazon Linux 2023, SCLS can generate SPEC files and build RPMs. This is the preferred route when the target system supports it, because it gives you normal package-manager installation and removal semantics.
 
 ### 2. DEB-based Linux builds
 
 On Debian/Ubuntu hosts SCLS produces `.deb` packages from the same recipes and flavors. The builder stages into a DESTDIR buildroot and wraps it with `dpkg-deb --build`, the DEB analogue of the RPM path. A 3.0 (quilt) source-package triplet (`.dsc` + `.orig.tar.<ext>` + `.debian.tar.xz`) is produced alongside the binary for license-compliance parity with source RPMs. Recipe `rpm_build_requires` and `rpm_requires` are translated to Debian names via [`packaging/system_packages.yaml`](packaging/system_packages.yaml); any unknown RHEL name is a hard error, not a silent fallback.
+
+DEB packaging is intentionally less feature-complete than RPM packaging. In particular, it does not currently split recipe subpackages such as `*-examples`; recipes that require subpackages are rejected by the DEB builder rather than being silently collapsed into one package. Adding full DEB subpackage support would be a large amount of packaging machinery for little practical improvement in the current stack.
 
 ### 3. Generic Unix-style installs
 
@@ -74,7 +76,7 @@ SCLS also supports a direct Unix builder for environments where native packaging
 
 ### 4. Native macOS builds
 
-SCLS supports direct builds on macOS as well. That includes older Intel Macs and should also extend to Apple Silicon through the same general recipe and flavor machinery.
+SCLS supports direct builds on macOS as well. The `macos` flavor is exercised regularly on Intel developer workstations. Apple Silicon hasn't been tested yet, but the same recipes and flavor machinery should carry over with at most minor fixes — there is nothing Intel-specific in the build model, and the toolchain choices (Homebrew GCC, system clang, OpenBLAS) all have first-class arm64 support.
 
 ## How the Repository Works
 
@@ -92,7 +94,7 @@ The project is built around three core concepts.
 
 [`python/`](python) contains the code that turns recipes and flavors into actual builds:
 
-- [`python/rpm_builder.py`](python/rpm_builder.py): RPM-oriented Linux packaging
+- [`python/rpm_builder.py`](python/rpm_builder.py): RPM packaging for Enterprise Linux targets
 - [`python/deb_builder.py`](python/deb_builder.py): Debian/Ubuntu `.deb` packaging, including 3.0 (quilt) source packages
 - [`python/unix_builder.py`](python/unix_builder.py): direct Unix-style builds and installs
 - [`python/build_common.py`](python/build_common.py): shared build logic
@@ -118,14 +120,15 @@ The project is built around three core concepts.
 
 A flavor defines the target platform, compilers, optimization flags, math backend, and install prefix. Each flavor installs into its own prefix, so multiple flavors can coexist.
 
-| Flavor   | Prefix            | Compiler | Math      | Notes                                |
-|----------|-------------------|----------|-----------|--------------------------------------|
-| `gcc`    | `/opt/scls/gcc`   | GCC      | OpenBLAS  | Default production build             |
-| `mkl`    | `/opt/scls/mkl`   | GCC      | Intel MKL | Requires `intel-oneapi-mkl` RPMs     |
-| `debug`  | `/opt/scls/debug` | GCC      | Reference | `-Og -g`, for valgrind / sanitizers  |
-| `intel`  | `/opt/scls/intel` | Intel    | Intel MKL | Requires Intel oneAPI compilers      |
-| `lbl`    | `/opt/scls/lbl`   | GCC      | OpenBLAS  | LBL site-specific, builds own GCC    |
-| `macos`  | `/opt/scls`       | GCC      | OpenBLAS  | macOS Intel (Apple Silicon planned)  |
+| Flavor          | Prefix                     | Compiler | Math      | Notes                                       |
+|-----------------|----------------------------|----------|-----------|---------------------------------------------|
+| `gcc`           | `/opt/scls/gcc`            | GCC      | OpenBLAS  | Default production build                    |
+| `mkl`           | `/opt/scls/mkl`            | GCC      | Intel MKL | Requires `intel-oneapi-mkl` RPMs            |
+| `debug`         | `/opt/scls/debug`          | GCC      | Reference | `-Og -g`, for valgrind / sanitizers         |
+| `intel`         | `/opt/scls/intel`          | Intel    | Intel MKL | Requires Intel oneAPI compilers             |
+| `lbl`           | custom site prefix         | GCC      | OpenBLAS  | LBL site-specific                           |
+| `macos`         | `/opt/scls`                | GCC      | OpenBLAS  | Intel Macs; Apple Silicon untested          |
+| `gcc-mkl-cuda`  | `/opt/scls/gcc-mkl-cuda`   | GCC      | Intel MKL | CUDA-enabled (NVIDIA HPC SDK); untested     |
 
 ### Deployment Targets
 
@@ -186,19 +189,36 @@ Other commands:
 ./scls order               # Show build order
 ```
 
+### Runtime environment
+
+Each installed flavor ships an activation script that puts the prefix on `PATH`, `LD_LIBRARY_PATH`, `PKG_CONFIG_PATH`, and the like, and exports package-specific variables when the relevant package is installed:
+
+```bash
+source /opt/scls/<flavor>/share/scls/activate.sh
+```
+
+For PETSc, `PETSC_DIR` points at the installed SCLS prefix and `PETSC_ARCH` is intentionally empty:
+
+```text
+PETSC_DIR=/opt/scls/<flavor>
+PETSC_ARCH=
+```
+
+SCLS installs PETSc as an installed-prefix package, not as an in-place PETSc source tree with a runtime architecture directory, so consume it through `PETSC_DIR`, `pkg-config`, CMake, or PETSc's installed configuration files under `lib/petsc/conf`.
+
 ### Optional examples
 
-PETSc, SLEPc, and SUNDIALS install their upstream tutorial/example sources under `%{prefix}/share/<package>/examples/`. These are split into `<package>-examples` subpackages and are not pulled in by the flavor meta-package. An optional companion meta-package, `scls-<flavor>-examples`, is built alongside `scls-<flavor>` and groups all of them; install it if you want the examples on disk.
+PETSc, SLEPc, and SUNDIALS install their upstream tutorial/example sources under `%{prefix}/share/<package>/examples/`. In RPM builds, these are split into `<package>-examples` subpackages and are not pulled in by the flavor meta-package. An optional companion meta-package, `scls-<flavor>-examples`, is built alongside `scls-<flavor>` and groups all of them; install it if you want the examples on disk. DEB builds do not currently support these example subpackages.
 
 ### Direct builder invocation
 
 For cases where the wrapper is not suitable:
 
 ```bash
-# RPM SPEC file only (Linux):
+# RPM SPEC file only (Enterprise Linux):
 python python/rpm_builder.py --package <package> --flavor <flavor> --spec-only
 
-# Build RPM package (Linux):
+# Build RPM package (Enterprise Linux):
 python python/rpm_builder.py --package <package> --flavor <flavor>
 
 # Generic Unix-style build/install:
