@@ -1,0 +1,27 @@
+From: SCLS
+Subject: Declare MatCreate*BAIJMKL under PETSC_HAVE_MKL_SPARSE_OPTIMIZE
+
+The baij/{seq,mpi}/baijmkl/ directories are gated on
+PETSC_HAVE_MKL_SPARSE_OPTIMIZE (the inspector-executor API), but the
+corresponding declarations in petscmat.h are gated on the legacy
+PETSC_HAVE_MKL_SPARSE (mkl_dcsrmv). Modern oneAPI MKL (2025+, shipped on
+RHEL 10) removed mkl_dcsrmv, so MKL_SPARSE_OPTIMIZE is detected without
+MKL_SPARSE, the BAIJMKL sources are still compiled, but the public
+declarations are missing. The auto-generated Fortran wrappers (which
+include <petscmat.h>) then call MatCreateBAIJMKL/MatCreateSeqBAIJMKL
+implicitly, which GCC 14 rejects as an error.
+
+Split the declaration block to mirror the makefile gates: AIJMKL stays
+under MKL_SPARSE, BAIJMKL moves under MKL_SPARSE_OPTIMIZE.
+
+--- a/include/petscmat.h
++++ b/include/petscmat.h
+@@ -411,6 +411,8 @@ PETSC_EXTERN const char *const MatStructures[];
+ #if defined(PETSC_HAVE_MKL_SPARSE)
+ PETSC_EXTERN PetscErrorCode MatCreateSeqAIJMKL(MPI_Comm, PetscInt, PetscInt, PetscInt, const PetscInt[], Mat *);
+ PETSC_EXTERN PetscErrorCode MatCreateMPIAIJMKL(MPI_Comm, PetscInt, PetscInt, PetscInt, PetscInt, PetscInt, const PetscInt[], PetscInt, const PetscInt[], Mat *);
++#endif
++#if defined(PETSC_HAVE_MKL_SPARSE_OPTIMIZE)
+ PETSC_EXTERN PetscErrorCode MatCreateBAIJMKL(MPI_Comm, PetscInt, PetscInt, PetscInt, PetscInt, PetscInt, PetscInt, const PetscInt[], PetscInt, const PetscInt[], Mat *);
+ PETSC_EXTERN PetscErrorCode MatCreateSeqBAIJMKL(MPI_Comm, PetscInt, PetscInt, PetscInt, PetscInt, const PetscInt[], Mat *);
+ #endif
