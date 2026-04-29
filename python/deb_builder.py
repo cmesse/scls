@@ -41,6 +41,8 @@ from build_common import (
     resolve_flavor_key,
     run_command,
     should_build_package,
+    get_subpackages_for_flavor,
+    get_subpackage_dependencies,
 )
 from patch_common import apply_patches, get_all_patches
 from unix_builder import UnixBuilder
@@ -155,6 +157,41 @@ def _apt_install_deb(deb_path: Path, label: str = "apt-get install") -> None:
     run_command(cmd, PROJECT_ROOT, os.environ, label)
 
 
+def _apt_install_debs(deb_paths: List[Path], label: str = "apt-get install") -> None:
+    """Install a batch of .debs in a single apt transaction.
+
+    Atomicity matters: subpackages declare cross-Depends on each other
+    (e.g. cblas → blas), and apt must see the whole batch in one
+    invocation to satisfy them; otherwise a fresh install of cblas
+    would fail before blas is in place.
+
+    `--reinstall` is added when ANY .deb in the batch matches a
+    same-version installed package — apt's flag is per-invocation.
+    For .debs whose version differs from the installed one (or aren't
+    installed at all), `--reinstall` is a no-op: apt installs/upgrades
+    them normally either way.
+    """
+    if not deb_paths:
+        return
+    deb_args: List[str] = []
+    needs_reinstall = False
+    for deb_path in deb_paths:
+        deb_args.append(
+            str(deb_path) if deb_path.is_absolute() else f"./{deb_path}"
+        )
+        name, version = _read_deb_package_version(deb_path)
+        if _deb_is_already_installed_at_version(name, version):
+            needs_reinstall = True
+    cmd = ['sudo', 'apt-get', 'install', '-y']
+    if needs_reinstall:
+        cmd.append('--reinstall')
+        print(f"Installing (with --reinstall): {deb_args}")
+    else:
+        print(f"Installing: {deb_args}")
+    cmd.extend(deb_args)
+    run_command(cmd, PROJECT_ROOT, os.environ, label)
+
+
 class DebBuilder(UnixBuilder):
     def __init__(self, package: str, flavor: str):
         super().__init__(package, flavor)
@@ -162,20 +199,6 @@ class DebBuilder(UnixBuilder):
         if self.platform != 'linux':
             raise BuildError(
                 f"deb_builder requires a linux flavor; got platform={self.platform}"
-            )
-
-        # DEB does not yet split subpackages (the RPM path does, e.g.
-        # -examples). Without this guard the recipe's subpackage layout
-        # would silently collapse into a single monolithic .deb.
-        from build_common import get_subpackages_for_flavor
-        if get_subpackages_for_flavor(self.recipe, self.flavor_name):
-            raise BuildError(
-                f"Recipe {self.package} declares subpackages: which is not "
-                f"yet supported by deb_builder. The RPM path produces split "
-                f"packages for these (e.g. -examples); the DEB path would "
-                f"silently produce a single monolithic .deb. Add DEB "
-                f"subpackage support before shipping this recipe through "
-                f"the DEB pipeline."
             )
 
         self.system_package_map = load_system_package_map()
@@ -586,34 +609,223 @@ class DebBuilder(UnixBuilder):
     # .deb creation
     # -------------------------------------------------------------------
 
-    def write_control(self) -> None:
-        """Render DEBIAN/control into the staged destdir.
+    def _binary_packages(self) -> List[Dict]:
+        """Return one descriptor per produced .deb, in the order:
+        [main, subpkg_0, subpkg_1, ...]. Filters out subpackages whose
+        scls_name would collide with main (mirrors rpm_builder.get_
+        subpackages_for_spec — those subpackages' files stay in main).
 
-        We discard the Build-Depends list returned by get_deb_depends(): this
-        is a binary package (dpkg-deb --build output), not a source package,
-        so Build-Depends would be dead metadata. get_deb_depends() still
-        returns the full tuple so a future source-package path (or tooling
-        that wants to pre-check build hosts) can consume it.
+        Each descriptor:
+          scls_name    — Debian Package: name (e.g. scls-debug-blas)
+          subpkg_name  — recipe-side subpackage name; None for main
+          depends      — list of Depends entries (already translated)
+          summary      — Description: header
+          description  — full description body (first line is summary)
         """
-        debian_dir = self.destdir / "DEBIAN"
+        main_depends = self.get_deb_depends()[1]
+        main_description = (
+            load_description(self.package) or self.recipe.get('summary', self.package)
+        )
+        main_summary = (
+            self.recipe.get('summary') or main_description.split('\n', 1)[0]
+        )
+        out = [{
+            'scls_name': self.scls_name,
+            'subpkg_name': None,
+            'depends': main_depends,
+            'summary': main_summary,
+            'description': main_description,
+        }]
+
+        subpackages = get_subpackages_for_flavor(self.recipe, self.flavor_name)
+        for subpkg in subpackages:
+            scls_name = f"scls-{self.flavor_name}-{subpkg['name']}"
+            if scls_name == self.scls_name:
+                # Collision with main — its files stay in main, no separate .deb.
+                continue
+            deps = get_subpackage_dependencies(subpkg, self.flavor_name)
+            translated = [f"scls-{self.flavor_name}-{d}" for d in deps]
+            summary = subpkg.get('summary', f"{subpkg['name']} subpackage")
+            description = subpkg.get('description') or summary
+            out.append({
+                'scls_name': scls_name,
+                'subpkg_name': subpkg['name'],
+                'depends': translated,
+                'summary': summary,
+                'description': description,
+            })
+        return out
+
+    def _enumerate_destdir_files(self) -> List[Tuple[Path, str]]:
+        """Walk self.destdir/<prefix>/ and return [(real_path, view_path), ...]
+
+        view_path is the prefix-relative path with the LFS lib64/ rewritten
+        as lib/, matching how recipe `files:` globs are written. The LFS
+        `lib -> lib64` symlink staged by install() is filtered out — it's
+        recreated per-destdir during splitting.
+        """
+        destdir_prefix = self.destdir / str(self.prefix).lstrip('/')
+        out: List[Tuple[Path, str]] = []
+        for path in destdir_prefix.rglob('*'):
+            if path.is_dir() and not path.is_symlink():
+                continue
+            try:
+                rel = path.relative_to(destdir_prefix)
+            except ValueError:
+                continue
+            rel_str = str(rel)
+            if rel_str == 'lib' and path.is_symlink():
+                continue
+            if rel_str.startswith('lib64/'):
+                view = 'lib/' + rel_str[len('lib64/'):]
+            else:
+                view = rel_str
+            out.append((path, view))
+        return out
+
+    def _split_destdir_for_subpackages(self) -> None:
+        """Move files claimed by subpackage `files:` globs out of self.destdir
+        and into per-subpackage destdirs at work/build/destdir-<subpkg>.
+
+        Behaviors mirrored from the RPM split semantics:
+        * Subpackages whose `scls-<flavor>-<name>` collides with the main
+          package's name are NOT split out — their files remain in main.
+        * Each subpackage must claim at least one file (empty match is a
+          recipe bug, surfaced as BuildError).
+        * A file matched by two different subpackages' globs is a recipe
+          bug; we raise rather than silently let first-declared win.
+        * `match` is fnmatch.fnmatch on the lib/ view; this is the same
+          glob semantics build_common.match_files_to_subpackage uses for
+          the RPM path.
+
+        After this runs, self.destdir contains only files that belong to
+        the main package; per-subpackage destdirs contain their own files
+        under `<prefix>/lib64/...`. Subpackage destdirs intentionally do
+        NOT include a `<prefix>/lib -> lib64` symlink — the environment
+        package owns that path, and a duplicate would cause dpkg file-
+        conflict errors on install. Files moved under lib64/ remain
+        reachable via the lib/ view at runtime because environment
+        provides the symlink.
+        """
+        import fnmatch
+
+        subpackages = get_subpackages_for_flavor(self.recipe, self.flavor_name)
+        splittable = [
+            s for s in subpackages
+            if f"scls-{self.flavor_name}-{s['name']}" != self.scls_name
+        ]
+        if not splittable:
+            return
+
+        files = self._enumerate_destdir_files()
+        view_to_real = {view: real for real, view in files}
+        ownership: Dict[str, str] = {}  # view path -> claiming subpackage name
+
+        # Assignment pass: figure out who claims what; reject overlap upfront
+        # so we don't half-move files before failing.
+        per_subpkg_views: Dict[str, List[str]] = {}
+        for subpkg in splittable:
+            patterns = subpkg.get('files', [])
+            if not patterns:
+                raise BuildError(
+                    f"Subpackage {subpkg['name']} of {self.package} has no "
+                    f"`files:` patterns; it would package nothing."
+                )
+            claimed = []
+            for view in view_to_real:
+                if not any(fnmatch.fnmatch(view, pat) for pat in patterns):
+                    continue
+                if view in ownership and ownership[view] != subpkg['name']:
+                    raise BuildError(
+                        f"File {view!r} matched by both "
+                        f"{ownership[view]!r} and {subpkg['name']!r} "
+                        f"subpackages of {self.package}; tighten one of "
+                        f"the `files:` glob lists."
+                    )
+                ownership[view] = subpkg['name']
+                claimed.append(view)
+            if not claimed:
+                raise BuildError(
+                    f"Subpackage {subpkg['name']} of {self.package} matched "
+                    f"zero installed files (patterns: {patterns}). Recipe "
+                    f"bug: either the glob is wrong or the file isn't being "
+                    f"installed."
+                )
+            per_subpkg_views[subpkg['name']] = claimed
+
+        # Move pass.
+        # On any failure inside this loop, the next `scls build <pkg>` run
+        # rebuilds self.destdir from scratch (install() does rmtree before
+        # restaging) and `_split_destdir_for_subpackages` rmtrees any
+        # `destdir-<subpkg>` it touches at start. So a partial split is not
+        # observable to a subsequent run; we just propagate the exception
+        # rather than implementing a stage-then-rename two-phase commit.
+        main_destdir_prefix = self.destdir / str(self.prefix).lstrip('/')
+        for subpkg_name, views in per_subpkg_views.items():
+            sub_destdir = self.work_dir / f"destdir-{subpkg_name}"
+            if sub_destdir.exists():
+                shutil.rmtree(sub_destdir)
+            sub_prefix = sub_destdir / str(self.prefix).lstrip('/')
+            sub_prefix.mkdir(parents=True)
+            # Do NOT create a `lib -> lib64` symlink in subpackage destdirs.
+            # The environment package owns `<prefix>/lib`; if a subpackage
+            # also packaged that symlink, dpkg would refuse the install with
+            # a file-conflict error. Files moved under lib64/ stay reachable
+            # via lib/ at runtime because environment provides the symlink.
+
+            for view in views:
+                real = view_to_real[view]
+                rel = real.relative_to(main_destdir_prefix)
+                dest = sub_prefix / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(real), str(dest))
+
+        # Drop now-empty directories under main (deepest first). This is
+        # cosmetic but prevents the main .deb from claiming ownership of
+        # empty trees that morally belong to a subpackage (e.g. an empty
+        # lib/cmake/cblas-1.0/ after cblas was split out).
+        self._prune_empty_dirs(main_destdir_prefix)
+
+    @staticmethod
+    def _prune_empty_dirs(root: Path) -> None:
+        """Remove empty directories under root, deepest first. Symlinks are
+        never removed; non-empty directories are skipped silently.
+        """
+        if not root.exists():
+            return
+        candidates = [
+            p for p in root.rglob('*')
+            if p.is_dir() and not p.is_symlink()
+        ]
+        for path in sorted(candidates, key=lambda p: len(p.parts), reverse=True):
+            try:
+                path.rmdir()
+            except OSError:
+                pass
+
+    def write_control(self, destdir: Path, scls_name: str,
+                      depends: List[str], summary: str,
+                      description: str) -> None:
+        """Render DEBIAN/control + DEBIAN/postinst into the given destdir.
+
+        Used for both the main package and each subpackage. We discard
+        Build-Depends here: this is a binary package (dpkg-deb --build
+        output), not a source package, so Build-Depends would be dead
+        metadata.
+        """
+        debian_dir = destdir / "DEBIAN"
         debian_dir.mkdir(parents=True, exist_ok=True)
 
-        _, depends = self.get_deb_depends()
-
-        description = load_description(self.package) or self.recipe.get(
-            'summary', self.package
-        )
-        summary = self.recipe.get('summary') or description.split('\n', 1)[0]
         # Debian control descriptions: first line is the summary (on the
         # Description: line itself), subsequent lines are indented by one
         # space, with '.' used for blank paragraph separators.
-        description_lines = description.strip().splitlines()[1:] if (
-            description.strip().startswith(summary)
-        ) else description.strip().splitlines()
+        body = description.strip().splitlines()
+        if body and body[0] == summary:
+            body = body[1:]
 
         template = self.jinja_env.get_template("default.control.j2")
         rendered = template.render(
-            scls_name=self.scls_name,
+            scls_name=scls_name,
             version=self.recipe['version'],
             release=self.release,
             architecture=self.architecture,
@@ -621,7 +833,7 @@ class DebBuilder(UnixBuilder):
             depends=depends,
             homepage=self.recipe.get('homepage', ''),
             summary=summary,
-            description_lines=description_lines,
+            description_lines=body,
         )
         control_path = debian_dir / "control"
         control_path.write_text(rendered)
@@ -638,6 +850,11 @@ class DebBuilder(UnixBuilder):
         is the build-time linkage target. We also refresh the loader
         cache for the SCLS prefix so consumers don't need
         LD_LIBRARY_PATH at runtime.
+
+        Emitted into every package's DEBIAN/ (main and each subpackage).
+        The script is self-guarded with `[ -d {prefix}/lib ]` so it's a
+        no-op for packages that ship no libraries; ldconfig over the
+        whole prefix is idempotent.
 
         We bake the literal install prefix in here because dpkg does not
         substitute spec-style macros the way rpmbuild does for the spec
@@ -673,29 +890,57 @@ exit 0
         print(f"Wrote {postinst}")
 
     def create_deb(self) -> Path:
-        """Package self.destdir into a .deb via dpkg-deb --build."""
+        """Package self.destdir (and any subpackage destdirs) into .debs.
+
+        Returns the path to the main package's .deb. For recipes that
+        declare `subpackages:`, additional .debs are produced as a side
+        effect under the same output dir; the registry marker still
+        tracks just the recipe (mirroring rpm_builder).
+        """
         if not self.destdir.exists():
             raise BuildError(
                 f"No staged buildroot at {self.destdir}. Run 'install' first."
             )
-        self.write_control()
+
+        # Split BEFORE rendering control: the splitter may move files
+        # out of self.destdir, and we don't want a stale DEBIAN/ in main
+        # to be moved with them.
+        self._split_destdir_for_subpackages()
+
         self.deb_out_dir.mkdir(parents=True, exist_ok=True)
+        binary_packages = self._binary_packages()
 
-        deb_filename = (
-            f"{self.scls_name}_{self.recipe['version']}-{self.release}"
-            f"_{self.architecture}.deb"
-        )
-        deb_path = self.deb_out_dir / deb_filename
-
-        cmd = [
-            'dpkg-deb',
-            '--root-owner-group',
-            '--build',
-            str(self.destdir),
-            str(deb_path),
-        ]
-        run_command(cmd, self.work_dir, os.environ, "dpkg-deb --build")
-        print(f"Created {deb_path}")
+        produced: List[Path] = []
+        main_deb_path: Path | None = None
+        for entry in binary_packages:
+            if entry['subpkg_name'] is None:
+                destdir = self.destdir
+            else:
+                destdir = self.work_dir / f"destdir-{entry['subpkg_name']}"
+            self.write_control(
+                destdir,
+                scls_name=entry['scls_name'],
+                depends=entry['depends'],
+                summary=entry['summary'],
+                description=entry['description'],
+            )
+            deb_filename = (
+                f"{entry['scls_name']}_{self.recipe['version']}-{self.release}"
+                f"_{self.architecture}.deb"
+            )
+            deb_path = self.deb_out_dir / deb_filename
+            cmd = [
+                'dpkg-deb',
+                '--root-owner-group',
+                '--build',
+                str(destdir),
+                str(deb_path),
+            ]
+            run_command(cmd, self.work_dir, os.environ, "dpkg-deb --build")
+            print(f"Created {deb_path}")
+            produced.append(deb_path)
+            if entry['subpkg_name'] is None:
+                main_deb_path = deb_path
 
         # Local registry marker so build-order tracking knows this package is
         # done without needing the .deb to be installed yet. Mirrors what
@@ -706,7 +951,8 @@ exit 0
         marker.write_text(
             f"name: {self.package}\nversion: {self.recipe['version']}\n"
         )
-        return deb_path
+        assert main_deb_path is not None  # _binary_packages always yields main
+        return main_deb_path
 
     # -------------------------------------------------------------------
     # Source package (3.0 quilt) — license-compliance analogue of SRPM
@@ -718,21 +964,11 @@ exit 0
 
         This is a DIFFERENT file from the binary DEBIAN/control: it has a
         Source: stanza at top with Build-Depends (no Architecture), then
-        one Package: stanza per binary (we produce exactly one). The
-        template in templates/default.control.j2 is binary-only, so we
-        render this one inline.
+        one Package: stanza per produced binary .deb. For recipes with
+        `subpackages:`, that's the main package + every non-colliding
+        subpackage. The template in templates/default.control.j2 is
+        binary-only, so we render this one inline.
         """
-        description = (load_description(self.package)
-                       or self.recipe.get('summary', self.package))
-        summary = (self.recipe.get('summary')
-                   or description.split('\n', 1)[0])
-        # Same indentation rule as the binary template: summary goes on
-        # Description:, subsequent lines are indented by one space with
-        # '.' standing in for blank paragraph separators.
-        desc_body = description.strip().splitlines()
-        if desc_body and desc_body[0] == summary:
-            desc_body = desc_body[1:]
-
         lines = [
             f"Source: {self.scls_name}",
             "Section: science",
@@ -746,16 +982,53 @@ exit 0
         if build_depends:
             lines.append(f"Build-Depends: {', '.join(build_depends)}")
 
-        lines.extend([
-            "",
-            f"Package: {self.scls_name}",
-            f"Architecture: {self.architecture}",
-        ])
-        if depends:
-            lines.append(f"Depends: {', '.join(depends)}")
-        lines.append(f"Description: {summary}")
-        for line in desc_body:
-            lines.append(f" {line if line else '.'}")
+        # Build descriptors for every binary package this source produces.
+        # We can't reuse self._binary_packages() directly because its main
+        # entry pulls Depends from get_deb_depends()[1]; here `depends` is
+        # passed in and we want to honour it (callers may have post-
+        # processed the list). The subpackage entries are derived freshly.
+        binaries = [{
+            'scls_name': self.scls_name,
+            'depends': depends,
+            'summary': (self.recipe.get('summary')
+                        or (load_description(self.package)
+                            or self.package).split('\n', 1)[0]),
+            'description': (load_description(self.package)
+                            or self.recipe.get('summary', self.package)),
+        }]
+        for sub in get_subpackages_for_flavor(self.recipe, self.flavor_name):
+            scls_name = f"scls-{self.flavor_name}-{sub['name']}"
+            if scls_name == self.scls_name:
+                continue
+            sub_deps = get_subpackage_dependencies(sub, self.flavor_name)
+            translated = [f"scls-{self.flavor_name}-{d}" for d in sub_deps]
+            summary = sub.get('summary', f"{sub['name']} subpackage")
+            description = sub.get('description') or summary
+            binaries.append({
+                'scls_name': scls_name,
+                'depends': translated,
+                'summary': summary,
+                'description': description,
+            })
+
+        for binary in binaries:
+            # Same indentation rule as the binary template: summary goes
+            # on Description:, subsequent lines are indented by one space
+            # with '.' standing in for blank paragraph separators.
+            desc_body = binary['description'].strip().splitlines()
+            if desc_body and desc_body[0] == binary['summary']:
+                desc_body = desc_body[1:]
+
+            lines.extend([
+                "",
+                f"Package: {binary['scls_name']}",
+                f"Architecture: {self.architecture}",
+            ])
+            if binary['depends']:
+                lines.append(f"Depends: {', '.join(binary['depends'])}")
+            lines.append(f"Description: {binary['summary']}")
+            for line in desc_body:
+                lines.append(f" {line if line else '.'}")
         lines.append("")  # trailing newline
         return '\n'.join(lines)
 
@@ -1081,6 +1354,11 @@ exit 0
         a series file.
         """
         debian = src_dir / 'debian'
+        # Some upstream tarballs (e.g. UCX) ship their own debian/ tree.
+        # Drop it so our overlay is the sole source of packaging metadata;
+        # the diff against the pristine .orig.tar will record the swap.
+        if debian.exists():
+            shutil.rmtree(debian)
         debian.mkdir()
 
         source_meta = debian / 'source'
@@ -1267,24 +1545,38 @@ exit 0
         return dsc
 
     def install_deb(self) -> None:
-        """Install (or reinstall) the most-recently-built .deb via apt-get.
+        """Install (or reinstall) the most-recently-built .debs via apt-get.
 
         Mirrors RPMBuilder.install_rpm semantically, including its
         reinstall-when-exact-version-is-already-installed behavior (see
         rpm_builder._partition_rpms_for_install). A rebuild of the same
         version overwrites the installed files instead of apt-get's
         "already the newest version" no-op.
+
+        For recipes with `subpackages:`, every produced binary .deb
+        (main + each subpackage) is installed in a single transaction so
+        apt resolves inter-subpackage Depends atomically.
         """
-        pattern = f"{self.scls_name}_*_{self.architecture}.deb"
-        candidates = sorted(
-            self.deb_out_dir.glob(pattern),
-            key=lambda p: p.stat().st_mtime, reverse=True,
-        )
-        if not candidates:
+        latest: Dict[str, Path] = {}
+        target_names = [b['scls_name'] for b in self._binary_packages()]
+        for name in target_names:
+            pattern = f"{name}_*_{self.architecture}.deb"
+            matches = sorted(
+                self.deb_out_dir.glob(pattern),
+                key=lambda p: p.stat().st_mtime, reverse=True,
+            )
+            if matches:
+                latest[name] = matches[0]
+        if not latest:
             raise BuildError(
                 f"No built .deb found for {self.scls_name} in {self.deb_out_dir}"
             )
-        _apt_install_deb(candidates[0], label="apt-get install")
+        if self.scls_name not in latest:
+            raise BuildError(
+                f"Missing main package .deb for {self.scls_name} in "
+                f"{self.deb_out_dir}; subpackages alone are not installable."
+            )
+        _apt_install_debs(list(latest.values()), label="apt-get install")
 
     def check_system_build_deps(self) -> None:
         """Verify non-SCLS entries in Build-Depends are installed on the host.
