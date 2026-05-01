@@ -407,8 +407,11 @@ def _artifact_exists_for(root, flavor, pkg_name, kind):
         if not pkgs_dir.exists():
             return False
         # deb_builder names files <scls_name>_<ver>-<rel>_<arch>.deb; the
-        # meta-package uses arch 'all'.
-        for _ in pkgs_dir.glob(f'{scls_name}_*.deb'):
+        # meta-package uses arch 'all'. Underscores in recipe names are
+        # mapped to hyphens for the Debian Package: name (policy 5.6.1),
+        # so the glob must use the same transform — mirrors deb_builder._deb_name.
+        deb_scls_name = scls_name.replace('_', '-')
+        for _ in pkgs_dir.glob(f'{deb_scls_name}_*.deb'):
             return True
         return False
     return False

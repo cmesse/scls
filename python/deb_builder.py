@@ -78,6 +78,15 @@ def load_system_package_map() -> Dict[str, str]:
     return data
 
 
+def _deb_name(name: str) -> str:
+    """Sanitize a recipe-internal name into a Debian Package: name.
+
+    Debian policy 5.6.1 restricts package names to [a-z0-9+\\-.]; underscores
+    in recipe names (e.g. `superlu_dist`) are mapped to hyphens.
+    """
+    return name.replace('_', '-')
+
+
 def detect_architecture() -> str:
     """Return dpkg architecture name for the current host."""
     try:
@@ -203,7 +212,7 @@ class DebBuilder(UnixBuilder):
 
         self.system_package_map = load_system_package_map()
         self.architecture = detect_architecture()
-        self.scls_name = f"scls-{self.flavor_name}-{self.package}"
+        self.scls_name = f"scls-{self.flavor_name}-{_deb_name(self.package)}"
         self.release = str(self.recipe.get('release', '1'))
         self.maintainer = self.recipe.get(
             'maintainer', 'Christian Messe <cmesse@lbl.gov>'
@@ -395,7 +404,7 @@ class DebBuilder(UnixBuilder):
 
         def add(names):
             for req in names:
-                scls_req = f"scls-{self.flavor_name}-{req}"
+                scls_req = f"scls-{self.flavor_name}-{_deb_name(req)}"
                 build_requires.append(scls_req)
                 if req not in BUILD_ONLY_TOOLS:
                     requires.append(scls_req)
@@ -639,12 +648,12 @@ class DebBuilder(UnixBuilder):
 
         subpackages = get_subpackages_for_flavor(self.recipe, self.flavor_name)
         for subpkg in subpackages:
-            scls_name = f"scls-{self.flavor_name}-{subpkg['name']}"
+            scls_name = f"scls-{self.flavor_name}-{_deb_name(subpkg['name'])}"
             if scls_name == self.scls_name:
                 # Collision with main — its files stay in main, no separate .deb.
                 continue
             deps = get_subpackage_dependencies(subpkg, self.flavor_name)
-            translated = [f"scls-{self.flavor_name}-{d}" for d in deps]
+            translated = [f"scls-{self.flavor_name}-{_deb_name(d)}" for d in deps]
             summary = subpkg.get('summary', f"{subpkg['name']} subpackage")
             description = subpkg.get('description') or summary
             out.append({
@@ -712,7 +721,7 @@ class DebBuilder(UnixBuilder):
         subpackages = get_subpackages_for_flavor(self.recipe, self.flavor_name)
         splittable = [
             s for s in subpackages
-            if f"scls-{self.flavor_name}-{s['name']}" != self.scls_name
+            if f"scls-{self.flavor_name}-{_deb_name(s['name'])}" != self.scls_name
         ]
         if not splittable:
             return
@@ -720,6 +729,13 @@ class DebBuilder(UnixBuilder):
         files = self._enumerate_destdir_files()
         view_to_real = {view: real for real, view in files}
         ownership: Dict[str, str] = {}  # view path -> claiming subpackage name
+
+        # Match a view path against a recipe pattern. RPM's %files treats a
+        # bare directory path as "the dir and everything under it"; emulate
+        # that here so recipes written for the RPM path (e.g.
+        # `share/sundials/examples`) still claim their tree on the deb path.
+        def matches(view: str, pat: str) -> bool:
+            return fnmatch.fnmatch(view, pat) or view.startswith(pat.rstrip('/') + '/')
 
         # Assignment pass: figure out who claims what; reject overlap upfront
         # so we don't half-move files before failing.
@@ -733,7 +749,7 @@ class DebBuilder(UnixBuilder):
                 )
             claimed = []
             for view in view_to_real:
-                if not any(fnmatch.fnmatch(view, pat) for pat in patterns):
+                if not any(matches(view, pat) for pat in patterns):
                     continue
                 if view in ownership and ownership[view] != subpkg['name']:
                     raise BuildError(
@@ -997,11 +1013,11 @@ exit 0
                             or self.recipe.get('summary', self.package)),
         }]
         for sub in get_subpackages_for_flavor(self.recipe, self.flavor_name):
-            scls_name = f"scls-{self.flavor_name}-{sub['name']}"
+            scls_name = f"scls-{self.flavor_name}-{_deb_name(sub['name'])}"
             if scls_name == self.scls_name:
                 continue
             sub_deps = get_subpackage_dependencies(sub, self.flavor_name)
-            translated = [f"scls-{self.flavor_name}-{d}" for d in sub_deps]
+            translated = [f"scls-{self.flavor_name}-{_deb_name(d)}" for d in sub_deps]
             summary = sub.get('summary', f"{sub['name']} subpackage")
             description = sub.get('description') or summary
             binaries.append({
@@ -1793,7 +1809,7 @@ def build_flavor_meta_package(flavor: str) -> Path:
             packages.insert(0, pkg)
 
     scls_name = f"scls-{flavor}"
-    depends = [f"scls-{flavor}-{pkg}" for pkg in packages]
+    depends = [f"scls-{flavor}-{_deb_name(pkg)}" for pkg in packages]
 
     # Version: use the environment recipe's version, matching rpm_builder.
     env_recipe = load_recipe('environment')

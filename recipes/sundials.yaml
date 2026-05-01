@@ -22,6 +22,11 @@ requires:
     - openmpi
     - petsc
 
+# SUNDIALS' FindPETSC.cmake invokes pkg_check_modules, which needs
+# pkg-config on PATH at configure time.
+rpm_build_requires:
+  - pkgconf-pkg-config
+
 features:
   fortran: false
   mpi: true

@@ -30,7 +30,8 @@ from build_common import (
     get_interface_args,
     read_extra_packages,
     resolve_flavor_key,
-    apply_flavor_overrides
+    apply_flavor_overrides,
+    resolve_gcc_runtime_lib,
 )
 from patch_common import (
     copy_patches_to_sources,
@@ -552,6 +553,11 @@ class RPMBuilder:
             # Use our built zlib
             cmd = [s.replace('%{zlib_include}', f'{self.prefix}/include') for s in cmd]
             cmd = [s.replace('%{zlib_lib}', f'{self.prefix}/lib/libz.so') for s in cmd]
+        # libgomp: ask the active gcc, so the path tracks system gcc,
+        # gcc-toolset/devtoolset, and the SCLS-built gcc under `lbl`.
+        if any('%{libgomp}' in s for s in cmd):
+            libgomp = resolve_gcc_runtime_lib('libgomp.so.1', self.prefix)
+            cmd = [s.replace('%{libgomp}', libgomp) for s in cmd]
         # Substitute extra source info (e.g., %{gmp_version}, %{gmp_tarball})
         for name, info in self.extra_source_info.items():
             cmd = [s.replace(f'%{{{name}_version}}', info['version']) for s in cmd]

@@ -33,7 +33,8 @@ from build_common import (
     get_subpackage_dependencies,
     split_files_by_subpackage,
     get_interface_args,
-    resolve_flavor_key
+    resolve_flavor_key,
+    resolve_gcc_runtime_lib,
 )
 
 from patch_common import (
@@ -131,6 +132,17 @@ class UnixBuilder:
                 self.host = f"{machine}-unknown-linux-gnu"
             self.lib_ext = '.so'
             self.soname_flag = '-soname'
+
+        # System library directory for placeholder substitution. RHEL puts
+        # 64-bit system libs under /usr/lib64; Debian/Ubuntu uses multiarch
+        # paths under /usr/lib/<triplet>. Detect by probing for the multiarch
+        # dir derived from the host triplet.
+        if self.platform == 'macos':
+            self.system_libdir = '/usr/lib'
+        elif Path(f'/usr/lib/{self.host}').is_dir():
+            self.system_libdir = f'/usr/lib/{self.host}'
+        else:
+            self.system_libdir = '/usr/lib64'
 
         # Feature flags
         self.openmp = False
@@ -459,7 +471,7 @@ class UnixBuilder:
             # Use system zlib
             if self.platform == 'linux':
                 cmd = [s.replace('%{zlib_include}', '/usr/include') for s in cmd]
-                cmd = [s.replace('%{zlib_lib}', '/usr/lib64/libz.so') for s in cmd]
+                cmd = [s.replace('%{zlib_lib}', f'{self.system_libdir}/libz.so') for s in cmd]
             else:
                 cmd = [s.replace('%{zlib_include}', '/usr/include') for s in cmd]
                 cmd = [s.replace('%{zlib_lib}', '/usr/lib/libz.dylib') for s in cmd]
@@ -467,6 +479,11 @@ class UnixBuilder:
             # Use our built zlib
             cmd = [s.replace('%{zlib_include}', f'{self.prefix}/include') for s in cmd]
             cmd = [s.replace('%{zlib_lib}', f'{self.prefix}/lib/libz{self.lib_ext}') for s in cmd]
+        # libgomp: ask the active gcc, so the path tracks system gcc,
+        # gcc-toolset/devtoolset, and the SCLS-built gcc under `lbl`.
+        if any('%{libgomp}' in s for s in cmd):
+            libgomp = resolve_gcc_runtime_lib('libgomp.so.1', self.prefix)
+            cmd = [s.replace('%{libgomp}', libgomp) for s in cmd]
         # Substitute extra source info (e.g., %{gmp_version}, %{gmp_tarball})
         for name, info in self.extra_source_info.items():
             cmd = [s.replace(f'%{{{name}_version}}', info['version']) for s in cmd]
@@ -1324,18 +1341,26 @@ class UnixBuilder:
             # Build
             self.build(build_dir, env)
         else:
-            # For test/install without build, find the build directory
-            # First try: if there's exactly one directory, use it (same logic as extract_source)
-            build_dirs = [d for d in self.work_dir.iterdir() if d.is_dir()] if self.work_dir.exists() else []
-            if not build_dirs:
-                raise BuildError("No build directory found. Run 'build' first.")
-            if len(build_dirs) > 1:
-                # Multiple dirs: try matching by package name (case-insensitive)
-                build_dirs = [d for d in build_dirs if d.name.lower().startswith(self.package.lower())]
-            if not build_dirs:
-                raise BuildError("No build directory found. Run 'build' first.")
-            build_dir = build_dirs[0]
-            self.source_dir = build_dir
+            # For test/install without build, reuse self.source_dir if a
+            # previous run() call on the same builder already set it
+            # (DebBuilder.run invokes super().run(['build','install']) and
+            # super().run(['test']) as separate phases). Otherwise fall back
+            # to scanning work_dir, which can mismatch when the recipe
+            # extracts to a non-package-prefixed directory (e.g. exodus →
+            # seacas-2025-10-14) and a sibling 'destdir' is present.
+            if self.source_dir and Path(self.source_dir).is_dir():
+                build_dir = Path(self.source_dir)
+            else:
+                build_dirs = [d for d in self.work_dir.iterdir() if d.is_dir()] if self.work_dir.exists() else []
+                if not build_dirs:
+                    raise BuildError("No build directory found. Run 'build' first.")
+                if len(build_dirs) > 1:
+                    # Multiple dirs: try matching by package name (case-insensitive)
+                    build_dirs = [d for d in build_dirs if d.name.lower().startswith(self.package.lower())]
+                if not build_dirs:
+                    raise BuildError("No build directory found. Run 'build' first.")
+                build_dir = build_dirs[0]
+                self.source_dir = build_dir
             if (build_dir / 'build').exists():  # CMake build
                 build_dir = build_dir / 'build'
             env = setup_environment(self.flavor, self.prefix, self.source_dir, self.recipe)

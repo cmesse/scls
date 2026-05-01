@@ -21,6 +21,41 @@ class BuildError(Exception):
     pass
 
 
+def resolve_gcc_runtime_lib(libname: str, prefix: Path = None) -> str:
+    """Ask the active gcc where it would find a runtime library (e.g.
+    'libgomp.so.1'). Mirrors what the link step would resolve to, so the
+    result is correct for system gcc, gcc-toolset/devtoolset, and the
+    SCLS-built gcc under `lbl` — without having to hard-code multiarch
+    paths or RHEL conventions in recipes.
+
+    `prefix`, if given, is prepended to PATH so the SCLS-built gcc is
+    preferred over the system one. Returns the absolute path; raises
+    BuildError if gcc can't resolve `libname` (gcc returns the bare name
+    unchanged on failure).
+    """
+    env = os.environ.copy()
+    if prefix is not None:
+        env['PATH'] = f"{prefix}/bin:{env.get('PATH', '')}"
+    try:
+        out = subprocess.check_output(
+            ['gcc', f'-print-file-name={libname}'],
+            env=env, text=True,
+        ).strip()
+    except (FileNotFoundError, subprocess.CalledProcessError) as e:
+        raise BuildError(f"Could not invoke gcc to resolve {libname}: {e}")
+    # gcc returns the input unchanged if it can't find the lib.
+    if out == libname or not os.path.isabs(out):
+        raise BuildError(
+            f"gcc could not resolve {libname} (returned {out!r}). "
+            f"Check that the gcc on PATH (or under {prefix}/bin) ships {libname}."
+        )
+    # gcc's internal lib search often returns paths with `..` segments
+    # (e.g. /usr/lib/gcc/<host>/<ver>/../../../<host>/libgomp.so.1).
+    # Collapse them with normpath; don't use realpath, which would also
+    # resolve the SONAME symlink to the underlying versioned file.
+    return os.path.normpath(out)
+
+
 def add_rpath_for_libdirs(ldflags: str, platform: str = 'linux') -> str:
     """
     Add rpath entries for every -L directory in ldflags.

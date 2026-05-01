@@ -163,8 +163,8 @@ configure:
     gcc:
       - "--with-cuda=0"
       - "--with-hwloc-dir=%{prefix}"
-      - "--with-zlib-include=/usr/include"
-      - "--with-zlib-lib=/usr/lib64/libz.so"
+      - "--with-zlib-include=%{zlib_include}"
+      - "--with-zlib-lib=%{zlib_lib}"
       - "--with-gmp-dir=/usr"
       - "--with-mpfr-dir=/usr"
       - "--with-blaslapack-lib=%{prefix}/lib/libopenblas%{libext}"
@@ -179,8 +179,8 @@ configure:
     lbl:
       - "--with-cuda=0"
       - "--with-hwloc-dir=/usr"
-      - "--with-zlib-include=/usr/include"
-      - "--with-zlib-lib=/usr/lib64/libz.so"
+      - "--with-zlib-include=%{zlib_include}"
+      - "--with-zlib-lib=%{zlib_lib}"
       - "--with-gmp-dir=%{prefix}"
       - "--with-mpfr-dir=%{prefix}"
       - "--with-blaslapack-lib=%{prefix}/lib/libopenblas%{libext}"
@@ -220,12 +220,12 @@ configure:
       - "--with-mpi-include=%{prefix}/include"
       - "--with-mpi-lib=%{prefix}/lib/libmpi%{libext}"
       - "--with-mpiexec=%{prefix}/bin/mpiexec"
-      - "--with-zlib-include=/usr/include"
-      - "--with-zlib-lib=/usr/lib64/libz.so"
+      - "--with-zlib-include=%{zlib_include}"
+      - "--with-zlib-lib=%{zlib_lib}"
       - "--CC_LINKER_FLAGS=%{ldflags} -lgfortran"
       - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
       - "--with-openmp-include=/usr/include"
-      - "--with-openmp-lib=/usr/lib64/libgomp.so.1"
+      - "--with-openmp-lib=%{libgomp}"
     mkl:
       - "--with-cuda=0"
       - "--with-gmp-dir=/usr"
@@ -243,7 +243,7 @@ configure:
       - "--CC_LINKER_FLAGS=%{ldflags} -lgfortran"
       - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
       - "--with-openmp-include=/usr/include"
-      - "--with-openmp-lib=/usr/lib64/libgomp.so.1"
+      - "--with-openmp-lib=%{libgomp}"
     intel:
       - "--with-cuda=0"
       - "--with-gmp-dir=/usr"
@@ -283,7 +283,7 @@ configure:
       - "--CC_LINKER_FLAGS=%{ldflags} -lgfortran"
       - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
       - "--with-openmp-include=/usr/include"
-      - "--with-openmp-lib=/usr/lib64/libgomp.so.1"
+      - "--with-openmp-lib=%{libgomp}"
   optimization:
     O_level: 2
 

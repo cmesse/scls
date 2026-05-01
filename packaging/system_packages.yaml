@@ -31,6 +31,7 @@ libtool:                  libtool
 make:                     make
 git:                      git
 sed:                      sed
+pkgconf-pkg-config:       pkg-config
 
 # Runtime libraries
 gmp:                      libgmp10
