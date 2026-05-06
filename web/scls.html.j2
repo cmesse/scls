@@ -103,7 +103,7 @@
             <td class="right" style="border: none;">
                 <p>SCLS is a curated build and packaging system for scientific computing libraries. It produces a consistent, tested stack of numerical libraries that work together: BLAS/LAPACK, sparse solvers, graph partitioners, MPI, I/O libraries, and their dependencies.</p>
 
-                <p>The stack is available as RPM packages for Enterprise Linux (Rocky, Alma, RHEL) and as direct prefix installs for macOS and other Unix systems. All installations are kept in <code>/opt/scls/&lt;flavor&gt;</code> so the stack does not interfere with the operating system.</p>
+                <p>The stack is available as RPM packages for Enterprise Linux (Rocky, Alma, RHEL), as DEB packages for Ubuntu 24.04 LTS, and as direct prefix installs for macOS and other Unix systems. All installations are kept in <code>/opt/scls/&lt;flavor&gt;</code> so the stack does not interfere with the operating system.</p>
 
                 <p>Send comments, questions, or suggestions to <b id="email">Christian Messe: [javascript protected email]</b></p>
             </td>
@@ -142,23 +142,34 @@
         <li><code><b>{{ flavor.package }}</b></code> &mdash; {{ flavor.label }}. {{ flavor.description }}</li>
         {% endfor %}
     </ul>
-    <p>The public binary flavors listed above are the RPM-delivered Enterprise Linux stacks. The repository also contains source-build flavors for site-specific Linux deployments, Intel compiler builds, CUDA-enabled experiments, and macOS. On systems without RPM support, the same stack can be built from source with the <code>./scls</code> Unix build script.</p>
+    <p>The public binary flavors listed above are delivered as RPM packages for Enterprise Linux 9 and 10 and as DEB packages for Ubuntu 24.04 LTS. The repository also contains source-build flavors for site-specific Linux deployments, Intel compiler builds, CUDA-enabled experiments, and macOS. On systems without binary support, the same stack can be built from source with the <code>./scls</code> Unix build script.</p>
     <p>CUDA binaries are not distributed, because a CUDA-linked stack would tie users to a specific driver and toolkit version. Users who need GPU acceleration can enable CUDA in the Unix build script and link against a locally installed CUDA toolkit.</p>
     <p>On macOS the stack uses OpenBLAS rather than Apple's Accelerate framework. The <code>macos</code> flavor builds its own GCC for Fortran support (SCLS ships a GCC build script for exactly this purpose), and pairing GCC-built Fortran with Accelerate is fragile &mdash; Accelerate is tuned for Apple's Clang toolchain and its ABI story is awkward from the GCC side. OpenBLAS is well-understood with GCC, keeps the math behavior identical to the Linux binary flavors, and is tuned for compute throughput rather than the performance/power tradeoffs that shape Accelerate.</p>
     <p>The Unix build script also produces the GPL-3 build tools and LGPL-3 arbitrary-precision libraries that are left out of the binary flavors. See the second package table below.</p>
 
     <h3>Installation on Enterprise Linux 9 and 10</h3>
     <p>First, install the release package for your Enterprise Linux version (choose one):</p>
-    <code><b>sudo dnf install <a href="https://belfem.lbl.gov/scls/el9/x86_64/scls-release-{{ release_version }}-1.el9.noarch.rpm">scls-release-{{ release_version }}-1.el9.noarch.rpm</a></b></code><br>
-    <code><b>sudo dnf install <a href="https://belfem.lbl.gov/scls/el10/x86_64/scls-release-{{ release_version }}-1.el10.noarch.rpm">scls-release-{{ release_version }}-1.el10.noarch.rpm</a></b></code><br>
+    <code><b>sudo dnf install <a href="https://belfem.lbl.gov/scls/el9/x86_64/scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm">scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm</a></b></code><br>
+    <code><b>sudo dnf install <a href="https://belfem.lbl.gov/scls/el10/x86_64/scls-release-{{ scls_release_pkg_version }}-1.el10.noarch.rpm">scls-release-{{ scls_release_pkg_version }}-1.el10.noarch.rpm</a></b></code><br>
     <p>Then install a flavor:</p>
     <code><b>sudo dnf install scls-&lt;flavor&gt;</b></code><br>
     <p>After installation, activate the environment:</p>
     <code><b>source /opt/scls/&lt;flavor&gt;/share/scls/activate</b></code><br>
     <p>This adds the stack's <code>bin/</code> and <code>lib/</code> to your paths and sets the <code>SCLS</code> environment variable. Run <code>scls help</code> once the environment is active for the list of runtime subcommands (<code>scls flavor</code>, <code>scls list</code>, <code>scls info &lt;package&gt;</code>, <code>scls env</code>, <code>scls prefix</code>, <code>scls license</code>, <code>scls deactivate</code>).</p>
 
+    <h3>Installation on Ubuntu 24.04 LTS</h3>
+    <p>Ubuntu 24.04 LTS (Noble Numbat) is the supported Debian-family target. Unlike <code>dnf</code>, <code>apt</code> does not install packages directly from a URL, so the keyring + repository-configuration package is fetched first and then installed from the local file:</p>
+    <code><b>wget <a href="https://belfem.lbl.gov/scls/ubuntu/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb">https://belfem.lbl.gov/scls/ubuntu/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</a></b></code><br>
+    <code><b>sudo apt install ./scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</b></code><br>
+    <p>This drops the SCLS public key under <code>/etc/apt/keyrings/scls-archive-keyring.gpg</code> and a deb822-format <code>scls.sources</code> file under <code>/etc/apt/sources.list.d/</code>. Then refresh apt and install a flavor:</p>
+    <code><b>sudo apt update</b></code><br>
+    <code><b>sudo apt install scls-&lt;flavor&gt;</b></code><br>
+    <p>After installation, activate the environment the same way as on Enterprise Linux:</p>
+    <code><b>source /opt/scls/&lt;flavor&gt;/share/scls/activate</b></code><br>
+    <p>The runtime <code>scls</code> command, the per-flavor prefix layout, and the activation script are identical between the RPM and DEB binary distributions.</p>
+
     <h3>Installation from Source (macOS and other Unix systems)</h3>
-    <p>On platforms without RPM support, the same stack is built directly from the repository with the <code>./scls</code> Unix build wrapper. This path is the supported route for macOS, for non-RHEL Linux distributions (Debian, Ubuntu, Arch, and similar), and for older enterprise Linux hosts where the RPM path does not fit.</p>
+    <p>On platforms outside the binary-distributed Enterprise Linux and Ubuntu targets, the same stack is built directly from the repository with the <code>./scls</code> Unix build wrapper. This path is the supported route for macOS, for Linux distributions other than EL 9/10 and Ubuntu 24.04 (Debian, Arch, and similar), and for older enterprise Linux hosts where the RPM path does not fit.</p>
     <p><strong>macOS support is currently beta</strong>, developed and tested on Intel Macs; Apple Silicon is planned but unverified. The flavor assumes you are comfortable with a Unix toolchain &mdash; installing Xcode Command Line Tools, understanding how linker and sysroot settings work, and knowing what to do when a build log points at an SDK or path issue. The <code>macos</code> flavor also builds its own GCC for Fortran support, which adds time to the first build. If the built-in GCC bootstrap (Apple Clang building GCC 15) fails, Homebrew's prebuilt GCC is supported as a fallback. See the <a href="https://github.com/cmesse/scls/blob/main/MACOS_BUILD.md">macOS build guide</a> for prerequisites, the step-by-step flow, and the two Homebrew fallback routes.</p>
     <p>Quick start:</p>
     <ol>

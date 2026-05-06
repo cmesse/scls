@@ -2392,10 +2392,15 @@ def _detect_scls_repo_dir() -> str:
 def build_scls_release_package(spec_only: bool = False) -> None:
     """Build the scls-release RPM (and SRPM).
 
-    No recipe, no flavor — the only on-disk inputs are the .repo template
-    (templates/scls.repo, with @SCLS_REPO_DIR@ substituted) and the GPG
-    key (RPM-GPG-KEY-SCLS at the repo root). Both are the single sources
-    of truth shared with deb_builder's scls-archive-keyring path.
+    No recipe of its own, no flavor — the only on-disk inputs are the
+    .repo template (templates/scls.repo, with @SCLS_REPO_DIR@ substituted)
+    and the GPG key (RPM-GPG-KEY-SCLS at the repo root). Both are the
+    single sources of truth shared with deb_builder's
+    scls-archive-keyring path. The package version tracks the
+    environment recipe (the canonical "SCLS release year"), matching the
+    flavor meta-package, so a stack-year bump auto-bumps scls-release.
+    Use Release: > 1 to respin scls-release inside the same year (e.g.
+    a fix to scls.repo) without bumping the year.
     """
     project_root = Path(__file__).parent.parent
     rpm_base = project_root / 'rpmbuild'
@@ -2416,11 +2421,15 @@ def build_scls_release_package(spec_only: bool = False) -> None:
     (sources_dir / 'scls.repo').write_text(rendered)
     shutil.copy2(key_src, sources_dir / 'RPM-GPG-KEY-SCLS')
 
+    env_recipe = load_recipe('environment')
+    version = str(env_recipe.get('version', '1'))
+    release = '1'
+
     changelog_date = datetime.now().strftime('%a %b %d %Y')
     spec_content = f"""\
 Name:           {SCLS_RELEASE}
-Version:        1
-Release:        1%{{?dist}}
+Version:        {version}
+Release:        {release}%{{?dist}}
 Summary:        SCLS repository configuration and GPG key
 
 License:        BSD-3-Clause-LBNL
@@ -2444,7 +2453,7 @@ install -Dpm 644 %{{SOURCE1}} %{{buildroot}}/etc/pki/rpm-gpg/RPM-GPG-KEY-SCLS
 /etc/pki/rpm-gpg/RPM-GPG-KEY-SCLS
 
 %changelog
-* {changelog_date} SCLS Builder <scls@lbl.gov> - 1-1
+* {changelog_date} SCLS Builder <scls@lbl.gov> - {version}-{release}
 - SCLS repository configuration and GPG key.
 """
     spec_file = specs_dir / f'{SCLS_RELEASE}.spec'

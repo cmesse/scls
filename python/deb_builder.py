@@ -1909,7 +1909,13 @@ def build_scls_release_package() -> Path:
     out_dir = PROJECT_ROOT / 'work' / 'pkgs'
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    version = '1'
+    # Version tracks the environment recipe (the canonical "SCLS release
+    # year"), matching scls-release on the RPM side and the flavor meta-
+    # package on the DEB side. Use release > 1 for in-year respins (e.g.
+    # a fix to the deb822 sources file) without bumping the year.
+    env_recipe = load_recipe('environment')
+    version = str(env_recipe.get('version', '1'))
+    release = '1'
     architecture = 'all'
 
     destdir = PROJECT_ROOT / 'work' / 'build' / f'destdir-{SCLS_RELEASE_DEB_NAME}'
@@ -1947,7 +1953,7 @@ def build_scls_release_package() -> Path:
     debian_dir.mkdir()
     control_lines = [
         f"Package: {SCLS_RELEASE_DEB_NAME}",
-        f"Version: {version}",
+        f"Version: {version}-{release}",
         "Section: misc",
         "Priority: optional",
         f"Architecture: {architecture}",
@@ -1959,7 +1965,7 @@ def build_scls_release_package() -> Path:
     ]
     (debian_dir / 'control').write_text('\n'.join(control_lines))
 
-    deb_path = out_dir / f"{SCLS_RELEASE_DEB_NAME}_{version}_{architecture}.deb"
+    deb_path = out_dir / f"{SCLS_RELEASE_DEB_NAME}_{version}-{release}_{architecture}.deb"
     run_command(
         ['dpkg-deb', '--root-owner-group', '--build',
          str(destdir), str(deb_path)],
