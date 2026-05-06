@@ -1789,9 +1789,9 @@ def build_flavor_meta_package(flavor: str) -> Path:
     installed once apt pulls it in.
 
     Parallels rpm_builder.build_flavor_meta_package. We do NOT emit an
-    examples meta-package here because deb_builder does not support the
-    `subpackages:` recipe section yet; when it does, the examples meta
-    follows the same pattern as the RPM path.
+    examples meta-package here yet; per-package example subpackages are
+    produced from recipe `subpackages:`, but there is no DEB equivalent of
+    `scls-<flavor>-examples`.
     """
     from build_order import get_flavor_package_list, FLAVOR_META
 
@@ -1884,6 +1884,97 @@ def build_flavor_meta_package(flavor: str) -> Path:
     return deb_path
 
 
+# ---------------------------------------------------------------------------
+# scls-release: format-aware static-config package, parallels FLAVOR_META.
+# Debian convention names repo-config packages <distro>-archive-keyring, so
+# the .deb is named scls-archive-keyring while the user-facing handle on
+# the CLI stays scls-release on both RPM and DEB hosts.
+# ---------------------------------------------------------------------------
+
+SCLS_RELEASE = 'scls-release'
+SCLS_RELEASE_DEB_NAME = 'scls-archive-keyring'
+
+
+def build_scls_release_package() -> Path:
+    """Build the scls-archive-keyring .deb (Debian-side counterpart of scls-release).
+
+    Ships:
+      /etc/apt/keyrings/scls-archive-keyring.gpg   — dearmored public key
+      /etc/apt/sources.list.d/scls.sources         — deb822 repo definition
+
+    The key must be dearmored (binary) on disk because APT cannot read
+    ASCII-armored keys; the same RPM-GPG-KEY-SCLS file at the repo root
+    feeds both the .rpm and the .deb path.
+    """
+    out_dir = PROJECT_ROOT / 'work' / 'pkgs'
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Version tracks the environment recipe (the canonical "SCLS release
+    # year"), matching scls-release on the RPM side and the flavor meta-
+    # package on the DEB side. Use release > 1 for in-year respins (e.g.
+    # a fix to the deb822 sources file) without bumping the year.
+    env_recipe = load_recipe('environment')
+    version = str(env_recipe.get('version', '1'))
+    release = '1'
+    architecture = 'all'
+
+    destdir = PROJECT_ROOT / 'work' / 'build' / f'destdir-{SCLS_RELEASE_DEB_NAME}'
+    if destdir.exists():
+        shutil.rmtree(destdir)
+
+    key_src = PROJECT_ROOT / 'RPM-GPG-KEY-SCLS'
+    if not key_src.exists():
+        raise BuildError(f"GPG key not found: {key_src}")
+
+    keyrings_dir = destdir / 'etc' / 'apt' / 'keyrings'
+    keyrings_dir.mkdir(parents=True)
+    keyring_path = keyrings_dir / f'{SCLS_RELEASE_DEB_NAME}.gpg'
+    run_command(
+        ['gpg', '--batch', '--yes', '--dearmor',
+         '-o', str(keyring_path), str(key_src)],
+        PROJECT_ROOT, os.environ, 'gpg --dearmor',
+    )
+    keyring_path.chmod(0o644)
+
+    sources_list_dir = destdir / 'etc' / 'apt' / 'sources.list.d'
+    sources_list_dir.mkdir(parents=True)
+    sources_content = (
+        "Types: deb\n"
+        "URIs: https://belfem.lbl.gov/scls/ubuntu\n"
+        "Suites: noble\n"
+        "Components: main\n"
+        f"Signed-By: /etc/apt/keyrings/{SCLS_RELEASE_DEB_NAME}.gpg\n"
+    )
+    sources_path = sources_list_dir / 'scls.sources'
+    sources_path.write_text(sources_content)
+    sources_path.chmod(0o644)
+
+    debian_dir = destdir / 'DEBIAN'
+    debian_dir.mkdir()
+    control_lines = [
+        f"Package: {SCLS_RELEASE_DEB_NAME}",
+        f"Version: {version}-{release}",
+        "Section: misc",
+        "Priority: optional",
+        f"Architecture: {architecture}",
+        "Maintainer: Christian Messe <cmesse@lbl.gov>",
+        "Description: Scientific Core Library Stack (SCLS) APT repository configuration",
+        " This package provides the APT sources file and GPG keyring for the",
+        " Scientific Core Library Stack (SCLS).",
+        "",
+    ]
+    (debian_dir / 'control').write_text('\n'.join(control_lines))
+
+    deb_path = out_dir / f"{SCLS_RELEASE_DEB_NAME}_{version}-{release}_{architecture}.deb"
+    run_command(
+        ['dpkg-deb', '--root-owner-group', '--build',
+         str(destdir), str(deb_path)],
+        PROJECT_ROOT, os.environ, f'dpkg-deb --build {SCLS_RELEASE_DEB_NAME}',
+    )
+    print(f"Created {deb_path}")
+    return deb_path
+
+
 def install_flavor_meta_package(flavor: str) -> None:
     """Install the most-recently-built scls-<flavor> meta .deb via apt-get."""
     from build_order import FLAVOR_META  # noqa: F401  (keeps call-site aligned with rpm)
@@ -1930,7 +2021,8 @@ def main():
 
     if not args.package:
         parser.error("--package/-p is required")
-    if not args.flavor:
+    # scls-release is flavor-independent; --flavor isn't required for it.
+    if not args.flavor and args.package != SCLS_RELEASE:
         parser.error("--flavor/-f is required")
     valid = {'build', 'test', 'install', 'deb', 'source'}
     bad = [c for c in args.commands if c not in valid]
@@ -1938,6 +2030,12 @@ def main():
         parser.error(f"invalid command(s): {bad!r}; valid choices are {sorted(valid)}")
 
     try:
+        # scls-release: no recipe, no flavor. Generated inline; the .deb
+        # ships APT sources and dearmored keyring under scls-archive-keyring.
+        if args.package == SCLS_RELEASE:
+            build_scls_release_package()
+            return 0
+
         # Flavor meta-package: no recipe, no source, just a Depends-only .deb
         # that pulls in every real package in the flavor. Mirrors
         # rpm_builder.main's FLAVOR_META special case.

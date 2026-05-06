@@ -530,7 +530,7 @@ def get_next_uninstalled_package(directory, flavor, prefix):
     return None
 
 
-def build_order(directory, flavor=None, show_stats=False):
+def build_order(directory, flavor=None, show_stats=False, names_only=False):
     """Main function to generate build order from YAML files."""
     # Resolve flavor names (with inheritance)
     flavor_names = get_flavor_names(flavor) if flavor else []
@@ -538,10 +538,12 @@ def build_order(directory, flavor=None, show_stats=False):
     # Load YAML files with flavor filtering
     packages = load_yaml_files(directory, flavor, flavor_names)
     if not packages:
-        print(f"No valid YAML files found in the directory{' for flavor ' + flavor if flavor else ''}.")
+        if not names_only:
+            print(f"No valid YAML files found in the directory{' for flavor ' + flavor if flavor else ''}.")
         return
 
-    print(f"\nLoaded {len(packages)} packages{' for flavor: ' + flavor if flavor else ' (all flavors)'}")
+    if not names_only:
+        print(f"\nLoaded {len(packages)} packages{' for flavor: ' + flavor if flavor else ' (all flavors)'}")
 
     # Build dependency graph with proper flavor handling
     graph, in_degree, nodes = build_dependency_graph(packages, flavor, flavor_names)
@@ -567,6 +569,11 @@ def build_order(directory, flavor=None, show_stats=False):
 
         # Validate the build order
         validate_build_order(build_order_list, packages, flavor, flavor_names)
+
+        if names_only:
+            for _rank, package in build_order_list:
+                print(package)
+            return
 
         # Print the build order
         print(f"\nBuild Order{' for flavor: ' + flavor if flavor else ' (all packages)'}:")
@@ -623,6 +630,8 @@ def main():
     parser.add_argument('--flavor', '-f', help='Filter packages by flavor (e.g., macos, gcc-debug)')
     parser.add_argument('--stats', '-s', action='store_true', help='Show dependency statistics')
     parser.add_argument('--debug', '-d', action='store_true', help='Show debug information')
+    parser.add_argument('--names-only', action='store_true',
+                        help='Print only package names, one per line, in build order')
 
     args = parser.parse_args()
 
@@ -635,7 +644,7 @@ def main():
         import logging
         logging.basicConfig(level=logging.DEBUG)
 
-    build_order(args.directory, args.flavor, args.stats)
+    build_order(args.directory, args.flavor, args.stats, args.names_only)
 
 
 if __name__ == "__main__":

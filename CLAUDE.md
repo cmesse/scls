@@ -22,6 +22,7 @@ The build system has three main components:
 
 Key modules:
 - `rpm_builder.py`: Generates RPM SPEC files and builds RPMs for Linux systems
+- `deb_builder.py`: Builds .debs for Debian/Ubuntu hosts. Uses `dpkg-deb`'s default compressor (zstd on Ubuntu 22.04+); the SCLS reprepro on belfem.lbl.gov is built from current EL9 sources so it ingests zstd-compressed .debs without `-Zxz`. Don't add `-Zxz` to "match" other call sites — there's nothing to match; the entire stack has shipped `.zst` from day one.
 - `unix_builder.py`: Direct Unix-style builds and installs for Linux/macOS (also serves as the macOS builder)
 - `build_order.py`: Resolves dependencies and determines parallel build order
 - `build_common.py`: Shared utilities for downloading, extracting, building packages

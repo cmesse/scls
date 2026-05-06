@@ -1,0 +1,51 @@
+#!/usr/bin/bash
+#
+# build-source-packages.sh — generate signed Debian source packages for SCLS.
+#
+# Run from the SCLS project root on the Ubuntu build host. Produces a
+# 3.0 (quilt) source-package triplet per recipe per flavor under
+# work/spkgs/, then signs every .dsc in one batch.
+#
+set -euo pipefail
+
+FLAVORS=(debug gcc mkl)
+KEYID="${SCLS_GPG_KEYID:-f38353b1835e8a44}"
+SPKG_DIR="work/spkgs"
+
+# Sanity checks before the slow work
+[[ -d recipes ]] || {
+    echo "ERROR: run from SCLS project root (no recipes/ here)" >&2; exit 1; }
+gpg --list-secret-keys "$KEYID" >/dev/null 2>&1 || {
+    echo "ERROR: GPG secret key $KEYID not available" >&2; exit 1; }
+command -v debsign >/dev/null || {
+    echo "ERROR: debsign not installed — apt install devscripts" >&2; exit 1; }
+
+# Warm up gpg-agent so debsign doesn't prompt per file
+export GPG_TTY=$(tty)
+echo test | gpg --clearsign --local-user "$KEYID" >/dev/null
+
+# Generate source packages, one flavor at a time
+for f in "${FLAVORS[@]}"; do
+    echo "=== Generating source packages: flavor $f ==="
+    for pkg in $(python3 python/build_order.py recipes --flavor "$f" --names-only); do
+        python3 python/deb_builder.py --package "$pkg" --flavor "$f" source \
+            || echo "  skipped: $pkg"
+    done
+done
+
+# Collect every .dsc that landed in work/spkgs/
+echo "=== Signing .dsc files in $SPKG_DIR ==="
+shopt -s nullglob
+dscs=("$SPKG_DIR"/*.dsc)
+shopt -u nullglob
+if (( ${#dscs[@]} == 0 )); then
+    echo "ERROR: no .dsc files found in $SPKG_DIR" >&2
+    exit 1
+fi
+
+# Sign one per line with clean output
+for dsc in "${dscs[@]}"; do
+    debsign -k "$KEYID" "$dsc" >/dev/null
+    printf '  signed: %s\n' "$(basename "$dsc")"
+done
+echo "Done. ${#dscs[@]} signed source packages in $SPKG_DIR"
