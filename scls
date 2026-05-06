@@ -123,26 +123,11 @@ case "$1" in
         exit 0
         ;;
     release)
-        if [ "$USE_RPM" != true ]; then
-            echo "Error: 'scls release' only works on RHEL-family Linux (RPM mode)."
-            exit 1
-        fi
-        SPEC="$SCLS_DIR/templates/scls-release.spec"
-        REPO="$SCLS_DIR/templates/scls.repo"
-        KEY="$SCLS_DIR/RPM-GPG-KEY-SCLS"
-        for f in "$SPEC" "$REPO" "$KEY"; do
-            if [ ! -f "$f" ]; then
-                echo "Error: missing $f"
-                exit 1
-            fi
-        done
-        mkdir -p "$SCLS_DIR/rpmbuild/SOURCES" "$SCLS_DIR/rpmbuild/SPECS"
-        install -m 644 "$REPO" "$SCLS_DIR/rpmbuild/SOURCES/scls.repo"
-        install -m 644 "$KEY"  "$SCLS_DIR/rpmbuild/SOURCES/RPM-GPG-KEY-SCLS"
-        install -m 644 "$SPEC" "$SCLS_DIR/rpmbuild/SPECS/scls-release.spec"
-        rpmbuild --define "_topdir $SCLS_DIR/rpmbuild" \
-                 -ba "$SCLS_DIR/rpmbuild/SPECS/scls-release.spec"
-        exit $?
+        # Back-compat shim: 'scls release' now just runs the same code path as
+        # 'scls build scls-release', which is format-aware (RPM on RHEL/AL2023,
+        # DEB on Ubuntu — the Debian output is named scls-archive-keyring per
+        # convention but the user-facing handle stays scls-release).
+        exec "$0" build scls-release
         ;;
 esac
 

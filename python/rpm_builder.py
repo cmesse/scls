@@ -2356,6 +2356,113 @@ only if you want the upstream example sources on disk.
     print(f"\nExamples meta-package {scls_name} built successfully!")
 
 
+# ---------------------------------------------------------------------------
+# scls-release: format-aware static-config package, parallels FLAVOR_META.
+# Ships /etc/yum.repos.d/scls.repo and /etc/pki/rpm-gpg/RPM-GPG-KEY-SCLS.
+# Same one-off pattern: no recipe, no source, generated inline.
+# ---------------------------------------------------------------------------
+
+SCLS_RELEASE = 'scls-release'
+
+
+def _detect_scls_repo_dir() -> str:
+    """Resolve @SCLS_REPO_DIR@ to bake into scls.repo at build time.
+
+    On RHEL-family hosts the .repo file uses 'el$releasever_major' verbatim
+    (a literal string that dnf expands at install time, so a single RPM
+    works on EL 9 and EL 10). On AL2023 and other dnf hosts whose dist tag
+    does not share the EL repo layout, the dist tag is baked in directly.
+    """
+    import re
+    try:
+        result = subprocess.run(
+            ['rpm', '--eval', '%{dist}'],
+            capture_output=True, text=True, check=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError) as e:
+        raise BuildError(f"Cannot determine RPM dist tag: {e}")
+    dist = result.stdout.strip().lstrip('.')
+    if not dist:
+        raise BuildError("rpm --eval %{dist} returned an empty string")
+    if re.match(r'^el\d+', dist):
+        return 'el$releasever_major'
+    return dist
+
+
+def build_scls_release_package(spec_only: bool = False) -> None:
+    """Build the scls-release RPM (and SRPM).
+
+    No recipe, no flavor — the only on-disk inputs are the .repo template
+    (templates/scls.repo, with @SCLS_REPO_DIR@ substituted) and the GPG
+    key (RPM-GPG-KEY-SCLS at the repo root). Both are the single sources
+    of truth shared with deb_builder's scls-archive-keyring path.
+    """
+    project_root = Path(__file__).parent.parent
+    rpm_base = project_root / 'rpmbuild'
+    sources_dir = rpm_base / 'SOURCES'
+    specs_dir = rpm_base / 'SPECS'
+    for sub in ('BUILD', 'RPMS', 'SOURCES', 'SPECS', 'SRPMS'):
+        (rpm_base / sub).mkdir(parents=True, exist_ok=True)
+
+    repo_template = project_root / 'templates' / 'scls.repo'
+    if not repo_template.exists():
+        raise BuildError(f"Repo template not found: {repo_template}")
+    key_src = project_root / 'RPM-GPG-KEY-SCLS'
+    if not key_src.exists():
+        raise BuildError(f"GPG key not found: {key_src}")
+
+    repo_dir = _detect_scls_repo_dir()
+    rendered = repo_template.read_text().replace('@SCLS_REPO_DIR@', repo_dir)
+    (sources_dir / 'scls.repo').write_text(rendered)
+    shutil.copy2(key_src, sources_dir / 'RPM-GPG-KEY-SCLS')
+
+    changelog_date = datetime.now().strftime('%a %b %d %Y')
+    spec_content = f"""\
+Name:           {SCLS_RELEASE}
+Version:        1
+Release:        1%{{?dist}}
+Summary:        SCLS repository configuration and GPG key
+
+License:        BSD-3-Clause-LBNL
+URL:            https://belfem.lbl.gov/scls
+
+Source0:        scls.repo
+Source1:        RPM-GPG-KEY-SCLS
+
+BuildArch:      noarch
+
+%description
+This package provides the repository configuration and GPG key for the
+Scientific Core Library Stack (SCLS).
+
+%install
+install -Dpm 644 %{{SOURCE0}} %{{buildroot}}/etc/yum.repos.d/scls.repo
+install -Dpm 644 %{{SOURCE1}} %{{buildroot}}/etc/pki/rpm-gpg/RPM-GPG-KEY-SCLS
+
+%files
+/etc/yum.repos.d/scls.repo
+/etc/pki/rpm-gpg/RPM-GPG-KEY-SCLS
+
+%changelog
+* {changelog_date} SCLS Builder <scls@lbl.gov> - 1-1
+- SCLS repository configuration and GPG key.
+"""
+    spec_file = specs_dir / f'{SCLS_RELEASE}.spec'
+    spec_file.write_text(spec_content)
+    print(f"Generated SPEC file: {spec_file} (SCLS_REPO_DIR={repo_dir})")
+
+    if spec_only:
+        return
+
+    cmd = ['rpmbuild', '--define', f'_topdir {rpm_base}', '-ba', str(spec_file)]
+    print(f"\n=== Building {SCLS_RELEASE} ===")
+    print(f"Command: {' '.join(cmd)}")
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        raise BuildError(f"rpmbuild failed with return code {result.returncode}")
+    print(f"\n{SCLS_RELEASE} built successfully!")
+
+
 def main():
     parser = argparse.ArgumentParser(description='Generate RPM SPEC files for SCLS packages')
     parser.add_argument('--package', '-p', help='Package name')
@@ -2381,10 +2488,17 @@ def main():
     # Require package and flavor for build commands
     if not args.package:
         parser.error("--package/-p is required when not using --list")
-    if not args.flavor:
+    # scls-release is flavor-independent; --flavor isn't required for it.
+    if not args.flavor and args.package != SCLS_RELEASE:
         parser.error("--flavor/-f is required when not using --list")
 
     try:
+        # scls-release: no recipe, no flavor. Generated inline; the .rpm
+        # ships the system repo config and GPG key.
+        if args.package == SCLS_RELEASE:
+            build_scls_release_package(spec_only=args.spec_only)
+            return
+
         # Flavor meta-package (_meta) is handled separately — no recipe needed
         from build_order import FLAVOR_META
         if args.package == FLAVOR_META:

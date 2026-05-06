@@ -248,6 +248,23 @@ def cmd_build(args, config: Dict) -> int:
 
     print(f"Building {package} with flavor '{flavor}' (format: {pkg_format})")
 
+    # scls-release: format-aware static-config package with no recipe. Same
+    # one-off pattern as the flavor meta-package — the builders generate
+    # everything inline. On RPM hosts this produces scls-release-1-1.<dist>;
+    # on Ubuntu the builder emits scls-archive-keyring_1_all.deb (the user
+    # never has to type that name — `scls build scls-release` is enough).
+    if package == 'scls-release':
+        if pkg_format == 'rpm':
+            return _build_rpm(package, flavor)
+        if pkg_format == 'deb':
+            return _build_deb(package, flavor)
+        print(
+            f"scls-release is only supported on rpm/deb hosts "
+            f"(got format={pkg_format})",
+            file=sys.stderr,
+        )
+        return 1
+
     try:
         # Check if recipe exists
         recipe = load_recipe(package)
