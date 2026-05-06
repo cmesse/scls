@@ -221,6 +221,22 @@
     <p>To build your own flavor, contribute recipes, or file issues:</p>
     <code><b><a href="https://github.com/cmesse/scls">https://github.com/cmesse/scls</a></b></code>
 
+    {# Compressed display strings for packages whose upstream license metadata is a long
+       SPDX AND-chain (doc/text exceptions, FSF blanket terms, etc.). The recipe YAMLs
+       keep the full SPDX expression; this map controls only what the tables show. #}
+    {% set license_display = {
+        'gcc':      'GPL-3.0+',
+        'autoconf': 'GPL-3.0+',
+        'automake': 'GPL-3.0+',
+        'libtool':  'GPL-3.0+',
+        'bison':    'GPL-3.0+',
+        'm4':       'GPL-3.0+',
+        'texinfo':  'GPL-3.0+',
+        'gmp':      'LGPL-3.0+ / GPL-2.0+',
+        'mpfr':     'LGPL-3.0+',
+        'mpc':      'LGPL-3.0+',
+    } %}
+
     <h2>Packages</h2>
     <p>The table below lists the packages that ship in the distributed binary flavors. All have permissive or weak-copyleft licenses compatible with mixed-license downstream linking.</p>
     <table class="package-table">
@@ -253,11 +269,17 @@
                 {% endif %}
             </td>
             {% endfor %}
-            <td class="left">{{ package.license }}</td>
+            <td class="left">
+                {%- if package.name == 'suitesparse' -%}
+                Various<sup>1</sup>
+                {%- else -%}
+                {{ license_display.get(package.name, package.license) }}
+                {%- endif -%}
+            </td>
         </tr>
         {% endfor %}
     </table>
-    <p><small><sup>1</sup> SuiteSparse is built with only a curated subset of its modules; Mongoose is excluded because it is GPL-3.0+.</small></p>
+    <p><small><sup>1</sup> SuiteSparse modules ship under LGPL-2.1+, BSD-3-Clause, GPL-2.0+, or Apache-2.0; SCLS builds only a curated subset and excludes Mongoose because it is GPL-3.0+.</small></p>
     <br>
 
     <h2>Source-Only Packages (GPL-3 / LGPL-3)</h2>
@@ -280,7 +302,7 @@
             </td>
             <td class="center">{{ package.version }}</td>
             <td class="left">{{ package.summary }}</td>
-            <td class="left">{{ package.license }}</td>
+            <td class="left">{{ license_display.get(package.name, package.license) }}</td>
         </tr>
         {% endfor %}
     </table>
