@@ -184,18 +184,20 @@
         <li><code><b>{{ flavor.package }}</b></code> &mdash; {{ flavor.label }}. {{ flavor.description }}</li>
         {% endfor %}
     </ul>
-    <p>The public binary repositories currently target Enterprise Linux 9 and 10 and Ubuntu 24.04 LTS. The same repository can also build local RPMs on compatible RHEL-family systems, including Amazon Linux 2023, local DEBs on Debian-family systems, or direct Unix installs on macOS and non-RPM/non-DEB Unix systems.</p>
+    <p>The public binary repositories currently target Enterprise Linux 9 and 10, Amazon Linux 2023, and Ubuntu 24.04 LTS. The same repository can also build local RPMs on other RHEL-family systems, local DEBs on Debian-family systems, or direct Unix installs on macOS and non-RPM/non-DEB Unix systems.</p>
     <p>Additional source-build flavors include <code>lbl</code> for a site-specific LBL prefix, <code>intel</code> for Intel compiler builds, <code>gcc-mkl-cuda</code> for CUDA-enabled experiments, and <code>macos</code>. See the <a href="https://github.com/cmesse/scls/tree/main/flavors"><code>flavors/</code></a> directory for the complete set.</p>
     <p>CUDA binaries are not distributed, because a CUDA-linked stack would tie users to a specific driver and toolkit version. Users who need GPU acceleration can use the <code>gcc-mkl-cuda</code> source-build flavor and link against a locally installed CUDA toolkit.</p>
     <p>On macOS the stack uses OpenBLAS rather than Apple's Accelerate framework. The <code>macos</code> flavor builds its own GCC for Fortran support (SCLS ships a GCC build script for exactly this purpose), and pairing GCC-built Fortran with Accelerate is fragile &mdash; Accelerate is tuned for Apple's Clang toolchain and its ABI story is awkward from the GCC side. OpenBLAS is well-understood with GCC, keeps the math behavior identical to the Linux binary flavors, and is tuned for compute throughput rather than the performance/power tradeoffs that shape Accelerate.</p>
     <p>The Unix build script also provides GPL-3 build tools and selected LGPL-3 arbitrary-precision dependencies that are left out of the public Linux binary flavors. See the second package table below.</p>
 
-    <h2>Installation on Enterprise Linux 9 and 10</h2>
-    <p>First, install the release package for your Enterprise Linux version (choose one):</p>
+    <h2>Installation on Enterprise Linux 9 / 10 and Amazon Linux 2023</h2>
+    <p>First, install the release package for your distribution (choose one):</p>
     <p>Enterprise Linux 9:</p>
-    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el9/x86_64/scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm">scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm</a></code></pre>
+    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el9/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm">scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm</a></code></pre>
     <p>Enterprise Linux 10:</p>
-    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el10/x86_64/scls-release-{{ scls_release_pkg_version }}-1.el10.noarch.rpm">scls-release-{{ scls_release_pkg_version }}-1.el10.noarch.rpm</a></code></pre>
+    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el10/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el10.noarch.rpm">scls-release-{{ scls_release_pkg_version }}-1.el10.noarch.rpm</a></code></pre>
+    <p>Amazon Linux 2023:</p>
+    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/amzn2023/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.amzn2023.noarch.rpm">scls-release-{{ scls_release_pkg_version }}-1.amzn2023.noarch.rpm</a></code></pre>
     <p>Then install a flavor:</p>
     <pre class="command"><code>sudo dnf install scls-&lt;flavor&gt;</code></pre>
     <p>RPM builds also provide an optional examples meta-package. Install <code>scls-&lt;flavor&gt;-examples</code> if you want the upstream PETSc, SLEPc, and SUNDIALS example sources on disk.</p>

@@ -39,9 +39,5 @@ install -Dpm 644 %{SOURCE1} %{buildroot}/etc/pki/rpm-gpg/RPM-GPG-KEY-SCLS
 /etc/pki/rpm-gpg/RPM-GPG-KEY-SCLS
 
 %changelog
-* Tue May 05 2026 Christian Messe <christian.messe@gmail.com> - 2026-2
-- Make scls.repo baseurl distro-aware so the package works on
-  Enterprise Linux 9, Enterprise Linux 10, and Amazon Linux 2023.
-
 * Sat Apr 18 2026 Christian Messe <christian.messe@gmail.com> - 2026-1
 - Initial scls-release package: ships scls.repo and RPM-GPG-KEY-SCLS.
