@@ -206,6 +206,9 @@ def main():
 
     flavor_names = [f['name'] for f in flavors]
     main_packages, gpl3_packages = split_packages(packages, flavor_names)
+    release_year = str(args.release_version).split('.', 1)[0]
+    if not release_year.isdigit():
+        release_year = datetime.now().strftime('%Y')
 
     # Prepare context
     context = {
@@ -214,6 +217,7 @@ def main():
         'flavors': flavors,
         'flavor_groups': generate_flavor_descriptions(flavors),
         'release_version': args.release_version,
+        'release_year': release_year,
         'scls_release_pkg_version': scls_release_pkg_version,
         'generation_date': datetime.now().strftime('%B %d, %Y'),
         'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')

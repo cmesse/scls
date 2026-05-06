@@ -1,2 +1,2 @@
-#!/usr/env/bin bash
+#!/usr/bin/env bash
 python3 ./python/generate_website.py --template web/scls.html.j2

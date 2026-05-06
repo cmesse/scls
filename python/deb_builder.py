@@ -1789,9 +1789,9 @@ def build_flavor_meta_package(flavor: str) -> Path:
     installed once apt pulls it in.
 
     Parallels rpm_builder.build_flavor_meta_package. We do NOT emit an
-    examples meta-package here because deb_builder does not support the
-    `subpackages:` recipe section yet; when it does, the examples meta
-    follows the same pattern as the RPM path.
+    examples meta-package here yet; per-package example subpackages are
+    produced from recipe `subpackages:`, but there is no DEB equivalent of
+    `scls-<flavor>-examples`.
     """
     from build_order import get_flavor_package_list, FLAVOR_META
 

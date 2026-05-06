@@ -63,7 +63,7 @@ On RHEL-family Enterprise Linux systems such as RHEL, Rocky Linux, AlmaLinux, Ce
 
 On Debian/Ubuntu hosts SCLS produces `.deb` packages from the same recipes and flavors. The builder stages into a DESTDIR buildroot and wraps it with `dpkg-deb --build`, the DEB analogue of the RPM path. A 3.0 (quilt) source-package triplet (`.dsc` + `.orig.tar.<ext>` + `.debian.tar.xz`) is produced alongside the binary for license-compliance parity with source RPMs. Recipe `rpm_build_requires` and `rpm_requires` are translated to Debian names via [`packaging/system_packages.yaml`](packaging/system_packages.yaml); any unknown RHEL name is a hard error, not a silent fallback.
 
-DEB packaging is intentionally less feature-complete than RPM packaging. In particular, it does not currently split recipe subpackages such as `*-examples`; recipes that require subpackages are rejected by the DEB builder rather than being silently collapsed into one package. Adding full DEB subpackage support would be a large amount of packaging machinery for little practical improvement in the current stack.
+DEB packaging is intentionally less feature-complete than RPM packaging. It can split recipe subpackages such as `*-examples`, but it does not currently build the optional all-examples meta-package that the RPM path emits. Adding full DEB meta-package parity would be extra packaging machinery for little practical improvement in the current stack.
 
 ### 3. Generic Unix-style installs
 
@@ -167,7 +167,13 @@ flavor: gcc
 #   - gcc
 ```
 
-Build and install the next package in dependency order:
+Build and install the full flavor in dependency order:
+
+```bash
+./scls build all
+```
+
+For a granular or resumable flow, build and install the next package:
 
 ```bash
 ./scls build next
@@ -191,11 +197,19 @@ Other commands:
 
 ### Runtime environment
 
-Each installed flavor ships an activation script that puts the prefix on `PATH`, `LD_LIBRARY_PATH`, `PKG_CONFIG_PATH`, and the like, and exports package-specific variables when the relevant package is installed:
+Each installed flavor ships activation scripts at both `activate` and
+`activate.sh`. The canonical short form is:
 
 ```bash
-source /opt/scls/<flavor>/share/scls/activate.sh
+source /opt/scls/<flavor>/share/scls/activate
 ```
+
+Activation adds the prefix's `bin/` directory to `PATH`, exposes package
+metadata through `PKG_CONFIG_PATH` and `CMAKE_PREFIX_PATH`, and exports
+package-specific variables when the relevant package is installed. It does not
+add the stack's `lib/` directory to `LD_LIBRARY_PATH` or `DYLD_LIBRARY_PATH`;
+runtime lookup is handled by rpaths. The script does remove stale SCLS entries
+from loader-path variables when switching between flavors.
 
 For PETSc, `PETSC_DIR` points at the installed SCLS prefix and `PETSC_ARCH` is intentionally empty:
 
@@ -208,7 +222,7 @@ SCLS installs PETSc as an installed-prefix package, not as an in-place PETSc sou
 
 ### Optional examples
 
-PETSc, SLEPc, and SUNDIALS install their upstream tutorial/example sources under `%{prefix}/share/<package>/examples/`. In RPM builds, these are split into `<package>-examples` subpackages and are not pulled in by the flavor meta-package. An optional companion meta-package, `scls-<flavor>-examples`, is built alongside `scls-<flavor>` and groups all of them; install it if you want the examples on disk. DEB builds do not currently support these example subpackages.
+PETSc, SLEPc, and SUNDIALS install their upstream tutorial/example sources under `%{prefix}/share/<package>/examples/`. In RPM builds, these are split into `<package>-examples` subpackages and are not pulled in by the flavor meta-package. An optional companion meta-package, `scls-<flavor>-examples`, is built alongside `scls-<flavor>` and groups all of them; install it if you want the examples on disk. DEB builds produce the per-package example subpackages but do not currently produce an all-examples meta-package.
 
 ### Direct builder invocation
 
