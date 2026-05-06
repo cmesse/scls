@@ -1,6 +1,6 @@
 Name:           scls-release
 Version:        2026
-Release:        2%{?dist}
+Release:        1%{?dist}
 Summary:        SCLS repository configuration and GPG key
 
 License:        BSD-3-Clause-LBNL
