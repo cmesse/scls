@@ -102,8 +102,13 @@
             background-color: #f9f9f9;
         }
         .table-scroll {
+            left: 50%;
             overflow-x: auto;
-            margin: 1rem 0;
+            margin: 1rem 0 1.25rem 0;
+            max-width: calc(100vw - 2rem);
+            position: relative;
+            transform: translateX(-50%);
+            width: min(1280px, calc(100vw - 2rem));
         }
         .table-scroll .package-table {
             min-width: 900px;
