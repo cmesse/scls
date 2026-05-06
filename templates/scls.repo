@@ -1,6 +1,6 @@
 [scls]
 name=Scientific Core Library Stack - $basearch
-baseurl=https://belfem.lbl.gov/scls/el$releasever_major/$basearch/
+baseurl=https://belfem.lbl.gov/scls/@SCLS_REPO_DIR@/$basearch/
 enabled=1
 gpgcheck=1
 countme=1
@@ -9,7 +9,7 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-SCLS
 
 [scls-source]
 name=Scientific Core Library Stack - $basearch - Source
-baseurl=https://belfem.lbl.gov/scls/el$releasever_major/source/
+baseurl=https://belfem.lbl.gov/scls/@SCLS_REPO_DIR@/source/
 enabled=0
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-SCLS
 gpgcheck=1
