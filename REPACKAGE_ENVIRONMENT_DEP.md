@@ -57,16 +57,27 @@ For deb hosts, `dpkg-deb` is already present; no extra install needed.
 ### 3. Run the repackager
 
 ```sh
-# RPM hosts:
+# RPM hosts (preferred — patched files have identical names to originals
+# so they replace the un-patched RPMs in place when copied to the repo):
 python tools/repackage_add_environment_dep.py rpm \
     --input  rpmbuild/RPMS \
-    --output patched/RPMS
+    --output patched/RPMS \
+    --release-suffix ''
 
-# DEB hosts:
+# DEB hosts (analogous):
 python tools/repackage_add_environment_dep.py deb \
     --input  work/pkgs \
-    --output patched/debs
+    --output patched/debs \
+    --version-suffix ''
 ```
+
+If you'd rather keep patched and un-patched copies side-by-side (e.g. for
+A/B testing or to roll back without re-extracting from rpmbuild/RPMS),
+omit the suffix flag — the script defaults to `.scls2` / `+scls2` so the
+patched artifacts get distinct names. With distinct names, dnf treats the
+patched RPM as a newer version; with identical names, it's a same-NEVRA
+replacement and consumer hosts must run `dnf clean metadata` before the
+new metadata is fetched.
 
 Expected runtime: about 10s per RPM (rpmbuild reconstructs the cpio
 payload). For ~130 RPMs this is ~20 min. The script is single-threaded.
@@ -87,15 +98,17 @@ skipped — they don't need the dep, and their metadata is unchanged.
 ```sh
 # Check both flag types are present (0 = Requires, 512 = Requires(pre)):
 rpm -qp --queryformat '[%{REQUIREFLAGS} %{REQUIRENAME}\n]' \
-    patched/RPMS/x86_64/scls-mkl-cmake-*.scls2.x86_64.rpm | grep environment
+    patched/RPMS/x86_64/scls-mkl-cmake-*.x86_64.rpm | grep environment
 # Expect:
 #   0   scls-mkl-environment
 #   512 scls-mkl-environment
 
-# Confirm release is bumped:
+# Confirm the NEVRA matches the original (with --release-suffix '') or
+# carries the chosen suffix:
 rpm -qp --queryformat '%{NAME}-%{VERSION}-%{RELEASE}\n' \
-    patched/RPMS/x86_64/scls-mkl-cmake-*.scls2.x86_64.rpm
-# Expect: scls-mkl-cmake-4.3.2-1.el10.scls2
+    patched/RPMS/x86_64/scls-mkl-cmake-*.x86_64.rpm
+# With --release-suffix '': scls-mkl-cmake-4.3.2-1.el10
+# With default suffix:      scls-mkl-cmake-4.3.2-1.el10.scls2
 ```
 
 ### 5. Publish the patched RPMs
@@ -154,7 +167,10 @@ sudo apt-get install scls-<flavor>
 The repackager is safe to re-run. The Requires filter strips any prior
 copies of `Requires(pre): scls-<flavor>-environment` and `Requires:
 scls-<flavor>-environment` before re-prepending fresh ones, so a re-run
-over already-patched RPMs does not stack duplicate Requires. The release
-suffix (default `.scls2`) is appended each time though, so re-running with
-the same suffix would produce `1.el10.scls2.scls2` — pass
-`--release-suffix .scls3` (or similar) on subsequent runs.
+over already-patched RPMs does not stack duplicate Requires.
+
+If you used a non-empty release suffix (e.g. the `.scls2` default), it is
+appended each time, so re-running with the same suffix produces
+`1.el10.scls2.scls2`. Either pass `--release-suffix ''` (recommended for
+in-place replacement) or bump to `--release-suffix .scls3` on subsequent
+runs.
