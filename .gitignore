@@ -6,9 +6,10 @@ rpmbuild/
 target/
 tmp/
 debbuild/
+patched/
 
 scls.html
-=======
+
 # Prerequisites
 *.d
 
