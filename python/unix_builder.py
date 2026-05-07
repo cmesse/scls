@@ -739,6 +739,31 @@ class UnixBuilder:
             shutil.rmtree(destdir)
         destdir.mkdir(parents=True)
 
+        # Stage lib -> lib64 in the destdir up-front so a package's
+        # `make install DESTDIR=...` lands files in the same layout we ship
+        # at the live prefix (LFS convention; the environment package owns
+        # the symlink on the installed system). Without this, an autotools
+        # package whose libdir resolves to lib/ would stage into
+        # <destdir>/<prefix>/lib while one whose libdir resolves to lib64/
+        # would stage into <destdir>/<prefix>/lib64 — and the rglob copy
+        # below would yield each file once at its real path and once via
+        # the live-prefix symlink (or, if the live symlink isn't there yet,
+        # materialize <prefix>/lib as a real directory). Mirrors
+        # deb_builder.install. We drop the staging symlink before the copy
+        # phase so rglob doesn't double-walk lib/ and lib64/.
+        destdir_prefix = destdir / str(self.prefix).lstrip('/')
+        destdir_prefix.mkdir(parents=True, exist_ok=True)
+        is_environment = self.package == 'environment'
+        staging_lib_symlink: Path | None = None
+        if platform.system() == 'Linux':
+            lib_link = destdir_prefix / 'lib'
+            lib64_dir = destdir_prefix / 'lib64'
+            if not lib_link.exists() and not lib_link.is_symlink():
+                lib64_dir.mkdir(parents=True, exist_ok=True)
+                lib_link.symlink_to('lib64')
+                if not is_environment:
+                    staging_lib_symlink = lib_link
+
         # Run any pre-install commands
         if 'install' in self.recipe and 'pre' in self.recipe['install']:
             for cmd in self.recipe['install']['pre']:
@@ -815,6 +840,12 @@ class UnixBuilder:
 
         # Clean up .la files in destdir
         clean_libtool_files(destdir / str(self.prefix).lstrip('/'))
+
+        # Drop the staging-only lib -> lib64 symlink before the rglob copy
+        # so we don't double-walk files (once via lib/, once via lib64/).
+        # Files staged under it remain at lib64/ where they already live.
+        if staging_lib_symlink is not None and staging_lib_symlink.is_symlink():
+            staging_lib_symlink.unlink()
 
         # Now copy from destdir to actual prefix
         # This gives us control over what gets installed
