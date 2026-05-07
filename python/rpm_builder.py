@@ -1234,7 +1234,7 @@ fi
                     self.fcflags += f" {flag}"
 
         # Get requirements
-        build_requires, requires = self.get_rpm_requires()
+        build_requires, requires, pre_requires = self.get_rpm_requires()
 
         # Get file list
         files = self.get_file_list()
@@ -1352,6 +1352,7 @@ fi
             ).replace('%{version}', self.recipe['version']),
             'build_requires': build_requires,
             'requires': requires,
+            'pre_requires': pre_requires,
             'prefix': str(self.prefix),
             'sources': str(self.sources_dir),  # For extra sources (e.g., gmp/mpfr/mpc for GCC)
             'cflags': self.cflags,
@@ -1506,10 +1507,23 @@ fi
 
         return args
 
-    def get_rpm_requires(self) -> tuple[list, list]:
-        """Get RPM BuildRequires and Requires from recipe and flavor-specific settings"""
+    def get_rpm_requires(self) -> tuple[list, list, list]:
+        """Get RPM BuildRequires, Requires, and Requires(pre) from recipe and
+        flavor-specific settings.
+
+        The pre_requires list emits `Requires(pre):` lines, used to force
+        transaction ordering: every non-environment package gets a pre-dep
+        on scls-<flavor>-environment so that environment's %pre scriptlet
+        (and the lib -> lib64 symlink layout) is guaranteed to be in place
+        before any other package's payload extracts files into %{prefix}/lib.
+        Without this, dnf is free to schedule environment last, and the
+        first package to install creates %{prefix}/lib as a real directory
+        — which then conflicts with environment's lib symlink and breaks
+        the whole transaction.
+        """
         build_requires = []
         requires = []
+        pre_requires = []
 
         # Get flavor-specific RPM requirements from recipe
         flavor_name = self.flavor_name
@@ -1636,11 +1650,22 @@ fi
             requires.append(scls_mpi)
             build_requires.append(scls_mpi)
 
+        # Every non-environment package must have the environment package
+        # installed first within the same dnf transaction (see method docstring).
+        if self.package != 'environment':
+            env_pkg = f"scls-{self.flavor_name}-environment"
+            pre_requires.append(env_pkg)
+            # Also emit a plain Requires so the steady-state dependency graph
+            # records the relationship (Requires(pre) alone is a scriptlet
+            # ordering hint and is not always reflected in `rpm -qR`).
+            requires.append(env_pkg)
+
         # Remove duplicates while preserving order
         build_requires = list(dict.fromkeys(build_requires))
         requires = list(dict.fromkeys(requires))
+        pre_requires = list(dict.fromkeys(pre_requires))
 
-        return build_requires, requires
+        return build_requires, requires, pre_requires
 
     def get_configure_env_vars(self) -> List[Dict[str, str]]:
         """Get configure environment variables for SPEC file"""
@@ -2081,12 +2106,23 @@ fi
             if rpm_name == self.scls_name:
                 continue
 
+            # Subpackages install files into %{prefix} just like the main
+            # package, so they need the same pre-dep on environment to avoid
+            # creating %{prefix}/lib as a real directory before environment
+            # has had a chance to lay down the lib -> lib64 symlink.
+            env_pkg = f"scls-{self.flavor_name}-environment"
+            sub_pre_requires = [env_pkg]
+            sub_requires = list(rpm_requires)
+            if env_pkg not in sub_requires:
+                sub_requires.append(env_pkg)
+
             spec_subpackages.append({
                 'name': subpkg_name,
                 'rpm_name': rpm_name,
                 'summary': subpkg.get('summary', f'{subpkg_name} subpackage'),
                 'description': subpkg.get('description', subpkg.get('summary', '')),
-                'requires': rpm_requires,
+                'requires': sub_requires,
+                'pre_requires': sub_pre_requires,
                 'files': file_patterns
             })
 

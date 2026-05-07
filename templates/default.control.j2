@@ -4,6 +4,9 @@ Section: science
 Priority: optional
 Architecture: {{ architecture }}
 Maintainer: {{ maintainer }}
+{% if pre_depends %}
+Pre-Depends: {{ pre_depends | join(', ') }}
+{% endif %}
 {% if depends %}
 Depends: {{ depends | join(', ') }}
 {% endif %}

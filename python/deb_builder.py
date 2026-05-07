@@ -638,10 +638,25 @@ class DebBuilder(UnixBuilder):
         main_summary = (
             self.recipe.get('summary') or main_description.split('\n', 1)[0]
         )
+        # Pre-Depends on environment forces dpkg to fully unpack and
+        # configure the environment package before this package is unpacked
+        # — the Debian-side equivalent of RPM's Requires(pre). Plain Depends
+        # is too weak: dpkg may unpack two packages with mutual Depends in
+        # either order, and the first to unpack would create %{prefix}/lib/
+        # as a real directory and break the layout. The environment package
+        # itself naturally skips this self-dep.
+        env_pkg = f"scls-{self.flavor_name}-environment"
+        main_pre_depends: List[str] = []
+        if self.package != 'environment':
+            main_pre_depends.append(env_pkg)
+            if env_pkg not in main_depends:
+                main_depends.append(env_pkg)
+
         out = [{
             'scls_name': self.scls_name,
             'subpkg_name': None,
             'depends': main_depends,
+            'pre_depends': main_pre_depends,
             'summary': main_summary,
             'description': main_description,
         }]
@@ -654,12 +669,17 @@ class DebBuilder(UnixBuilder):
                 continue
             deps = get_subpackage_dependencies(subpkg, self.flavor_name)
             translated = [f"scls-{self.flavor_name}-{_deb_name(d)}" for d in deps]
+            # Subpackages also install into %{prefix} and need env first.
+            sub_pre_depends = [env_pkg]
+            if env_pkg not in translated:
+                translated.append(env_pkg)
             summary = subpkg.get('summary', f"{subpkg['name']} subpackage")
             description = subpkg.get('description') or summary
             out.append({
                 'scls_name': scls_name,
                 'subpkg_name': subpkg['name'],
                 'depends': translated,
+                'pre_depends': sub_pre_depends,
                 'summary': summary,
                 'description': description,
             })
@@ -821,7 +841,8 @@ class DebBuilder(UnixBuilder):
 
     def write_control(self, destdir: Path, scls_name: str,
                       depends: List[str], summary: str,
-                      description: str) -> None:
+                      description: str,
+                      pre_depends: List[str] | None = None) -> None:
         """Render DEBIAN/control + DEBIAN/postinst into the given destdir.
 
         Used for both the main package and each subpackage. We discard
@@ -847,6 +868,7 @@ class DebBuilder(UnixBuilder):
             architecture=self.architecture,
             maintainer=self.maintainer,
             depends=depends,
+            pre_depends=pre_depends or [],
             homepage=self.recipe.get('homepage', ''),
             summary=summary,
             description_lines=body,
@@ -937,6 +959,7 @@ exit 0
                 destdir,
                 scls_name=entry['scls_name'],
                 depends=entry['depends'],
+                pre_depends=entry.get('pre_depends', []),
                 summary=entry['summary'],
                 description=entry['description'],
             )
@@ -1003,9 +1026,17 @@ exit 0
         # entry pulls Depends from get_deb_depends()[1]; here `depends` is
         # passed in and we want to honour it (callers may have post-
         # processed the list). The subpackage entries are derived freshly.
+        # Pre-Depends on environment is added to every non-environment
+        # binary (and is skipped for the environment package itself), to
+        # parallel the runtime binary control written by write_control.
+        env_pkg = f"scls-{self.flavor_name}-environment"
+        main_pre_depends: List[str] = []
+        if self.package != 'environment':
+            main_pre_depends.append(env_pkg)
         binaries = [{
             'scls_name': self.scls_name,
             'depends': depends,
+            'pre_depends': main_pre_depends,
             'summary': (self.recipe.get('summary')
                         or (load_description(self.package)
                             or self.package).split('\n', 1)[0]),
@@ -1023,6 +1054,7 @@ exit 0
             binaries.append({
                 'scls_name': scls_name,
                 'depends': translated,
+                'pre_depends': [env_pkg],
                 'summary': summary,
                 'description': description,
             })
@@ -1040,6 +1072,8 @@ exit 0
                 f"Package: {binary['scls_name']}",
                 f"Architecture: {self.architecture}",
             ])
+            if binary.get('pre_depends'):
+                lines.append(f"Pre-Depends: {', '.join(binary['pre_depends'])}")
             if binary['depends']:
                 lines.append(f"Depends: {', '.join(binary['depends'])}")
             lines.append(f"Description: {binary['summary']}")

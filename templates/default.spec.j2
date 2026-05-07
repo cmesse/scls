@@ -40,6 +40,11 @@ Patch{{ patch.number }}:         {{ patch.file }}
 BuildRequires:  {{ req }}
 {% endfor %}
 
+# Pre-install requirements (force transaction ordering: env first)
+{% for req in pre_requires %}
+Requires(pre):  {{ req }}
+{% endfor %}
+
 # Runtime requirements
 {% for req in requires %}
 Requires:       {{ req }}
@@ -57,6 +62,9 @@ AutoReqProv:    no
 #######################################################################
 %package -n {{ subpkg.rpm_name }}
 Summary:        {{ subpkg.summary }}
+{% for req in subpkg.pre_requires %}
+Requires(pre):  {{ req }}
+{% endfor %}
 {% for req in subpkg.requires %}
 Requires:       {{ req }}
 {% endfor %}
