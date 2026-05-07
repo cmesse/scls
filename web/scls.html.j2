@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
     <title>SCLS — Scientific Core Library Stack for Linux and macOS</title>
     <meta name="description" content="SCLS packages a coherent stack of scientific libraries — BLAS/LAPACK, MPI, sparse solvers, PETSc, HDF5 — as RPMs for Enterprise Linux, DEBs for Ubuntu 24.04 LTS, and source-built installs for macOS and Unix systems.">
     <link rel="canonical" href="https://belfem.lbl.gov/scls.html">
@@ -76,7 +80,7 @@
             flex: 1;
             min-width: 0;
         }
-        @media (max-width: 640px) {
+        @media (max-width: 800px) {
             .scls-hero {
                 flex-direction: column;
                 gap: 1rem;
@@ -105,9 +109,9 @@
             background-color: #f7f7f7;
             border: 1px solid #ddd;
             border-radius: 4px;
-            overflow-x: auto;
             padding: 0.75rem;
-            white-space: pre;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
         }
         .package-table td.center-check {
             text-align: center;
@@ -193,11 +197,11 @@
     <h2>Installation on Enterprise Linux 9 / 10 and Amazon Linux 2023</h2>
     <p>First, install the release package for your distribution (choose one):</p>
     <p>Enterprise Linux 9:</p>
-    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el9/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm">scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm</a></code></pre>
+    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el9/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm">https://belfem.lbl.gov/scls/el9/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm</a></code></pre>
     <p>Enterprise Linux 10:</p>
-    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el10/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el10.noarch.rpm">scls-release-{{ scls_release_pkg_version }}-1.el10.noarch.rpm</a></code></pre>
+    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el10/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el10.noarch.rpm">https://belfem.lbl.gov/scls/el10/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el10.noarch.rpm</a></code></pre>
     <p>Amazon Linux 2023:</p>
-    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/amzn2023/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.amzn2023.noarch.rpm">scls-release-{{ scls_release_pkg_version }}-1.amzn2023.noarch.rpm</a></code></pre>
+    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/amzn2023/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.amzn2023.noarch.rpm">https://belfem.lbl.gov/scls/amzn2023/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.amzn2023.noarch.rpm</a></code></pre>
     <p>Then install a flavor:</p>
     <pre class="command"><code>sudo dnf install scls-&lt;flavor&gt;</code></pre>
     <p>RPM builds also provide an optional examples meta-package. Install <code>scls-&lt;flavor&gt;-examples</code> if you want the upstream PETSc, SLEPc, and SUNDIALS example sources on disk.</p>
