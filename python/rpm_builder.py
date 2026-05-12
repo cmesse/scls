@@ -1614,6 +1614,15 @@ fi
                 # against which our binaries are linked).
                 requires.extend(['intel-oneapi-mkl', 'intel-oneapi-mkl-devel'])
                 build_requires.extend(['intel-oneapi-mkl', 'intel-oneapi-mkl-devel'])
+                # TODO(mkl-soname-guard): floor is unversioned, so an SCLS RPM
+                # built against MKL .so.N installs cleanly on a host with MKL
+                # .so.M and fails at runtime with `ldd: not found`. SPEC sets
+                # `AutoReqProv: no` deliberately (deterministic deps; prevent
+                # /usr/lib64 sneak-in), so auto-Requires can't carry the
+                # SONAME. An MKL-only enhancement could scan built binaries
+                # for `libmkl_*\.so\.N` in DT_NEEDED and emit explicit
+                # `Requires: libmkl_core.so.N()(64bit)` lines here, leaving
+                # AutoReqProv off everywhere else. See doc/MKL_ABI_POLICY.md.
                 # ScaLAPACK: we ship our own reference build layered on
                 # MKL BLAS/LAPACK (see math_common.py for rationale).
                 if math_feature == 'parallel':

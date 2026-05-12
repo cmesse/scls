@@ -358,6 +358,16 @@ class DebBuilder(UnixBuilder):
                 for dep in ('intel-oneapi-mkl', 'intel-oneapi-mkl-devel'):
                     requires.append(dep)
                     build_requires.append(dep)
+                # TODO(mkl-soname-guard): floor is unversioned, mirroring
+                # rpm_builder. DEBIAN/control is written explicitly here and
+                # dpkg-deb --build runs directly (no dpkg-shlibdeps), so the
+                # MKL SONAME baked into each binary's DT_NEEDED is not
+                # captured in Depends. An MKL-only enhancement could scan
+                # built binaries for `libmkl_*\.so\.N` and emit the
+                # corresponding versioned `Depends:` lines here. The exact
+                # DEB dependency shape (package name / virtual provides)
+                # needs verification against Intel's apt repo metadata
+                # before implementing. See doc/MKL_ABI_POLICY.md.
                 if math_feature == 'parallel':
                     scls_scalapack = f"scls-{self.flavor_name}-scalapack"
                     requires.append(scls_scalapack)
@@ -1290,7 +1300,7 @@ exit 0
         baked in — self-contained reproduction info. Our debian/rules
         is a stub (we don't rebuild via dpkg-buildpackage), so without
         this subdirectory the source package would merely point at an
-        external SCLS checkout. LICENSE_POLICY.md requires the source
+        external SCLS checkout. doc/LICENSE_POLICY.md requires the source
         package to carry enough to reproduce the binary; shipping the
         recipe + flavor + SCLS revision + rendered binary control
         satisfies that.
@@ -1370,7 +1380,7 @@ exit 0
             f"\n"
             f"This directory carries the inputs SCLS used to build the\n"
             f"binary `.deb`. It satisfies the source-availability\n"
-            f"obligation documented in `LICENSE_POLICY.md` by pairing the\n"
+            f"obligation documented in `doc/LICENSE_POLICY.md` by pairing the\n"
             f"upstream tarball + patches with the recipe/flavor metadata\n"
             f"SCLS would use to reproduce the binary.\n"
             f"\n"
@@ -1427,7 +1437,7 @@ exit 0
         rules.chmod(0o755)
 
         # SCLS-specific reproduction metadata (addresses the
-        # source-availability gap called out in LICENSE_POLICY.md).
+        # source-availability gap called out in doc/LICENSE_POLICY.md).
         self._write_scls_build_info(debian)
 
         # Patches: resolve via patch_common so flavor-specific selection
@@ -1476,7 +1486,7 @@ exit 0
         upstream tarball plus our patches plus generated debian/
         metadata, so a downstream consumer can reconstruct the binary
         from scratch. Required for license compliance with copyleft
-        dependencies per LICENSE_POLICY.md.
+        dependencies per doc/LICENSE_POLICY.md.
 
         Output triplet (Debian's canonical source-package shape):
           work/spkgs/<scls-name>_<upstream-version>.orig.tar.<ext>

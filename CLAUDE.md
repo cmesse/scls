@@ -144,9 +144,13 @@ Two install hooks exist and they handle `%{buildroot}` / `%{prefix}` differently
 - **`install.post`** appends commands after the default install step. Write destinations as `%{prefix}/…` (no `%{buildroot}`) — the RPM builder's post-processor rewrites the literal prefix to `%{buildroot}%{prefix}` for you, so writing `%{buildroot}%{prefix}` yourself produces a double `%{buildroot}` in the generated spec. CWD depends on the configure type: for cmake out-of-source builds it's the `build/` subdirectory, so use `../` to reach source-root files (e.g. upstream `LICENSE_en.txt`).
 - `%{srcdir}` resolves to `$PWD` at spec-generation time. It's only safe in hooks where the shell's `$PWD` is the source root — e.g. `install.commands`, but *not* `install.post` for cmake recipes.
 
+### MKL ABI handling
+
+See [`doc/MKL_ABI_POLICY.md`](doc/MKL_ABI_POLICY.md). Applies to every flavor with `math.linalg: mkl` (`mkl`, `intel`, `gcc-mkl-cuda`). The MKL major SONAME (`libmkl_core.so.3` etc.) is baked into every consumer's `DT_NEEDED` at link time, and SCLS's `AutoReqProv: no` policy (deliberate — keeps deps deterministic and prevents `/usr/lib64/liblapack` sneak-in) means RPM/DEB metadata does not capture that SONAME. SONAME mismatches therefore surface at runtime, not install time; the mitigation is a CI rebuild on the affected build host when Intel bumps the MKL major. Linking against the unversioned `libmkl_*.so` symlink does *not* future-proof this — the SONAME is read from the resolved library's `DT_SONAME` at link time, regardless of the filename passed to `-l`.
+
 ### Licensing
 
-See [`LICENSE_POLICY.md`](LICENSE_POLICY.md) for the full package policy and rationale. Short version: distributed binary flavors avoid GPL-3 linkable libraries (FFTW is the canonical reason); GPL-3 build tools are fine when only executed during the build; GPL-2, LGPL, and CeCILL-C scientific libraries are allowed with source and notice compliance; GMP/MPFR/MPC use system `*-devel` packages on mainline Linux binary flavors and are built in-stack only on `lbl` and `macos`. Source RPMs and (on macOS) source-plus-binary DMGs are how SCLS satisfies the source-availability obligations.
+See [`doc/LICENSE_POLICY.md`](doc/LICENSE_POLICY.md) for the full package policy and rationale. Short version: distributed binary flavors avoid GPL-3 linkable libraries (FFTW is the canonical reason); GPL-3 build tools are fine when only executed during the build; GPL-2, LGPL, and CeCILL-C scientific libraries are allowed with source and notice compliance; GMP/MPFR/MPC use system `*-devel` packages on mainline Linux binary flavors and are built in-stack only on `lbl` and `macos`. Source RPMs and (on macOS) source-plus-binary DMGs are how SCLS satisfies the source-availability obligations.
 
 ### No Python / language bindings in the stack
 
