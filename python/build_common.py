@@ -880,13 +880,18 @@ def setup_environment(flavor: Dict, prefix: Path, srcdir: Path, recipe: Dict = N
     env['F77'] = env['FC']
     env['FF'] = env['FC']
 
-    # Path setup - PREPEND to ensure our binaries are found first
-    env['PATH'] = f"{prefix}/bin:{env.get('PATH', '')}"
-    env['PKG_CONFIG_PATH'] = f"{prefix}/lib/pkgconfig:{env.get('PKG_CONFIG_PATH', '')}"
+    # Path setup - PREPEND to ensure our binaries are found first.
+    # Guard against trailing/leading empty entries: a "foo:" or ":foo"
+    # in LIBRARY_PATH is interpreted as "current directory" by the loader
+    # and by gcc's configure (which refuses to bootstrap with such a value).
+    def _prepend(var: str, value: str) -> None:
+        existing = env.get(var, '')
+        env[var] = f"{value}:{existing}" if existing else value
 
-    # Library and include path setup
-    env['LIBRARY_PATH'] = f"{prefix}/lib:{env.get('LIBRARY_PATH', '')}"
-    env['CPATH'] = f"{prefix}/include:{env.get('CPATH', '')}"
+    _prepend('PATH', f"{prefix}/bin")
+    _prepend('PKG_CONFIG_PATH', f"{prefix}/lib/pkgconfig")
+    _prepend('LIBRARY_PATH', f"{prefix}/lib")
+    _prepend('CPATH', f"{prefix}/include")
 
     # MKL and CUDA flavor environment. Mirrors rpm_builder's
     # get_intel_oneapi_setup() and get_path_setup() so direct unix builds
@@ -896,13 +901,9 @@ def setup_environment(flavor: Dict, prefix: Path, srcdir: Path, recipe: Dict = N
     if 'mkl' in flavor_name:
         mkl_root = os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
         env['MKLROOT'] = mkl_root
-        env['LD_LIBRARY_PATH'] = (
-            f"{mkl_root}/lib/intel64:{env.get('LD_LIBRARY_PATH', '')}"
-        )
-        env['LIBRARY_PATH'] = (
-            f"{mkl_root}/lib/intel64:{env['LIBRARY_PATH']}"
-        )
-        env['CPATH'] = f"{mkl_root}/include:{env['CPATH']}"
+        _prepend('LD_LIBRARY_PATH', f"{mkl_root}/lib/intel64")
+        _prepend('LIBRARY_PATH', f"{mkl_root}/lib/intel64")
+        _prepend('CPATH', f"{mkl_root}/include")
 
     if flavor.get('nvidia'):
         try:
