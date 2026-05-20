@@ -77,11 +77,10 @@ install:
     macos:
       # Apple's build creates .so files, rename to .dylib
       - "if [ -f %{prefix}/lib/libz.so.%{version} ]; then cd %{prefix}/lib && mv libz.so.%{version} libz.%{version}.dylib; fi"
-      - "if [ -f %{prefix}/lib/libz.so.1 ]; then cd %{prefix}/lib && rm libz.so.1; fi"
-      - "if [ -f %{prefix}/lib/libz.so ]; then cd %{prefix}/lib && rm libz.so; fi"
+      - "cd %{prefix}/lib && rm -f libz.so.1 libz.so"
       - "cd %{prefix}/lib && ln -sf libz.%{version}.dylib libz.1.dylib"
       - "cd %{prefix}/lib && ln -sf libz.%{version}.dylib libz.dylib"
-      - "install_name_tool -id %{prefix}/lib/libz.%{version}.dylib %{prefix}/lib/libz.%{version}.dylib"
+      - "install_name_tool -id %{final_prefix}/lib/libz.%{version}.dylib %{prefix}/lib/libz.%{version}.dylib"
 
 build:
   parallel: true

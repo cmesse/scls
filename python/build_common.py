@@ -643,8 +643,15 @@ def get_configure_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, inst
         cxx = 'mpicxx'
         fc = 'mpifort'
     else:
-        # Use compilers from flavor
-        compilers = flavor.get('compilers', {})
+        # Bootstrap packages build before scls gcc is usable (e.g. on macOS
+        # the freshly built gcc lands on PATH but can't parse Apple SDK
+        # headers that use clang blocks). Honor the flavor's
+        # bootstrap_compilers override, matching _prepare_build_env.
+        is_bootstrap = recipe.get('bootstrap', False)
+        if is_bootstrap and 'bootstrap_compilers' in flavor:
+            compilers = flavor['bootstrap_compilers']
+        else:
+            compilers = flavor.get('compilers', {})
         cc = compilers.get('cc', 'gcc')
         cxx = compilers.get('cxx', 'g++')
         fc = compilers.get('fc', 'gfortran')
@@ -716,8 +723,15 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
         cxx = 'mpicxx'
         fc = 'mpifort'
     else:
-        # Use compilers from flavor
-        compilers = flavor.get('compilers', {})
+        # Bootstrap packages build before scls gcc is usable (e.g. on macOS
+        # the freshly built gcc lands on PATH but can't parse Apple SDK
+        # headers that use clang blocks). Honor the flavor's
+        # bootstrap_compilers override, matching _prepare_build_env.
+        is_bootstrap = recipe.get('bootstrap', False)
+        if is_bootstrap and 'bootstrap_compilers' in flavor:
+            compilers = flavor['bootstrap_compilers']
+        else:
+            compilers = flavor.get('compilers', {})
         cc = compilers.get('cc', 'gcc')
         cxx = compilers.get('cxx', 'g++')
         fc = compilers.get('fc', 'gfortran')

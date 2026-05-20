@@ -9,6 +9,7 @@ target/
 tmp/
 debbuild/
 patched/
+tex/
 
 scls.html
 

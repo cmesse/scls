@@ -22,6 +22,10 @@ requires:
   - automake
   - libtool
 
+patches:
+  macos:
+    - 0001-glib-do-not-use-bool-as-a-field-name.patch
+
 features:
   fortran: false
   mpi: false

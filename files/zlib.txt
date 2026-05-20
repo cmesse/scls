@@ -1,7 +1,9 @@
-%{prefix}/include/zlib.h
 %{prefix}/include/zconf.h
-%{prefix}/lib/libz.dylib
-%{prefix}/lib/libz.1.2.12.dylib
-%{prefix}/lib/libz.1.dylib
-%{prefix}/share/man/man3/zlib.3
+%{prefix}/include/zlib.h
+%{prefix}/lib/libz.1.2.so
+%{prefix}/lib/libz.1.2.so.*
+%{prefix}/lib/libz.so
+%{prefix}/lib/libz.so.*
 %{prefix}/lib/pkgconfig/zlib.pc
+%{prefix}/share/man/man3
+%{prefix}/share/man/man3/zlib.3

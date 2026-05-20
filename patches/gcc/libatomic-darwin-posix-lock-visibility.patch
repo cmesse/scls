@@ -1,0 +1,26 @@
+diff --git a/libatomic/config/posix/host-config.h b/libatomic/config/posix/host-config.h
+index 85f10c8d2c3..0a519f34c6a 100644
+--- a/libatomic/config/posix/host-config.h
++++ b/libatomic/config/posix/host-config.h
+@@ -26,8 +26,9 @@
+ 
+ 
+ #ifndef protect_start_end
+-# ifdef HAVE_ATTRIBUTE_VISIBILITY
++# if defined(HAVE_ATTRIBUTE_VISIBILITY) && !defined(__APPLE__)
+ #  pragma GCC visibility push(hidden)
++#  define LIBAT_PUSHED_HIDDEN_VISIBILITY 1
+ # endif
+ 
+ void libat_lock_1 (void *ptr);
+@@ -47,8 +48,9 @@ protect_end (void *ptr, UWORD dummy UNUSED)
+ }
+ 
+ # define protect_start_end 1
+-# ifdef HAVE_ATTRIBUTE_VISIBILITY
++# ifdef LIBAT_PUSHED_HIDDEN_VISIBILITY
+ #  pragma GCC visibility pop
++#  undef LIBAT_PUSHED_HIDDEN_VISIBILITY
+ # endif
+ #endif /* protect_start_end */
+ 

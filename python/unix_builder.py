@@ -108,9 +108,18 @@ class UnixBuilder:
 
         # Platform-specific settings
         if self.platform == 'macos':
-            # macOS: get SDK path and Darwin version
-            self.sdk = subprocess.check_output(
+            # macOS: get SDK path and Darwin version. `xcrun` returns the
+            # versioned SDK directory (e.g. .../SDKs/MacOSX26.2.sdk), but
+            # Xcode also ships an unversioned `MacOSX.sdk` alongside it
+            # (either as the real directory with versioned symlinks, or
+            # vice versa, depending on the Xcode release). Prefer the
+            # unversioned path so that paths baked into artifacts —
+            # notably gcc's `--with-sysroot`, which is compiled into the
+            # binary — survive a Command Line Tools / Xcode upgrade.
+            xcrun_sdk = subprocess.check_output(
                 ["xcrun", "--sdk", "macosx", "--show-sdk-path"], text=True).strip()
+            unversioned = os.path.join(os.path.dirname(xcrun_sdk), "MacOSX.sdk")
+            self.sdk = unversioned if os.path.exists(unversioned) else xcrun_sdk
             uname_r = subprocess.check_output(["uname", "-r"], text=True).strip()
             # Detect architecture
             machine = platform.machine()
@@ -1194,8 +1203,12 @@ class UnixBuilder:
         """
         base_tools = ['make', 'patch', 'curl', 'tar']
 
-        # Platform-specific tools
-        if self.platform == 'macos':
+        # Platform-specific tools. `gsed` is GNU sed (built by the SCLS `sed`
+        # recipe with --program-prefix=g); bootstrap recipes must build with
+        # only system tools, so they cannot require it — otherwise m4 /
+        # autoconf / automake / make would cycle through `sed`, which itself
+        # depends on automake/autoconf/make.
+        if self.platform == 'macos' and not self.recipe.get('bootstrap', False):
             base_tools.append('gsed')
 
         # Configure-type-specific tools

@@ -1,8 +1,8 @@
 %{prefix}/bin/make
 %{prefix}/include/gnumake.h
 %{prefix}/share/info/make.info
-%{prefix}/share/info/make.info-3
-%{prefix}/share/info/make.info-2
-%{prefix}/share/info/dir
 %{prefix}/share/info/make.info-1
+%{prefix}/share/info/make.info-2
+%{prefix}/share/info/make.info-3
+%{prefix}/share/man/man1
 %{prefix}/share/man/man1/make.1

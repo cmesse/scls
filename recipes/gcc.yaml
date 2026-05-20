@@ -1,12 +1,16 @@
 name: gcc
-version: 15.2.0
+version: 16.1.0
 summary: The GNU Compiler Collection
 homepage: https://gcc.gnu.org/
 license: GPL-3.0-or-later WITH GCC-exception-3.1
 bootstrap: true  # Build with system compilers (this IS the GCC we're building)
 
 source:
-  url: https://ftp.gnu.org/gnu/gcc/gcc-15.1/gcc-%{version}.tar.xz
+  url: https://ftp.gnu.org/gnu/gcc/gcc-%{version}/gcc-%{version}.tar.xz
+
+patches:
+  macos:
+    - libatomic-darwin-posix-lock-visibility.patch
 
 update:
   strategy: gnu_ftp
