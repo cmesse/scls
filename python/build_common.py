@@ -745,6 +745,12 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
     cmake_include_path = f"{prefix}/include"
     extra_link_dirs = ""  # extra -L / -rpath / -rpath-link entries
     std_libs = "-lm"     # appended to every link via CMAKE_C/CXX_STANDARD_LIBRARIES
+    # Apple's ld64 doesn't understand -rpath-link; Mach-O dylibs carry install
+    # names so the static linker resolves transitive deps without it. Only emit
+    # the flag on Linux (GNU ld / lld), where it's needed for try_compile checks
+    # and demo/test linking against indirect deps.
+    is_linux = flavor.get('platform', 'linux') == 'linux'
+    rpath_link_flag = f" -Wl,-rpath-link,{prefix}/lib" if is_linux else ""
     if flavor.get('math', {}).get('linalg') == 'mkl':
         import os as _os
         mkl_root = _os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
@@ -770,8 +776,9 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
         extra_link_dirs = (
             f" -L{mkl_root}/lib/intel64"
             f" -Wl,-rpath,{mkl_root}/lib/intel64"
-            f" -Wl,-rpath-link,{mkl_root}/lib/intel64"
         )
+        if is_linux:
+            extra_link_dirs += f" -Wl,-rpath-link,{mkl_root}/lib/intel64"
 
     args = [
         f"-DCMAKE_INSTALL_PREFIX={install_prefix}",
@@ -789,8 +796,8 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
         # -rpath-link helps the linker resolve indirect shared library
         # dependencies (e.g. libopenblas.so -> libgfortran.so, libcholmod.so
         # -> libmkl_*.so.2) during try_compile checks and demo/test linking.
-        f"-DCMAKE_SHARED_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib -Wl,-rpath-link,{prefix}/lib{extra_link_dirs}",
-        f"-DCMAKE_EXE_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib -Wl,-rpath-link,{prefix}/lib{extra_link_dirs}",
+        f"-DCMAKE_SHARED_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}",
+        f"-DCMAKE_EXE_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}",
         # Libraries that every link command needs, appended at the END (after
         # target libs). For MKL: the full MKL link line so transitive deps
         # resolve. For non-MKL: just -lm (catches CMakeLists that forgot it).
