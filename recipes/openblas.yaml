@@ -79,16 +79,10 @@ install:
     - "rm -f %{prefix}/lib/libopenblas*.a"
     # Create compatibility symlinks: libblas/libcblas/liblapack/liblapacke -> libopenblas
     # OpenBLAS includes BLAS, CBLAS, LAPACK, and LAPACKE in the same library
-    - "cd %{prefix}/lib && ln -sf libopenblas.so libblas.so || true"
-    - "cd %{prefix}/lib && ln -sf libopenblas.so libcblas.so || true"
-    - "cd %{prefix}/lib && ln -sf libopenblas.so liblapack.so || true"
-    - "cd %{prefix}/lib && ln -sf libopenblas.so liblapacke.so || true"
-  flavor_post:
-    macos:
-      - "cd %{prefix}/lib && ln -sf libopenblas.dylib libblas.dylib || true"
-      - "cd %{prefix}/lib && ln -sf libopenblas.dylib libcblas.dylib || true"
-      - "cd %{prefix}/lib && ln -sf libopenblas.dylib liblapack.dylib || true"
-      - "cd %{prefix}/lib && ln -sf libopenblas.dylib liblapacke.dylib || true"
+    - "cd %{prefix}/lib && ln -sf libopenblas%{libext} libblas%{libext} || true"
+    - "cd %{prefix}/lib && ln -sf libopenblas%{libext} libcblas%{libext} || true"
+    - "cd %{prefix}/lib && ln -sf libopenblas%{libext} liblapack%{libext} || true"
+    - "cd %{prefix}/lib && ln -sf libopenblas%{libext} liblapacke%{libext} || true"
 
 test:
   inherit_build_args: true
