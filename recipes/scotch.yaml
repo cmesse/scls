@@ -65,8 +65,10 @@ install:
     # the cmake build/ subdir (after `cd build && make install`), so the
     # source-root license file is one level up. `%{prefix}` alone is correct
     # here — the rpm_builder post-processor rewrites it to
-    # `%{buildroot}%{prefix}` automatically.
-    - "install -D -m 644 ../LICENSE_en.txt %{prefix}/share/licenses/scotch/LICENSE"
+    # `%{buildroot}%{prefix}` automatically. Avoid `install -D` because BSD
+    # install (macOS) interprets `-D` differently from GNU install.
+    - "mkdir -p %{prefix}/share/licenses/scotch"
+    - "install -m 644 ../LICENSE_en.txt %{prefix}/share/licenses/scotch/LICENSE"
 
 test:
   commands:

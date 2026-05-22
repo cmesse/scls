@@ -59,7 +59,9 @@ install:
     - "install -m 755 lib/lib*%{libext} %{buildroot}%{prefix}/lib/"
     - "install -m 644 include/*.h %{buildroot}%{prefix}/include/"
     # Bundle CeCILL-C license text; upstream ships `LICENSE` at source root.
-    - "install -D -m 644 %{srcdir}/LICENSE %{buildroot}%{prefix}/share/licenses/mumps/LICENSE"
+    # Avoid `install -D` — BSD install (macOS) interprets it differently.
+    - "mkdir -p %{buildroot}%{prefix}/share/licenses/mumps"
+    - "install -m 644 %{srcdir}/LICENSE %{buildroot}%{prefix}/share/licenses/mumps/LICENSE"
 
 test:
   commands:

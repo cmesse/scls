@@ -61,6 +61,15 @@ configure:
     - "-DSUNDIALS_TEST_ENABLE_GTEST=ON"
     - "-DSUNDIALS_TEST_ENABLE_DIFF_OUTPUT=OFF"
     - "-DGTest_ROOT=%{prefix}"
+    # Defer GoogleTest case discovery from build-time (POST_BUILD, default,
+    # 5s timeout) to ctest-time (PRE_TEST). On macOS the first launch of an
+    # unsigned binary triggers a synchronous Gatekeeper/XProtect scan, which
+    # combined with dyld resolving SUNDIALS' many shared deps regularly blows
+    # the 5s budget and aborts `make`. SUNDIALS' own gtest_discover_tests()
+    # calls pass no explicit mode, so this CMake variable wins. Linux builds
+    # are unaffected — they did not hit the timeout but also gain nothing
+    # from running discovery at build-time, so flipping it globally is safe.
+    - "-DCMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST"
   # LP64/ILP64 index size
   lp64_args:
     - "-DSUNDIALS_INDEX_SIZE=32"

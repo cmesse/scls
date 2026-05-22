@@ -34,21 +34,35 @@ configure:
     - "-DVTK_BUILD_SCALED_SOA_ARRAYS=OFF"
     - "-DVTK_BUILD_SPHINX_DOCUMENTATION=OFF"
     - "-DVTK_BUILD_TESTING=OFF"
-    - "-DVTK_SMP_IMPLEMENTATION_TYPE=OpenMP"
     - "-DVTK_USE_MPI=OFF"
     - "-DVTK_WRAP_JAVA=OFF"
     - "-DVTK_WRAP_PYTHON=OFF"
   flavor_args:
     gcc:
       - "-DVTK_USE_CUDA=OFF"
+      - "-DVTK_SMP_IMPLEMENTATION_TYPE=OpenMP"
     lbl:
       - "-DVTK_USE_CUDA=OFF"
+      - "-DVTK_SMP_IMPLEMENTATION_TYPE=OpenMP"
     macos:
+      - "-DVTK_USE_COCOA=ON"
       - "-DVTK_USE_CUDA=OFF"
+      - "-DVTK_USE_X=OFF"
+      - "-DVTK_SMP_IMPLEMENTATION_TYPE=Sequential"
+      - "-DVTK_SMP_ENABLE_STDTHREAD=OFF"
+      - "-DCMAKE_C_COMPILER=/usr/bin/gcc"
+      - "-DCMAKE_CXX_COMPILER=/usr/bin/g++"
+      - "-DCMAKE_CXX_FLAGS=-stdlib=libstdc++ -femulated-tls -nostdinc++ -isystem %{prefix}/include/c++/16.1.0 -isystem %{prefix}/include/c++/16.1.0/x86_64-apple-darwin24.6.0 -isystem %{prefix}/include/c++/16.1.0/backward"
+      - "-DCMAKE_EXE_LINKER_FLAGS=-stdlib=libstdc++ -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib"
+      - "-DCMAKE_SHARED_LINKER_FLAGS=-stdlib=libstdc++ -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib"
+      - "-DCMAKE_MODULE_LINKER_FLAGS=-stdlib=libstdc++ -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib"
+      - "-DVTK_REQUIRED_OBJCXX_FLAGS=-stdlib=libstdc++ -femulated-tls -nostdinc++ -isystem %{prefix}/include/c++/16.1.0 -isystem %{prefix}/include/c++/16.1.0/x86_64-apple-darwin24.6.0 -isystem %{prefix}/include/c++/16.1.0/backward"
     debug:
       - "-DVTK_USE_CUDA=OFF"
+      - "-DVTK_SMP_IMPLEMENTATION_TYPE=OpenMP"
     cuda:
       - "-DVTK_USE_CUDA=ON"
+      - "-DVTK_SMP_IMPLEMENTATION_TYPE=OpenMP"
       - "-DCMAKE_CUDA_ARCHITECTURES=%{cuda_architectures}"
   optimization:
     O_level: 2

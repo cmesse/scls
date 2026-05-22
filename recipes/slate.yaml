@@ -32,6 +32,16 @@ configure:
     - "-DBUILD_SHARED_LIBS=ON"
     - "-Dblaspp_DIR=%{prefix}"
     - "-Dlapackpp_DIR=%{prefix}"
+    # Pin to C++17. Upstream sets target_compile_features(cxx_std_17), which is
+    # a minimum rather than a cap, so GCC 16's higher default (C++20 — verified
+    # via `g++ -dM`, __cplusplus 202002L) leaks in and exposes std::erase_if
+    # in <vector>. That collides with the local erase_if() in
+    # test/test_norm.cc:101 (upstream comment: "we currently use C++17").
+    # Forcing the standard honors upstream's intent and steers around the
+    # ambiguity without touching sources.
+    - "-DCMAKE_CXX_STANDARD=17"
+    - "-DCMAKE_CXX_STANDARD_REQUIRED=ON"
+    - "-DCMAKE_CXX_EXTENSIONS=OFF"
   # LP64/ILP64: SLATE inherits integer interface from blaspp/lapackpp
   flavor_args:
     gcc:

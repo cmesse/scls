@@ -7,6 +7,13 @@ license: BSD-3-Clause
 source:
   url: https://github.com/liuyangzhuan/ButterflyPACK/archive/refs/tags/v%{version}.tar.gz
 
+patches:
+  all:
+    # CPPWrapper.cpp uses HOST_NAME_MAX, a glibc extension. macOS (BSD libc)
+    # only defines _POSIX_HOST_NAME_MAX, so we add a guarded fallback. The
+    # #ifndef makes the patch inert on Linux.
+    - butterflypack-4.1.0-host-name-max-portability.patch
+
 requires:
   all:
     - cmake

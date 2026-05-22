@@ -166,3 +166,70 @@ Leave `compilers` and `bootstrap_packages` unchanged. SCLS will then build
 its own GCC inside `/opt/scls` using Homebrew's GCC as the stage-0
 compiler, and the final stack points only at `/opt/scls/bin/gcc` and
 friends.
+
+## Harmless linker warnings during post-bootstrap builds
+
+Once SCLS's own GCC takes over from Apple Clang, you will see these
+warnings from Apple's `ld` on essentially every link, sometimes several
+times per target:
+
+```
+ld: warning: duplicate -rpath '/opt/scls/lib' ignored
+ld: warning: ignoring duplicate libraries: '-lgcc'
+```
+
+**They are cosmetic.** The linker is reporting that it deduplicated
+redundant inputs; the resulting binary contains exactly one rpath entry
+and one libgcc reference. There is no runtime effect and no
+functional difference between a binary built with these warnings and one
+built without. Linux builds are unaffected — GNU `ld` performs the same
+deduplication silently and never emits these messages.
+
+### Why the duplicates exist
+
+SCLS-built GCC is configured with `--prefix=/opt/scls`. Its Darwin link
+spec therefore automatically injects, for every link:
+
+```
+-L/opt/scls/lib
+-rpath @loader_path
+-rpath /opt/scls/lib/gcc/<triple>/<version>
+-rpath /opt/scls/lib
+```
+
+so that binaries built by this GCC find its runtime libraries
+(`libgcc_s`, `libgomp`, `libstdc++`, `libgfortran`, `libquadmath`) at
+runtime without any external help. In parallel, the macOS flavor's
+`ldflags` in `flavors/macos.yaml` adds `-L/opt/scls/lib
+-Wl,-rpath,/opt/scls/lib` so that earlier-stage clang-built bootstrap
+packages can find SCLS-owned libraries too. Both contributions
+overlap on `/opt/scls/lib` once GCC takes over. Hence the duplicate
+warning.
+
+The `-lgcc` duplicate originates entirely inside GCC's own Darwin link
+spec, which stitches `-lgcc` in via three sub-rules (`link_libgcc`, the
+libgomp section, and `link_gcc_c_sequence`). It is not coming from SCLS
+configuration and cannot be removed without modifying GCC itself.
+
+### Why we do not "fix" it
+
+This was investigated and intentionally left alone. The realistic options
+are:
+
+| Approach | Cost | Result |
+|---|---|---|
+| Drop redundant entries from `flavors/macos.yaml` ldflags | Clean post-bootstrap | Breaks clang-built bootstrap packages that link against `/opt/scls/lib` (e.g. cmake → zlib) |
+| Conditionally adjust ldflags based on which compiler the recipe will use | Cross-cutting plumbing in `unix_builder`, fragile compiler-prefix detection | Silently wrong rpath if detection misfires — much worse failure mode than the warnings |
+| `-Wl,-no_warn_duplicate_libraries` | One-line, surgical | Kills the `-lgcc` warning. Does not address rpath. |
+| `-Wl,-ld_classic` (force the legacy linker) | Switches linker | Does **not** silence the rpath warning (the message predates ld-prime), and adds its own deprecation warning. Strictly worse. |
+| `-Wl,-w` (suppress all ld warnings) | One-line | Hides every linker warning, including legitimate ones (architecture mismatches, weak-symbol issues). Loses signal. |
+| Do nothing | Zero | Chatty build logs. Correct binaries. |
+
+We chose to do nothing. The duplicates are emitted by Apple's `ld` only,
+have no functional effect, and the surgical fix for the `-rpath` half
+does not exist. Suppressing them broadly would silence warnings that
+might matter on a future link.
+
+If a `duplicate -rpath` or `duplicate libraries: '-lgcc'` warning appears
+during a macOS build, ignore it. If a *different* ld warning appears,
+read it — it is real.

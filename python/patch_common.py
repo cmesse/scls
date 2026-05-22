@@ -120,6 +120,28 @@ def discover_patches_in_directory(package_name: str, patches_dir: Path = Path("p
     return patches
 
 
+def collect_declared_patch_files(patch_config) -> set:
+    """Collect every patch filename explicitly mentioned in a patches block."""
+    declared = set()
+
+    def collect_entries(entries):
+        if not isinstance(entries, list):
+            return
+        for entry in entries:
+            if isinstance(entry, str):
+                declared.add(entry)
+            elif isinstance(entry, dict) and 'file' in entry:
+                declared.add(entry['file'])
+
+    if isinstance(patch_config, dict):
+        for entries in patch_config.values():
+            collect_entries(entries)
+    elif isinstance(patch_config, list):
+        collect_entries(patch_config)
+
+    return declared
+
+
 def infer_patch_level(patch_file: Path) -> int:
     """
     Try to infer the appropriate -p level for a patch by examining its content
@@ -160,8 +182,13 @@ def get_all_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("p
     recipe_patches = get_patches_from_recipe(recipe, flavor)
     patches.extend(recipe_patches)
 
-    # If no patches specified in recipe, auto-discover all patches
-    if not recipe_patches:
+    patch_config = recipe.get('patches')
+    patch_config_present = 'patches' in recipe
+
+    # If no patches block is present, auto-discover all patches for legacy
+    # recipes. Once a recipe declares patches explicitly, an empty resolved
+    # list means "no patches for this flavor", not "discover everything".
+    if not patch_config_present:
         print(f"No patches specified in recipe, auto-discovering patches for {package_name}...")
         discovered_patches = discover_patches_in_directory(package_name, patches_dir)
         patches.extend(discovered_patches)
@@ -171,22 +198,7 @@ def get_all_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("p
         discovered_patches = discover_patches_in_directory(package_name, patches_dir)
 
         # Collect ALL patch filenames from the recipe, not just the resolved ones
-        all_recipe_patch_files = set()
-        patch_config = recipe.get('patches', {})
-        if isinstance(patch_config, dict):
-            for key, entries in patch_config.items():
-                if isinstance(entries, list):
-                    for entry in entries:
-                        if isinstance(entry, str):
-                            all_recipe_patch_files.add(entry)
-                        elif isinstance(entry, dict) and 'file' in entry:
-                            all_recipe_patch_files.add(entry['file'])
-        elif isinstance(patch_config, list):
-            for entry in patch_config:
-                if isinstance(entry, str):
-                    all_recipe_patch_files.add(entry)
-                elif isinstance(entry, dict) and 'file' in entry:
-                    all_recipe_patch_files.add(entry['file'])
+        all_recipe_patch_files = collect_declared_patch_files(patch_config)
         # Also include the already-resolved patches
         all_recipe_patch_files.update(p['file'] for p in recipe_patches)
 

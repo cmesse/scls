@@ -11,6 +11,28 @@ rpm_files_auto: true
 source:
   url: https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-%{version}.tar.bz2
 
+# GCC 16's inliner treats __opal_attribute_always_inline__ as mandatory and
+# exhausts its budget on this request-start helper, turning a soft hint into
+# a hard compile error. Dropping the forced attribute leaves the function
+# `static inline`, so older GCC still inlines it via normal heuristics and
+# behavior is unchanged. Apply across every 5.0.10 flavor so a future Linux
+# host with GCC >= 16 (gcc_toolset:16, Fedora 43+, etc.) doesn't hit the same
+# wall. lbl is excluded because it pins OpenMPI to 4.1.6, which predates the
+# MPI-4 persist part component the patch touches; the empty list short-circuits
+# the `gcc:` key that lbl would otherwise inherit.
+patches:
+  gcc:
+    - openmpi-5.0.10-part-persist-drop-forced-inline.patch
+  mkl:
+    - openmpi-5.0.10-part-persist-drop-forced-inline.patch
+  debug:
+    - openmpi-5.0.10-part-persist-drop-forced-inline.patch
+  intel:
+    - openmpi-5.0.10-part-persist-drop-forced-inline.patch
+  macos:
+    - openmpi-5.0.10-part-persist-drop-forced-inline.patch
+  lbl: []
+
 update:
   strategy: github_tag
   repo: open-mpi/ompi
