@@ -295,15 +295,39 @@ class UnixBuilder:
             # Run platform-specific pre-configure commands
             self.run_platform_pre(source_dir, env)
 
-            # Run configure
-            cmd = self.check_args(['./configure'] + args)
-            run_command(cmd, source_dir, env, "configure")
+            # Run configure. Some packages (notably GCC) must be configured
+            # from a separate build directory: an in-source GCC build forces
+            # host_subdir=host-<triplet> (so xgcc lives under that subdir),
+            # while the target libraries' gcc_objdir stays ../../gcc. The
+            # result is libatomic_asneeded.so being written where the
+            # bootstrap xgcc can't find it ("cannot find -latomic_asneeded").
+            # Configuring out-of-source keeps host_subdir=. and the paths
+            # consistent. Pre-configure steps still run in source_dir so
+            # in-tree sources (gmp/mpfr/mpc) land in the source root.
+            # out_of_source may be a plain bool or a flavor-keyed mapping
+            # (e.g. {lbl: true}) so a recipe can opt in per flavor.
+            oos = self.recipe.get('configure', {}).get('out_of_source', False)
+            if isinstance(oos, dict):
+                out_of_source = bool(resolve_flavor_key(self.flavor, oos))
+            else:
+                out_of_source = bool(oos)
+            if out_of_source:
+                build_dir = source_dir / 'build'
+                build_dir.mkdir(exist_ok=True)
+                cmd = self.check_args([str(source_dir / 'configure')] + args)
+                run_command(cmd, build_dir, env, "configure")
+            else:
+                build_dir = source_dir
+                cmd = self.check_args(['./configure'] + args)
+                run_command(cmd, source_dir, env, "configure")
 
             # Run any post-configure commands
             if 'configure' in self.recipe and 'post' in self.recipe['configure']:
                 for cmd in self.recipe['configure']['post']:
                     checked_cmd = self.check_args([cmd])[0]
-                    run_command(['sh', '-c', checked_cmd], source_dir, env, "post-configure")
+                    run_command(['sh', '-c', checked_cmd], build_dir, env, "post-configure")
+
+            return build_dir
 
         elif configure_type == 'cmake':
             # Create build directory

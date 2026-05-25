@@ -62,6 +62,15 @@ configure:
     - "find . -name configure -exec sed -i 's/--version -v -V -qversion/--version -v/g' {} \\;"
 
   type: autotools
+  # GCC's bootstrap requires a separate object directory on GNU/Linux.
+  # In-source, configure forces host_subdir=host-<triplet> while the target
+  # libs keep gcc_objdir=../../gcc, so libatomic_asneeded.so is written where
+  # the bootstrap xgcc can't find it and libgomp's configure fails with
+  # "cannot find -latomic_asneeded". macOS is unaffected because the
+  # as-needed linker-script trick is GNU-ld-only (disabled on Mach-O), so its
+  # known-good in-source build is left as-is.
+  out_of_source:
+    lbl: true
   args:
     - --enable-bootstrap
     - --enable-checking=release
