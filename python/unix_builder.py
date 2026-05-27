@@ -1627,11 +1627,16 @@ class UnixBuilder:
                 run_command(['sh', '-c', cmd], self.work_dir, env, "flavor-final-post-install")
 
     def _local_macos_install_name(self, install_name: str, lib_dir: Path) -> Optional[str]:
-        """Return the absolute prefix path for local @rpath dylib names."""
-        if not install_name.startswith('@rpath/'):
+        """Return the absolute prefix path for local Mach-O dylib names."""
+        if install_name.startswith('/'):
+            return None
+        if install_name.startswith('@') and not install_name.startswith('@rpath/'):
             return None
 
-        candidate = lib_dir / install_name[len('@rpath/'):]
+        if install_name.startswith('@rpath/'):
+            candidate = lib_dir / install_name[len('@rpath/'):]
+        else:
+            candidate = lib_dir / Path(install_name).name
         if candidate.exists():
             return str(candidate)
         return None

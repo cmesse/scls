@@ -10,8 +10,10 @@ usage() {
     cat <<'USAGE'
 Usage: tools/fix_macos_install_names.sh [options]
 
-Rewrite local @rpath dylib install names under an SCLS prefix to absolute
-paths in that prefix's lib directory.
+Rewrite local dylib install names under an SCLS prefix to absolute paths in
+that prefix's lib directory. This covers @rpath names plus bare or relative
+names such as libfoo.dylib and ../lib/libfoo.dylib when libfoo.dylib exists
+in the selected libdir.
 
 Options:
   --prefix PATH   SCLS prefix to repair (default: /opt/scls)
@@ -77,15 +79,31 @@ rewrite_local_name() {
     local candidate=""
 
     case "$install_name" in
-        @rpath/*)
-            rel="${install_name#@rpath/}"
-            candidate="$libdir/$rel"
-            if [[ -e "$candidate" ]]; then
-                printf '%s\n' "$candidate"
-                return 0
-            fi
+        /*)
+            return 1
+            ;;
+        @*)
+            case "$install_name" in
+                @rpath/*) ;;
+                *) return 1 ;;
+            esac
             ;;
     esac
+
+    case "$install_name" in
+        @rpath/*)
+            rel="${install_name#@rpath/}"
+            ;;
+        *)
+            rel="${install_name##*/}"
+            ;;
+    esac
+
+    candidate="$libdir/$rel"
+    if [[ -e "$candidate" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
 
     return 1
 }
@@ -103,6 +121,11 @@ run_install_name_tool() {
 files_seen=0
 ids_changed=0
 deps_changed=0
+tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/scls-install-names.XXXXXX")"
+trap 'rm -rf "$tmpdir"' EXIT
+
+dylib_list="$tmpdir/dylibs"
+find "$libdir" -type f -name '*.dylib' -print | sort > "$dylib_list"
 
 while IFS= read -r dylib; do
     files_seen=$((files_seen + 1))
@@ -120,6 +143,9 @@ while IFS= read -r dylib; do
         fi
     fi
 
+    deps_list="$tmpdir/deps"
+    otool -L "$dylib" 2>/dev/null | awk 'NR > 1 { print $1 }' > "$deps_list" || true
+
     while IFS= read -r linked_name; do
         [[ -n "$linked_name" ]] || continue
         [[ "$linked_name" != "$dylib_id" ]] || continue
@@ -130,8 +156,8 @@ while IFS= read -r dylib; do
                 deps_changed=$((deps_changed + 1))
             fi
         fi
-    done < <(otool -L "$dylib" 2>/dev/null | awk 'NR > 1 { print $1 }')
-done < <(find "$libdir" -type f -name '*.dylib' -print | sort)
+    done < "$deps_list"
+done < "$dylib_list"
 
 echo "inspected dylibs: $files_seen"
 echo "dylib IDs changed: $ids_changed"
