@@ -53,9 +53,9 @@ configure:
       - "-DCMAKE_C_COMPILER=/usr/bin/gcc"
       - "-DCMAKE_CXX_COMPILER=/usr/bin/g++"
       - "-DCMAKE_CXX_FLAGS=-stdlib=libstdc++ -femulated-tls -nostdinc++ -isystem %{prefix}/include/c++/16.1.0 -isystem %{prefix}/include/c++/16.1.0/x86_64-apple-darwin24.6.0 -isystem %{prefix}/include/c++/16.1.0/backward"
-      - "-DCMAKE_EXE_LINKER_FLAGS=-stdlib=libstdc++ -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib"
-      - "-DCMAKE_SHARED_LINKER_FLAGS=-stdlib=libstdc++ -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib"
-      - "-DCMAKE_MODULE_LINKER_FLAGS=-stdlib=libstdc++ -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib"
+      - "-DCMAKE_EXE_LINKER_FLAGS=-stdlib=libstdc++ -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib -Wl,-headerpad_max_install_names"
+      - "-DCMAKE_SHARED_LINKER_FLAGS=-stdlib=libstdc++ -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib -Wl,-headerpad_max_install_names"
+      - "-DCMAKE_MODULE_LINKER_FLAGS=-stdlib=libstdc++ -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib -Wl,-headerpad_max_install_names"
       - "-DVTK_REQUIRED_OBJCXX_FLAGS=-stdlib=libstdc++ -femulated-tls -nostdinc++ -isystem %{prefix}/include/c++/16.1.0 -isystem %{prefix}/include/c++/16.1.0/x86_64-apple-darwin24.6.0 -isystem %{prefix}/include/c++/16.1.0/backward"
     debug:
       - "-DVTK_USE_CUDA=OFF"

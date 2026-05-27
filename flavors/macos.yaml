@@ -38,7 +38,7 @@ flags:
   cflags: "-g -fPIC -fno-fast-math -march=native"
   cxxflags: "-g -fPIC -fno-fast-math -march=native"
   fflags: "-g -fPIC -fno-fast-math -march=native"
-  ldflags: "-Wl,-rpath,/opt/scls/lib -L/opt/scls/lib"
+  ldflags: "-Wl,-rpath,/opt/scls/lib -Wl,-headerpad_max_install_names -L/opt/scls/lib"
 
 # Math libraries configuration
 math:

@@ -749,8 +749,11 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
     # names so the static linker resolves transitive deps without it. Only emit
     # the flag on Linux (GNU ld / lld), where it's needed for try_compile checks
     # and demo/test linking against indirect deps.
-    is_linux = flavor.get('platform', 'linux') == 'linux'
+    platform_name = flavor.get('platform', 'linux')
+    is_linux = platform_name == 'linux'
+    is_macos = platform_name == 'macos'
     rpath_link_flag = f" -Wl,-rpath-link,{prefix}/lib" if is_linux else ""
+    macos_linker_flags = " -Wl,-headerpad_max_install_names" if is_macos else ""
     if flavor.get('math', {}).get('linalg') == 'mkl':
         import os as _os
         mkl_root = _os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
@@ -796,8 +799,9 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
         # -rpath-link helps the linker resolve indirect shared library
         # dependencies (e.g. libopenblas.so -> libgfortran.so, libcholmod.so
         # -> libmkl_*.so.2) during try_compile checks and demo/test linking.
-        f"-DCMAKE_SHARED_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}",
-        f"-DCMAKE_EXE_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}",
+        f"-DCMAKE_SHARED_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}{macos_linker_flags}",
+        f"-DCMAKE_MODULE_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}{macos_linker_flags}",
+        f"-DCMAKE_EXE_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}{macos_linker_flags}",
         # Libraries that every link command needs, appended at the END (after
         # target libs). For MKL: the full MKL link line so transitive deps
         # resolve. For non-MKL: just -lm (catches CMakeLists that forgot it).
@@ -806,6 +810,13 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
         f"-DCMAKE_C_STANDARD_LIBRARIES={std_libs}",
         f"-DCMAKE_CXX_STANDARD_LIBRARIES={std_libs}",
     ]
+
+    if is_macos:
+        args.extend([
+            f"-DCMAKE_INSTALL_NAME_DIR={install_prefix}/lib",
+            f"-DCMAKE_INSTALL_RPATH={prefix}/lib",
+            "-DCMAKE_SKIP_INSTALL_RPATH=OFF",
+        ])
 
     # Get defaults configuration if it exists
     defaults = recipe.get('configure', {}).get('defaults', {})
