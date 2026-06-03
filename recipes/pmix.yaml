@@ -20,8 +20,6 @@ requires:
   all:
     - libevent
     - hwloc
-  macos:
-    - zlib
 
 features:
   fortran: false
@@ -38,6 +36,11 @@ configure:
     - --with-libevent=%{prefix}
     - --with-hwloc=%{prefix}
     - --with-slurm
+  flavor_env:
+    macos:
+      CFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"
+      CXXFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"
+      LDFLAGS: "+=-isysroot %{sdk}"
   optimization:
     O_level: 2
     strict_aliasing: true

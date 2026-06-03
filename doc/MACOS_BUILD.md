@@ -81,9 +81,9 @@ without arguments to see its usage.
 
 The macOS flavor builds a set of bootstrap packages with Apple Clang before
 SCLS's own GCC takes over. The full order (from `flavors/macos.yaml`) is:
-`m4`, `openssl`, `texinfo`, `zlib`, `autoconf`, `automake`, `bison`,
-`libtool`, `make`, `pkg-config`, `sed`, `cmake`, and then `gcc`. Everything
-built after `gcc` uses the SCLS-owned GCC.
+`m4`, `openssl`, `texinfo`, `autoconf`, `automake`, `bison`, `libtool`,
+`make`, `pkg-config`, `sed`, `cmake`, and then `gcc`. Everything built after
+`gcc` uses the SCLS-owned GCC.
 
 The `gcc` step is the single most fragile part of the bootstrap sequence:
 
@@ -218,7 +218,7 @@ are:
 
 | Approach | Cost | Result |
 |---|---|---|
-| Drop redundant entries from `flavors/macos.yaml` ldflags | Clean post-bootstrap | Breaks clang-built bootstrap packages that link against `/opt/scls/lib` (e.g. cmake → zlib) |
+| Drop redundant entries from `flavors/macos.yaml` ldflags | Clean post-bootstrap | Breaks clang-built bootstrap packages that need stack libraries under `/opt/scls/lib` |
 | Conditionally adjust ldflags based on which compiler the recipe will use | Cross-cutting plumbing in `unix_builder`, fragile compiler-prefix detection | Silently wrong rpath if detection misfires — much worse failure mode than the warnings |
 | `-Wl,-no_warn_duplicate_libraries` | One-line, surgical | Kills the `-lgcc` warning. Does not address rpath. |
 | `-Wl,-ld_classic` (force the legacy linker) | Switches linker | Does **not** silence the rpath warning (the message predates ld-prime), and adds its own deprecation warning. Strictly worse. |

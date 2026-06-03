@@ -42,7 +42,6 @@ requires:
     - make
     - sed
     - m4
-    - zlib
 
 features:
   fortran: false
@@ -71,6 +70,11 @@ configure:
   # known-good in-source build is left as-is.
   out_of_source:
     lbl: true
+  flavor_env:
+    macos:
+      CFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"
+      CXXFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"
+      LDFLAGS: "+=-isysroot %{sdk}"
   args:
     - --enable-bootstrap
     - --enable-checking=release
@@ -89,6 +93,13 @@ configure:
     gcc:
       - --enable-gnu-unique-object
       - --enable-linker-build-id
+      # Build SCLS GCC so linked executables carry the stack runtime path by
+      # default. This is a driver self-spec, not a *link: spec, so guard it
+      # out for compiler-query/compile-only/preprocess/assemble/static/
+      # relocatable steps and emit a normal driver-level linker option only
+      # for dynamic final links. Libtool probes plain `g++ -v`; injecting a
+      # linker option there makes GCC try a no-input link and disables CXX.
+      - "--with-specs=%{!v:%{!c:%{!S:%{!E:%{!r:%{!static:%{!static-pie:-Wl,-rpath,%{prefix}/lib}}}}}}}"
       - --with-gcc-major-version-only
       - --with-linker-hash-style=gnu
       - --enable-initfini-array

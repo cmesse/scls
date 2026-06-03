@@ -393,7 +393,14 @@ def process_env_operations(env: Dict[str, str], env_ops: Dict[str, str]) -> Dict
     return env
 
 
-def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict, prefix: Path, srcdir: Path = None) -> Dict[str, str]:
+def apply_configure_environment(
+    env: Dict[str, str],
+    recipe: Dict,
+    flavor: Dict,
+    prefix: Path,
+    srcdir: Path = None,
+    sdk: str = '',
+) -> Dict[str, str]:
     """
     Apply configure-specific environment variables from recipe
     Supports operations like +=, -=, and =
@@ -403,6 +410,13 @@ def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict,
 
     configure_config = recipe['configure']
     flavor_name = flavor.get('name', '')
+
+    def expand_env_value(val):
+        val = str(val).replace('%{prefix}', str(prefix))
+        val = val.replace('%{sdk}', sdk)
+        if srcdir:
+            val = val.replace('%{srcdir}', str(srcdir))
+        return val
 
     # Apply general configure environment
     if 'env' in configure_config:
@@ -415,20 +429,14 @@ def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict,
                     # Process variable substitution
                     processed_env = {}
                     for var, val in env_item.items():
-                        val = str(val).replace('%{prefix}', str(prefix))
-                        if srcdir:
-                            val = val.replace('%{srcdir}', str(srcdir))
-                        processed_env[var] = val
+                        processed_env[var] = expand_env_value(val)
                     env = process_env_operations(env, processed_env)
         # Handle dict format: {"VAR": "value", "VAR2": "value2"}
         elif isinstance(env_config, dict):
             # Process variable substitution
             processed_env = {}
             for var, val in env_config.items():
-                val = str(val).replace('%{prefix}', str(prefix))
-                if srcdir:
-                    val = val.replace('%{srcdir}', str(srcdir))
-                processed_env[var] = val
+                processed_env[var] = expand_env_value(val)
             env = process_env_operations(env, processed_env)
 
     # Apply flavor-specific configure environment. Use resolve_flavor_key
@@ -443,10 +451,7 @@ def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict,
             # Dictionary format: {"VAR": "value"}
             processed_env = {}
             for var, val in flavor_env.items():
-                val = str(val).replace('%{prefix}', str(prefix))
-                if srcdir:
-                    val = val.replace('%{srcdir}', str(srcdir))
-                processed_env[var] = val
+                processed_env[var] = expand_env_value(val)
             env = process_env_operations(env, processed_env)
         elif isinstance(flavor_env, list):
             # List format: [{"VAR": "value"}, {"VAR2": "value2"}]
@@ -454,10 +459,7 @@ def apply_configure_environment(env: Dict[str, str], recipe: Dict, flavor: Dict,
                 if isinstance(env_item, dict):
                     processed_env = {}
                     for var, val in env_item.items():
-                        val = str(val).replace('%{prefix}', str(prefix))
-                        if srcdir:
-                            val = val.replace('%{srcdir}', str(srcdir))
-                        processed_env[var] = val
+                        processed_env[var] = expand_env_value(val)
                     env = process_env_operations(env, processed_env)
 
     return env

@@ -75,8 +75,6 @@
 %{prefix}/lib/libmca_common_sm.so.*
 %{prefix}/lib/libmca_common_ucx.so
 %{prefix}/lib/libmca_common_ucx.so.*
-%{prefix}/lib/libmca_common_verbs.so
-%{prefix}/lib/libmca_common_verbs.so.*
 %{prefix}/lib/libmpi.so
 %{prefix}/lib/libmpi.so.*
 %{prefix}/lib/libmpi_mpifh.so
@@ -108,7 +106,6 @@
 %{prefix}/lib/openmpi/mca_atomic_basic.so
 %{prefix}/lib/openmpi/mca_atomic_ucx.so
 %{prefix}/lib/openmpi/mca_bml_r2.so
-%{prefix}/lib/openmpi/mca_btl_openib.so
 %{prefix}/lib/openmpi/mca_btl_self.so
 %{prefix}/lib/openmpi/mca_btl_sm.so
 %{prefix}/lib/openmpi/mca_btl_tcp.so
@@ -923,7 +920,6 @@
 %{prefix}/share/man/man7/orte_hosts.7
 %{prefix}/share/man/man7/orte_snapc.7
 %{prefix}/share/man/man7/orte_sstore.7
-%{prefix}/share/openmpi/amca-param-sets/btl-openib-benchmark
 %{prefix}/share/openmpi/amca-param-sets/example.conf
 %{prefix}/share/openmpi/help-btl-vader.txt
 %{prefix}/share/openmpi/help-coll-sync.txt
@@ -938,9 +934,6 @@
 %{prefix}/share/openmpi/help-mca-var.txt
 %{prefix}/share/openmpi/help-mpi-api.txt
 %{prefix}/share/openmpi/help-mpi-btl-base.txt
-%{prefix}/share/openmpi/help-mpi-btl-openib-cpc-base.txt
-%{prefix}/share/openmpi/help-mpi-btl-openib-cpc-rdmacm.txt
-%{prefix}/share/openmpi/help-mpi-btl-openib.txt
 %{prefix}/share/openmpi/help-mpi-btl-sm.txt
 %{prefix}/share/openmpi/help-mpi-btl-tcp.txt
 %{prefix}/share/openmpi/help-mpi-coll-sm.txt
@@ -951,7 +944,6 @@
 %{prefix}/share/openmpi/help-mpool-base.txt
 %{prefix}/share/openmpi/help-oob-base.txt
 %{prefix}/share/openmpi/help-oob-tcp.txt
-%{prefix}/share/openmpi/help-opal-common-verbs.txt
 %{prefix}/share/openmpi/help-opal-crs-none.txt
 %{prefix}/share/openmpi/help-opal-hwloc-base.txt
 %{prefix}/share/openmpi/help-opal-runtime.txt
@@ -1002,7 +994,6 @@
 %{prefix}/share/openmpi/help-shmem-api.txt
 %{prefix}/share/openmpi/help-shmem-runtime.txt
 %{prefix}/share/openmpi/help-state-base.txt
-%{prefix}/share/openmpi/mca-btl-openib-device-params.ini
 %{prefix}/share/openmpi/mpiCC-wrapper-data.txt
 %{prefix}/share/openmpi/mpic++-wrapper-data.txt
 %{prefix}/share/openmpi/mpicc-wrapper-data.txt

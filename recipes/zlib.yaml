@@ -13,9 +13,9 @@ update:
   # currently pinned in the source URL instead of the recipe's version field.
   current: "100"
 
-# Only build for these flavors
-include_flavors:
-  - macos
+# SCLS uses system zlib on every normal flavor. Keep this recipe available as
+# a reference, but do not include it in default flavor build orders.
+include_flavors: []
 
 # Platform-specific source and version
 linux:

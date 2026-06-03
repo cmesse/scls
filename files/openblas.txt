@@ -12,7 +12,7 @@
 %{prefix}/lib/libcblas.so
 %{prefix}/lib/liblapack.so
 %{prefix}/lib/liblapacke.so
-%{prefix}/lib/libopenblas-r%{version}.so
+%{prefix}/lib/libopenblas-r0.3.33.so
 %{prefix}/lib/libopenblas.so
 %{prefix}/lib/libopenblas.so.*
 %{prefix}/lib/pkgconfig/openblas.pc

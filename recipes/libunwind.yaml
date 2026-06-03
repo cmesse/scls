@@ -31,6 +31,11 @@ features:
 
 configure:
   type: autotools
+  # GCC 15+ defaults toward C23 semantics, where an empty parameter list in
+  # old test code means "no arguments" rather than "unspecified arguments".
+  # libunwind 1.8.3 still has that style in tests/Gtest-nomalloc.c.
+  env:
+    - CFLAGS: "+=-std=gnu17"
   args:
     - "--disable-static"
     - "--enable-shared"

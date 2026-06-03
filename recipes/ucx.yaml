@@ -48,6 +48,12 @@ features:
 
 configure:
   type: autotools
+  # GCC 16 warns that OpenMP `master` is deprecated since OpenMP 5.1.
+  # UCX 1.20.0 still uses it in src/tools/perf/perftest.c, and UCX's
+  # configure injects a broad -Werror into BASE_CFLAGS. Keep warnings as
+  # errors generally, but do not fail on this compatibility warning.
+  env:
+    - CFLAGS: "+=-Wno-error=deprecated-openmp"
   args:
     - --enable-optimizations
     - --enable-mt

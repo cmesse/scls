@@ -83,6 +83,7 @@
 %{prefix}/lib/libscotchmetisv3.so.*
 %{prefix}/lib/libscotchmetisv5.so
 %{prefix}/lib/libscotchmetisv5.so.*
+%{prefix}/share/licenses/scotch/LICENSE
 %{prefix}/share/man/man1
 %{prefix}/share/man/man1/acpl.1
 %{prefix}/share/man/man1/amk_ccc.1
@@ -107,5 +108,4 @@
 %{prefix}/share/man/man1/mcv.1
 %{prefix}/share/man/man1/mmk_m2.1
 %{prefix}/share/man/man1/mord.1
-%{prefix}/share/licenses/scotch/LICENSE
 %{prefix}/share/man/man1/mtst.1

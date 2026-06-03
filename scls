@@ -168,6 +168,61 @@ if [ "$1" = "build" ] && [ "$PACKAGE" = "all" ]; then
         trap "kill $KEEPALIVE_PID 2>/dev/null; wait $KEEPALIVE_PID 2>/dev/null" EXIT INT TERM
     fi
 
+    # In direct/unix mode there is no local package artifact marker. A plain
+    # `scls build <pkg>` compiles into work/build but does not install and
+    # does not write the prefix registry, so get_next_unbuilt_package would
+    # keep returning the same package forever. Build and install the selected
+    # package in the same iteration so the registry becomes the progress
+    # marker.
+    if [ "$USE_DEB" != true ] && [ "$USE_RPM" != true ]; then
+        STEPS=0
+        while :; do
+            PKG=$($PYTHON -c "
+import sys; sys.path.insert(0, '$SCLS_DIR/python')
+from build_order import get_next_unbuilt_package
+from build_common import load_flavor
+prefix = load_flavor('$FLAVOR')['prefix']
+pkg = get_next_unbuilt_package('$SCLS_DIR/recipes', '$FLAVOR', prefix)
+if pkg:
+    print(pkg)
+    sys.exit(0)
+sys.exit(1)
+" 2>/dev/null)
+            if [ $? -ne 0 ] || [ -z "$PKG" ]; then
+                break
+            fi
+            if [ "$PKG" = "_meta" ]; then
+                break
+            fi
+            N=$((STEPS + 1))
+
+            echo ""
+            echo "================================================================"
+            echo "  [$N] build+install: $PKG (flavor=$FLAVOR)"
+            echo "================================================================"
+            if ! "$SCLS_DIR/scls" build "$PKG"; then
+                echo "" >&2
+                echo "Error: 'scls build $PKG' failed after $STEPS successful steps." >&2
+                echo "Fix the issue and re-run 'scls build all' to resume." >&2
+                exit 1
+            fi
+            if ! "$SCLS_DIR/scls" install "$PKG"; then
+                echo "" >&2
+                echo "Error: 'scls install $PKG' failed after $STEPS successful steps." >&2
+                echo "Fix the issue and re-run 'scls build all' to resume." >&2
+                exit 1
+            fi
+
+            STEPS=$((STEPS + 1))
+        done
+
+        echo ""
+        echo "================================================================"
+        echo "  Done. Completed $STEPS build/install steps for flavor '$FLAVOR'."
+        echo "================================================================"
+        exit 0
+    fi
+
     # Loop order: install-before-build. On each iteration we first ask
     # for any package that is built-but-not-installed (e.g. a prior run
     # aborted mid-install) and install it; only when nothing is pending

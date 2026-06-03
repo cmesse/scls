@@ -1,7 +1,7 @@
-%{prefix}/lib/cmake/scalapack-%{version}/scalapack-config-version.cmake
-%{prefix}/lib/cmake/scalapack-%{version}/scalapack-config.cmake
-%{prefix}/lib/cmake/scalapack-%{version}/scalapack-targets-release.cmake
-%{prefix}/lib/cmake/scalapack-%{version}/scalapack-targets.cmake
+%{prefix}/lib/cmake/scalapack-2.2.3/scalapack-config-version.cmake
+%{prefix}/lib/cmake/scalapack-2.2.3/scalapack-config.cmake
+%{prefix}/lib/cmake/scalapack-2.2.3/scalapack-targets-release.cmake
+%{prefix}/lib/cmake/scalapack-2.2.3/scalapack-targets.cmake
 %{prefix}/lib/libscalapack.so
 %{prefix}/lib/libscalapack.so.*
 %{prefix}/lib/pkgconfig/scalapack.pc

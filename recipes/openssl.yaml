@@ -25,6 +25,11 @@ features:
 configure:
   type: custom
   command: ./Configure
+  flavor_env:
+    macos:
+      CFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"
+      CXXFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"
+      LDFLAGS: "+=-isysroot %{sdk}"
   args:
     - "--prefix=%{prefix}"
     - "--libdir=%{prefix}/lib"

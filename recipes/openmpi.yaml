@@ -31,7 +31,8 @@ patches:
     - openmpi-5.0.10-part-persist-drop-forced-inline.patch
   macos:
     - openmpi-5.0.10-part-persist-drop-forced-inline.patch
-  lbl: []
+  lbl:
+    - openmpi-4.1.6-memheap-zero-init.patch
 
 update:
   strategy: github_tag

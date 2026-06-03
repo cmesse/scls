@@ -16,8 +16,6 @@ update:
 requires:
   all:
     - openmpi
-  macos:
-    - zlib
 features:
   fortran: true
   mpi: true
@@ -34,6 +32,11 @@ configure:
 
   args:
     - --enable-parallel
+  flavor_env:
+    macos:
+      CFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"
+      CXXFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"
+      LDFLAGS: "+=-isysroot %{sdk}"
 
   optimization:
     O_level: 2

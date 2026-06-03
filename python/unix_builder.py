@@ -278,7 +278,7 @@ class UnixBuilder:
             args.extend(get_interface_args(self.recipe, self.flavor))
 
             env = self._prepare_build_env(env, pkg_config_path)
-            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir, self.sdk)
             env = self.apply_platform_env(env)
 
             # apply special clang hack (macOS only - removes -qversion flag for clang compatibility)
@@ -342,7 +342,7 @@ class UnixBuilder:
 
             env = self._prepare_build_env(env, pkg_config_path)
             # apply_configure_environment ONCE, after flags are finalized
-            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir, self.sdk)
             env = self.apply_platform_env(env)
 
             # Run any pre-configure commands
@@ -383,7 +383,7 @@ class UnixBuilder:
                 env['FC'] = compilers.get('fc', 'gfortran')
 
             env = self._prepare_build_env(env, pkg_config_path, skip_compiler_env=skip_compiler_env)
-            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir, self.sdk)
             env = self.apply_platform_env(env)
 
             # Run any pre-configure commands
@@ -427,7 +427,7 @@ class UnixBuilder:
 
         elif configure_type == 'custom_makefile':
             env = self._prepare_build_env(env, pkg_config_path)
-            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir)
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir, self.sdk)
             self.process_custom_makefile(source_dir, env)
 
         else:
@@ -506,8 +506,8 @@ class UnixBuilder:
                 cmd = [s.replace('%{zlib_include}', '/usr/include') for s in cmd]
                 cmd = [s.replace('%{zlib_lib}', f'{self.system_libdir}/libz.so') for s in cmd]
             else:
-                cmd = [s.replace('%{zlib_include}', '/usr/include') for s in cmd]
-                cmd = [s.replace('%{zlib_lib}', '/usr/lib/libz.dylib') for s in cmd]
+                cmd = [s.replace('%{zlib_include}', f'{self.sdk}/usr/include') for s in cmd]
+                cmd = [s.replace('%{zlib_lib}', f'{self.sdk}/usr/lib/libz.tbd') for s in cmd]
         else:
             # Use our built zlib
             cmd = [s.replace('%{zlib_include}', f'{self.prefix}/include') for s in cmd]
@@ -1967,4 +1967,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

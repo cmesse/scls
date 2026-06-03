@@ -31,3 +31,7 @@ math:
   linalg: openblas
   threading: openmp
   interface: lp64  # 32-bit integers
+
+# Use system zlib on Linux; SCLS does not build or ship its own zlib.
+system_libraries:
+  zlib: true

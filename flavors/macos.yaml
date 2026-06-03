@@ -23,7 +23,6 @@ bootstrap_packages:
   - m4
   - openssl
   - texinfo
-  - zlib
   - autoconf
   - automake
   - bison
@@ -49,4 +48,4 @@ math:
 # System libraries configuration
 # When false, we build our own version; when true, use system-provided
 system_libraries:
-  zlib: false  # macOS requires Apple's modified zlib
+  zlib: true  # Use Apple SDK/system zlib; do not build a stack libz.

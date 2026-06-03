@@ -17,7 +17,7 @@ requires:
 rpm_build_requires:
     - ncurses-devel
     - openssl-devel
-    - zlib-devel      # --system-zlib requires libz headers; macOS builds its own zlib
+    - zlib-devel      # --system-zlib requires libz headers on Linux
 
 rpm_requires:
     - sed
@@ -52,6 +52,9 @@ configure:
   flavor_env:
     macos:
       SED: "gsed"
+      CFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"
+      CXXFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"
+      LDFLAGS: "+=-isysroot %{sdk}"
 
 build:
   parallel: true
