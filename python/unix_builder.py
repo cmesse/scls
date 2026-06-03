@@ -15,7 +15,7 @@ import subprocess
 import tarfile
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 from build_common import (
@@ -800,6 +800,11 @@ class UnixBuilder:
 
         # Run any final post-install commands (after files are in final location)
         self.run_final_post_install_commands()
+
+        # Normalize Mach-O install names after the files are in their final
+        # prefix. This catches CMake projects that default to @rpath IDs and
+        # any package-specific final_post commands that installed dylibs.
+        self.fix_macos_dylib_install_names()
 
         # Generate RPM-style file list for use in SPEC files
         self.generate_rpm_file_list()
@@ -1620,6 +1625,124 @@ class UnixBuilder:
                 cmd = cmd.replace('%{prefix}', str(self.prefix))
                 cmd = cmd.replace('%{install_prefix}', str(self.prefix))
                 run_command(['sh', '-c', cmd], self.work_dir, env, "flavor-final-post-install")
+
+    def _local_macos_install_name(self, install_name: str, lib_dir: Path) -> Optional[str]:
+        """Return the absolute prefix path for local Mach-O dylib names."""
+        if install_name.startswith('/'):
+            return None
+        if install_name.startswith('@') and not install_name.startswith('@rpath/'):
+            return None
+
+        if install_name.startswith('@rpath/'):
+            candidate = lib_dir / install_name[len('@rpath/'):]
+        else:
+            candidate = lib_dir / Path(install_name).name
+        if candidate.exists():
+            return str(candidate)
+        return None
+
+    def _otool_dylib_id(self, dylib: Path) -> Optional[str]:
+        try:
+            out = subprocess.check_output(
+                ['otool', '-D', str(dylib)],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            return None
+
+        lines = [line.strip() for line in out.splitlines() if line.strip()]
+        return lines[1] if len(lines) > 1 else None
+
+    def _otool_linked_install_names(self, dylib: Path) -> List[str]:
+        try:
+            out = subprocess.check_output(
+                ['otool', '-L', str(dylib)],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            return []
+
+        install_names = []
+        for line in out.splitlines()[1:]:
+            fields = line.strip().split()
+            if fields:
+                install_names.append(fields[0])
+        return install_names
+
+    def _run_install_name_tool(self, args: List[str], dylib: Path, old: str, new: str) -> None:
+        try:
+            subprocess.run(
+                ['install_name_tool'] + args + [str(dylib)],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+        except FileNotFoundError as e:
+            raise BuildError("install_name_tool not found; cannot fix macOS dylib install names") from e
+        except subprocess.CalledProcessError as e:
+            detail = e.stderr.strip() or e.stdout.strip() or f"exit status {e.returncode}"
+            raise BuildError(
+                f"Failed to rewrite macOS install name in {dylib}: "
+                f"{old} -> {new}: {detail}"
+            ) from e
+
+    def fix_macos_dylib_install_names(self) -> None:
+        """Rewrite local @rpath dylib IDs/dependencies to absolute prefix paths."""
+        if self.platform != 'macos':
+            return
+        if not hasattr(self, 'installed_files') or not self.installed_files:
+            return
+
+        lib_dir = self.prefix / "lib"
+        if not lib_dir.exists():
+            return
+
+        dylibs = []
+        seen_inodes = set()
+        for file_path in self.installed_files:
+            path = Path(file_path)
+            if path.suffix != '.dylib' or path.is_symlink() or not path.is_file():
+                continue
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            inode_key = (stat.st_dev, stat.st_ino)
+            if inode_key in seen_inodes:
+                continue
+            seen_inodes.add(inode_key)
+            dylibs.append(path)
+
+        if not dylibs:
+            return
+
+        changes = 0
+        for dylib in sorted(dylibs):
+            dylib_id = self._otool_dylib_id(dylib)
+            if dylib_id:
+                new_id = self._local_macos_install_name(dylib_id, lib_dir)
+                if new_id and new_id != dylib_id:
+                    self._run_install_name_tool(['-id', new_id], dylib, dylib_id, new_id)
+                    changes += 1
+
+            for linked_name in self._otool_linked_install_names(dylib):
+                # The dylib's own ID must be changed with -id, not -change.
+                if linked_name == dylib_id:
+                    continue
+                new_name = self._local_macos_install_name(linked_name, lib_dir)
+                if new_name and new_name != linked_name:
+                    self._run_install_name_tool(
+                        ['-change', linked_name, new_name],
+                        dylib,
+                        linked_name,
+                        new_name,
+                    )
+                    changes += 1
+
+        if changes:
+            print(f"Fixed {changes} macOS dylib install names")
 
     def fix_library_symlinks(self) -> None:
         """Fix library symlinks that may have been created as hard copies"""
