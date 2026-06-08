@@ -3,6 +3,9 @@ version: 7.12.2
 summary: A collection of sparse matrix libraries
 homepage: https://faculty.cse.tamu.edu/davis/suitesparse.html
 license: LGPL-2.1-or-later AND BSD-3-Clause AND GPL-2.0-or-later AND Apache-2.0
+# SuiteSparse is intentionally kept buildable from source recipes, but omitted
+# from default flavor builds and binary repositories for licensing reasons.
+include_flavors: []
 # Module licenses in play (SuiteSparse 7.12):
 #   BSD-3-Clause: AMD, BTF, CAMD, CCOLAMD, COLAMD, SuiteSparse_config, LAGraph
 #   LGPL-2.1+:    CHOLMOD (core), CXSparse, KLU, LDL

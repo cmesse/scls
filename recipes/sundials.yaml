@@ -18,7 +18,6 @@ patches:
 requires:
   all:
     - cmake
-    - suitesparse
     - openmpi
     - petsc
 
@@ -45,10 +44,7 @@ configure:
     # PETSc integration (NVECTOR_PETSC, SUNNONLINSOL_PETSCSNES)
     - "-DENABLE_PETSC=ON"
     - "-DPETSC_DIR=%{prefix}"
-    # SuiteSparse KLU solver
-    - "-DENABLE_KLU=ON"
-    - "-DKLU_INCLUDE_DIR=%{prefix}/include/suitesparse"
-    - "-DKLU_LIBRARY=%{prefix}/lib/libklu%{libext}"
+    - "-DENABLE_KLU=OFF"
     - "-DMPIEXEC_EXECUTABLE=%{prefix}/bin/mpiexec"
     - "-DEXAMPLES_ENABLE_C=ON"
     - "-DEXAMPLES_ENABLE_CXX=ON"
@@ -107,8 +103,8 @@ subpackages:
     summary: Example programs for SUNDIALS
     description: |
       Example source files for the SUNDIALS solvers (ARKODE, CVODE, CVODES,
-      IDA, IDAS, KINSOL), including serial, parallel (MPI), OpenMP, PETSc,
-      and KLU variants.
+      IDA, IDAS, KINSOL), including serial, parallel (MPI), OpenMP, and
+      PETSc variants.
     requires:
       - sundials
     files:

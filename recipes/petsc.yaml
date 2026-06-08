@@ -1,5 +1,5 @@
 name: petsc
-version: 3.25.0
+version: 3.25.2
 
 summary: Portable Extensible Toolkit for Scientific Computation
 homepage: https://petsc.org/
@@ -35,7 +35,6 @@ requires:
     - parmetis
     - scotch
     # Direct solvers
-    - suitesparse
     - superlu
     - superlu_dist
     - mumps
@@ -144,7 +143,7 @@ configure:
     - "--with-parmetis-lib=%{prefix}/lib/libparmetis%{libext}"
     - "--with-ptscotch-dir=%{prefix}"
     # Direct solvers
-    - "--with-suitesparse-dir=%{prefix}"
+    - "--with-suitesparse=0"
     - "--with-superlu-dir=%{prefix}"
     - "--with-superlu_dist-dir=%{prefix}"
     - "--with-mumps-dir=%{prefix}"

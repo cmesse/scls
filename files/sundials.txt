@@ -118,7 +118,6 @@
 %{prefix}/include/sundomeigest/sundomeigest_power.h
 %{prefix}/include/sunlinsol/sunlinsol_band.h
 %{prefix}/include/sunlinsol/sunlinsol_dense.h
-%{prefix}/include/sunlinsol/sunlinsol_klu.h
 %{prefix}/include/sunlinsol/sunlinsol_pcg.h
 %{prefix}/include/sunlinsol/sunlinsol_spbcgs.h
 %{prefix}/include/sunlinsol/sunlinsol_spfgmr.h
@@ -169,8 +168,6 @@
 %{prefix}/lib/libsundials_sunlinsolband.so.*
 %{prefix}/lib/libsundials_sunlinsoldense.so
 %{prefix}/lib/libsundials_sunlinsoldense.so.*
-%{prefix}/lib/libsundials_sunlinsolklu.so
-%{prefix}/lib/libsundials_sunlinsolklu.so.*
 %{prefix}/lib/libsundials_sunlinsolpcg.so
 %{prefix}/lib/libsundials_sunlinsolpcg.so.*
 %{prefix}/lib/libsundials_sunlinsolspbcgs.so
