@@ -78,9 +78,9 @@ AutoReqProv:    no
 %setup -q -n {{ source_directory }}
 {% for patch in patches %}
 {% if patch.strip == 1 %}
-%patch{{ patch.number }} -p1
+%patch {{ patch.number }} -p1
 {% else %}
-%patch{{ patch.number }} -p{{ patch.strip }}
+%patch {{ patch.number }} -p{{ patch.strip }}
 {% endif %}
 {% endfor %}
 
