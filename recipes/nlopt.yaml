@@ -1,5 +1,5 @@
 name: nlopt
-version: 2.10.1
+version: 2.11.0
 summary: Nonlinear optimization library
 homepage: https://nlopt.readthedocs.io/
 license: MIT

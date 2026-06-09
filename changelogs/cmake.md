@@ -1,5 +1,8 @@
 # Cmake Changelog
 
+## Version 4.3.3-1 - Tue Jun 09 2026
+- Updated to version 4.3.3
+
 ## Version 4.3.2-1 - Sat Apr 25 2026
 - Updated to version 4.3.2
 

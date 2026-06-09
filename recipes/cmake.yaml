@@ -1,5 +1,5 @@
 name: cmake
-version: 4.3.2
+version: 4.3.3
 summary: Cross-platform make system
 homepage: https://cmake.org/
 license: BSD-3-Clause
