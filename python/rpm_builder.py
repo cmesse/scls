@@ -1431,7 +1431,10 @@ fi
 
     def get_cmake_args_with_paths(self) -> List[str]:
         """Get CMake arguments with proper path substitutions"""
-        args = get_cmake_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
+        build_libdir = f"%{{_builddir}}/{self._resolve_source_directory()}/build/lib"
+        args = get_cmake_args(
+            self.recipe, self.host, self.flavor, self.prefix, self.install_prefix,
+            build_libdir=build_libdir)
 
         # Add interface-specific arguments (LP64/ILP64)
         args.extend(get_interface_args(self.recipe, self.flavor))

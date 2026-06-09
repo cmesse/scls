@@ -6,6 +6,7 @@ license: BSD-3-Clause
 
 source:
   url: https://vtk.org/files/release/9.6/VTK-%{version}.tar.gz
+  directory: VTK-%{version}
 
 update:
   strategy: gitlab

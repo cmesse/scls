@@ -13,7 +13,7 @@ import urllib.request
 import tarfile
 import shutil
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 
 class BuildError(Exception):
@@ -711,7 +711,8 @@ def get_configure_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, inst
     return args
 
 
-def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_prefix: Path) -> List[str]:
+def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path,
+                   install_prefix: Path, build_libdir: Optional[Union[Path, str]] = None) -> List[str]:
     """Get CMake arguments"""
     # Determine compilers based on MPI feature
     features = recipe.get('features', {})
@@ -752,7 +753,14 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_
     platform_name = flavor.get('platform', 'linux')
     is_linux = platform_name == 'linux'
     is_macos = platform_name == 'macos'
-    rpath_link_flag = f" -Wl,-rpath-link,{prefix}/lib" if is_linux else ""
+    rpath_link_dirs = []
+    if is_linux:
+        if build_libdir is not None:
+            # Put the active build tree first so GNU ld resolves indirect
+            # shared-library deps from this build before any installed flavor.
+            rpath_link_dirs.append(str(build_libdir))
+        rpath_link_dirs.append(f"{prefix}/lib")
+    rpath_link_flag = ''.join(f" -Wl,-rpath-link,{path}" for path in rpath_link_dirs)
     macos_linker_flags = " -Wl,-headerpad_max_install_names" if is_macos else ""
     if flavor.get('math', {}).get('linalg') == 'mkl':
         import os as _os

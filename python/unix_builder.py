@@ -335,7 +335,9 @@ class UnixBuilder:
             build_dir.mkdir(exist_ok=True)
 
             # Get CMake arguments
-            args = get_cmake_args(self.recipe, self.host, self.flavor, self.prefix, self.install_prefix)
+            args = get_cmake_args(
+                self.recipe, self.host, self.flavor, self.prefix, self.install_prefix,
+                build_libdir=build_dir / 'lib')
 
             # Add interface-specific arguments (LP64/ILP64)
             args.extend(get_interface_args(self.recipe, self.flavor))
