@@ -185,7 +185,11 @@ cmake .. \
 
 {% endfor %}
 
-{{ make_command }}
+{% if parallel_build %}
+make %{?_smp_mflags}{% for arg in build_args %} {{ arg }}{% endfor %}
+{% else %}
+make{% for arg in build_args %} {{ arg }}{% endfor %}
+{% endif %}
 
 {% elif configure_type == 'none' %}
 # No configure step - direct build
