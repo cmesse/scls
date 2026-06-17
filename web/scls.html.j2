@@ -320,17 +320,12 @@ cmake --build build</code></pre>
             </td>
             {% endfor %}
             <td class="left">
-                {%- if package.name == 'suitesparse' -%}
-                Various<sup>1</sup>
-                {%- else -%}
                 {{ license_display.get(package.name, package.license) }}
-                {%- endif -%}
             </td>
         </tr>
         {% endfor %}
         </tbody>
     </table>
-    <p><small><sup>1</sup> SuiteSparse modules ship under LGPL-2.1+, BSD-3-Clause, GPL-2.0+, or Apache-2.0; SCLS builds only a curated subset and excludes Mongoose because it is GPL-3.0+.</small></p>
     <br>
 
     <h2>Source-Only Packages (GPL-3 / LGPL-3)</h2>
