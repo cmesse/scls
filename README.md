@@ -1,8 +1,16 @@
+## Copyright Notice
+
+Copyright (c) 2026 The Regents of the University of California,
+through Lawrence Berkeley National Laboratory.
+
+See LICENSE.txt and COPYRIGHT for licensing and government-rights information.
+
 # SCLS
 
 SCLS, the Scientific Core Library Stack, is an opinionated build and packaging system for scientific computing libraries.
 
 The project exists to solve a specific problem: getting a consistent, usable stack of numerical libraries built and installed across real machines, not idealized ones. That includes modern Enterprise Linux systems with RPM packaging, Debian/Ubuntu systems with DEB packaging, older or awkward Linux environments where native packaging is not an option, and macOS on Intel — with Apple Silicon untested so far, but expected to work after minimal fixes.
+
 
 ## What SCLS Is For
 
