@@ -23,6 +23,10 @@ its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
 Software to reproduce, distribute copies to the public, prepare derivative 
 works, and perform publicly and display publicly, and to permit others to do so.
 
+## License
+
+SCLS is licensed under the Lawrence Berkeley National Laboratory BSD variant, SPDX identifier `BSD-3-Clause-LBNL`. See [`LICENSE`](LICENSE).
+
 ## What SCLS Is For
 
 SCLS builds libraries that are meant to work together as a coherent stack: BLAS/LAPACK, MPI-enabled math libraries, sparse solvers, graph partitioners, I/O libraries, and their dependencies.
@@ -277,9 +281,6 @@ python python/build_order.py recipes --flavor <flavor>
 - [`CLAUDE.md`](CLAUDE.md) contains repository guidance for Claude Code.
 - [`CODEX.md`](CODEX.md) points Codex-style agents at the same repository guidance.
 
-## License
-
-SCLS is licensed under the Lawrence Berkeley National Laboratory BSD variant, SPDX identifier `BSD-3-Clause-LBNL`. See [`LICENSE`](LICENSE).
 
 ## Status
 
