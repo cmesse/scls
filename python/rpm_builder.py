@@ -47,6 +47,8 @@ from math_common import (
     get_math_compile_flags,
     get_mkl_serial_link_line,
     get_mkl_mpi_link_line,
+    compiler_family,
+    openmp_flag,
     get_cuda_path,
     nv_hpc_compiler_path,
     get_nv_gpu_targets )
@@ -345,6 +347,14 @@ class RPMBuilder:
 
         # check for MPI
         self.mpi = False
+        # Native (non-wrapper) compilers, i.e. what the flavor actually
+        # compiles with. Kept separately because the MPI override below
+        # replaces flavor['compilers'] with mpicc/mpicxx/mpifort, and
+        # math_common branches on the *compiler family name* ('gcc',
+        # 'icx', 'clang'). Handing it 'mpicc' silently matches nothing,
+        # which drops -fopenmp from the compile flags and the MKL
+        # threading layer (-lmkl_gnu_thread -lgomp) from the link line.
+        self.native_compilers = dict(self.flavor.get('compilers', {}))
         features = self.recipe.get('features', {})
         if 'mpi' in features:
             if features['mpi'] == True:
@@ -399,6 +409,20 @@ class RPMBuilder:
     def get_release_string(self) -> str:
         """Get release string from recipe or default"""
         return str(self.recipe.get('release', '1'))
+
+    def math_flavor(self) -> Dict:
+        """Flavor view carrying the native compilers, for math_common.
+
+        math_common picks the MKL interface/threading layer and the OpenMP
+        flag by matching the compiler *family name* ('gcc', 'icx', ...).
+        For MPI recipes self.flavor['compilers'] holds mpicc/mpicxx/mpifort
+        instead, which matches nothing: -fopenmp is dropped from the compile
+        flags, and on the intel flavor the link line silently falls back
+        from mkl_intel_lp64/mkl_intel_thread/iomp5 to the gfortran ABI.
+        """
+        flavor = dict(self.flavor)
+        flavor['compilers'] = self.native_compilers
+        return flavor
 
     def get_parallel_make_flags(self) -> str:
         """Get appropriate make flags for parallel builds"""
@@ -534,11 +558,20 @@ class RPMBuilder:
         cmd = [s.replace('%{cuda}', str(self.cuda_path)) for s in cmd]
         cuda_archs = self.flavor.get('nvidia', {}).get('architectures', '')
         cmd = [s.replace('%{cuda_architectures}', cuda_archs) for s in cmd]
-        # MKL paths and linker flags (canonical definitions in math_common)
+        # MKL paths and linker flags (canonical definitions in math_common).
+        # Skipped only for LLVM toolchains, for which math_common has no MKL
+        # policy and deliberately raises. The condition is the toolchain, NOT
+        # flavor.math.linalg: recipes/blaze.yaml expands %{mkl_linker_flags}
+        # behind a runtime MKLROOT test, so non-MKL gnu flavors reference it
+        # too and must keep getting a real line.
         cmd = [s.replace('%{mklroot}', str(self.mkl_root)) for s in cmd]
-        mkl_linker = get_mkl_serial_link_line(self.flavor)
-        mkl_mpi_linker = get_mkl_mpi_link_line(self.flavor)
-        mkl_mpi_linker = mkl_mpi_linker.replace('%{prefix}', str(self.prefix))
+        if compiler_family(self.math_flavor()) != 'llvm':
+            mkl_linker = get_mkl_serial_link_line(self.math_flavor())
+            mkl_mpi_linker = get_mkl_mpi_link_line(self.math_flavor())
+            mkl_mpi_linker = mkl_mpi_linker.replace('%{prefix}', str(self.prefix))
+        else:
+            mkl_linker = ''
+            mkl_mpi_linker = ''
         cmd = [s.replace('%{mkl_linker_flags}', mkl_linker) for s in cmd]
         cmd = [s.replace('%{mkl_mpi_linker_flags}', mkl_mpi_linker) for s in cmd]
         # Platform
@@ -895,18 +928,17 @@ class RPMBuilder:
                 'mpifort': 'mpifort',
             })
 
-        # Compiler family — detect from the flavor name / compiler binary.
-        # Note: 'icc' is a substring of 'mpicc', so check flavor name instead.
-        if 'intel' in self.flavor_name:
-            context['compiler_family'] = 'intel'
-        else:
-            context['compiler_family'] = 'gnu'
+        # Compiler family — math_common is the single source of truth.
+        # Previously guessed from the flavor name because 'icc' is a substring
+        # of 'mpicc'; the resolver takes native compilers, so neither the
+        # wrapper nor the flavor name is involved.
+        context['compiler_family'] = compiler_family(self.math_flavor())
 
         # Math libraries
         if math_linalg == 'mkl':
             context['math_provider'] = 'mkl'
-            context['mkl_linker_flags'] = get_mkl_serial_link_line(self.flavor)
-            mkl_mpi = get_mkl_mpi_link_line(self.flavor)
+            context['mkl_linker_flags'] = get_mkl_serial_link_line(self.math_flavor())
+            mkl_mpi = get_mkl_mpi_link_line(self.math_flavor())
             context['mkl_mpi_linker_flags'] = mkl_mpi.replace('%{prefix}', str(self.prefix))
         else:
             context['math_provider'] = 'lapack'
@@ -928,13 +960,14 @@ class RPMBuilder:
                 context['scalapack_libs'] = ''
                 context['math_libs'] = f"{context['lapack_libs']} {context['blas_libs']}".strip()
 
-        # OpenMP
+        # OpenMP — flag follows the compiler family. (There used to be an
+        # 'openmp_libs' context entry here hardcoded to -lgomp; no template or
+        # recipe ever consumed it, and it duplicated a decision that belongs to
+        # math_common, so it was removed rather than fixed.)
         if self.recipe.get('features', {}).get('openmp', False):
-            context['openmp_flag'] = '-fopenmp'
-            context['openmp_libs'] = '-lgomp'
+            context['openmp_flag'] = openmp_flag(self.math_flavor())
         else:
             context['openmp_flag'] = ''
-            context['openmp_libs'] = ''
 
         return template.render(**context)
 
@@ -1195,8 +1228,8 @@ fi
         # Get math flags if math features are enabled
         features = self.recipe.get('features', {})
         if features.get('math') :
-            self.math_flags = get_math_compile_flags(self.flavor, self.recipe)
-            self.math_ldflags = get_math_link_line(self.flavor, self.recipe)
+            self.math_flags = get_math_compile_flags(self.math_flavor(), self.recipe)
+            self.math_ldflags = get_math_link_line(self.math_flavor(), self.recipe)
 
             # Replace %{mklroot} with actual path
             if self.mkl_root:
@@ -1432,19 +1465,28 @@ fi
     def get_cmake_args_with_paths(self) -> List[str]:
         """Get CMake arguments with proper path substitutions"""
         build_libdir = f"%{{_builddir}}/{self._resolve_source_directory()}/build/lib"
+        # math_flavor(), not self.flavor: get_cmake_args builds
+        # CMAKE_<LANG>_STANDARD_LIBRARIES from the MKL link line, which is an
+        # ABI decision and must not be made from the MPI wrapper names.
         args = get_cmake_args(
-            self.recipe, self.host, self.flavor, self.prefix, self.install_prefix,
-            build_libdir=build_libdir)
+            self.recipe, self.host, self.math_flavor(), self.prefix,
+            self.install_prefix, build_libdir=build_libdir)
 
         # Add interface-specific arguments (LP64/ILP64)
         args.extend(get_interface_args(self.recipe, self.flavor))
 
         # MKL link-line placeholders. Non-MKL flavors never reference these
         # macros (gcc/debug recipes prescribe -lopenblas / -llapack directly),
-        # so computing them unconditionally is safe.
-        mkl_linker = get_mkl_serial_link_line(self.flavor)
-        mkl_mpi_linker = get_mkl_mpi_link_line(self.flavor).replace(
-            '%{prefix}', str(self.prefix))
+        # but recipes/blaze.yaml does expand %{mkl_linker_flags} behind a
+        # runtime MKLROOT test, so the skip keys on the toolchain (LLVM has no
+        # MKL policy and raises), never on flavor.math.linalg.
+        if compiler_family(self.math_flavor()) != 'llvm':
+            mkl_linker = get_mkl_serial_link_line(self.math_flavor())
+            mkl_mpi_linker = get_mkl_mpi_link_line(self.math_flavor()).replace(
+                '%{prefix}', str(self.prefix))
+        else:
+            mkl_linker = ''
+            mkl_mpi_linker = ''
 
         # Process arguments for MKL and CUDA paths
         processed_args = []

@@ -45,6 +45,7 @@ from patch_common import (
 )
 
 from math_common import ( get_math_link_line, get_math_compile_flags,
+                          compiler_family, openmp_flag,
                           get_mkl_serial_link_line, get_mkl_mpi_link_line,
                           get_cuda_path )
 
@@ -1538,13 +1539,12 @@ class UnixBuilder:
             else:
                 context['math_libs'] = '-llapack -lblas'
 
-        # OpenMP configuration - simple since we use symlinks
+        # OpenMP — flag follows the compiler family (see rpm_builder for why
+        # the unconsumed 'openmp_libs' entry was removed rather than fixed).
         if self.openmp:
-            context['openmp_flag'] = '-fopenmp'
-            context['openmp_libs'] = '-lgomp'
+            context['openmp_flag'] = openmp_flag(self.flavor)
         else:
             context['openmp_flag'] = ''
-            context['openmp_libs'] = ''
 
         # Library type
         context['shared_libs'] = True
@@ -1556,14 +1556,10 @@ class UnixBuilder:
         # Platform
         context['platform'] = self.platform
 
-        # Compiler family (gnu, intel, etc.)
-        cc = compilers.get('cc', 'gcc')
-        if 'gcc' in cc or 'g++' in cc:
-            context['compiler_family'] = 'gnu'
-        elif 'icx' in cc or 'icc' in cc:
-            context['compiler_family'] = 'intel'
-        else:
-            context['compiler_family'] = 'gnu'  # default
+        # Compiler family — math_common is the single source of truth.
+        # The previous substring test matched 'icc' inside 'mpicc', so an MPI
+        # recipe on a GCC flavor could be classified intel.
+        context['compiler_family'] = compiler_family(self.flavor)
 
         # Version components
         version = str(self.recipe.get('version', '0.0.0'))

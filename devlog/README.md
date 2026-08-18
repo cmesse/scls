@@ -12,3 +12,4 @@ file, it is lost.
 ## Entries
 
 - [dl20260817_ai_collaboration_setup.md](dl20260817_ai_collaboration_setup.md) — ported the BELFEM AI collaboration tooling and protocol to SCLS
+- [dl20260817_strumpack_openmp_tasking.md](dl20260817_strumpack_openmp_tasking.md) — mkl-flavor STRUMPACK lost its OpenMP tasking: `-lgomp` in `CMAKE_<LANG>_STANDARD_LIBRARIES` poisons cmake `try_compile` probes

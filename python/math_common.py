@@ -1,6 +1,184 @@
 #!/usr/bin/env python3
-from typing import Dict
+import os
+import re
+from typing import Dict, Optional
 from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Compiler family — the single source of truth
+#
+# The stack's rule is: the OpenMP runtime follows the COMPILER, never the math
+# library. GCC emits calls into libgomp, Intel's compilers into libiomp5, and
+# MKL's threading layer must match whichever one the compiler emitted code for.
+# Loading two OpenMP runtimes into one process is the failure mode this exists
+# to prevent, so exactly one function decides the family and everything else
+# derives from it.
+#
+# Before this was centralised the decision was duplicated in nine places that
+# disagreed: exact-match on 'gcc', family-match on three GNU names,
+# default-to-GNU, substring match on the compiler name ('icc' is a substring of
+# 'mpicc'), and a flavor-name test. That inconsistency is what let the RPM
+# builder's mpicc/mpicxx override silently drop -fopenmp and the MKL threading
+# layer. Add new consumers here; do not re-derive a family locally.
+# ---------------------------------------------------------------------------
+
+_FAMILY_BY_NAME = {
+    'gcc': 'gnu', 'g++': 'gnu', 'gfortran': 'gnu',
+    'icx': 'intel', 'icpx': 'intel', 'icc': 'intel', 'icpc': 'intel',
+    'ifx': 'intel', 'ifort': 'intel',
+    'clang': 'llvm', 'clang++': 'llvm', 'flang': 'llvm',
+}
+
+# Compiler wrappers must never reach the resolver: they hide the underlying
+# compiler, which is precisely how a wrong ABI used to be chosen silently.
+_MPI_WRAPPERS = {
+    'mpicc', 'mpicxx', 'mpic++', 'mpiCC', 'mpifort', 'mpif77', 'mpif90',
+    'mpiicc', 'mpiicpc', 'mpiifort', 'mpiicx', 'mpiicpx', 'mpiifx',
+}
+
+# Trailing version suffix on a compiler binary: gcc-15, gfortran-14.2, clang-18
+_VERSION_SUFFIX = re.compile(r'-\d+(?:\.\d+)*$')
+
+
+def _normalize_compiler(name: str) -> str:
+    """Reduce a compiler setting to a bare binary name.
+
+    Handles absolute paths (the flavors' bootstrap_compilers use /usr/bin/gcc,
+    and the gcc-toolset rewrite in rpm_builder produces
+    /opt/rh/gcc-toolset-N/root/usr/bin/gcc) and versioned binaries (gcc-15,
+    as used by the Homebrew toolchain on macOS).
+    """
+    base = os.path.basename(str(name).strip())
+    return _VERSION_SUFFIX.sub('', base)
+
+
+def _family_of(name: str, role: str) -> str:
+    """Map one compiler setting to 'gnu' | 'intel' | 'llvm', or raise."""
+    binary = _normalize_compiler(name)
+    if binary in _MPI_WRAPPERS:
+        raise ValueError(
+            f"compiler_family: {role}={name!r} is an MPI wrapper. The wrapper "
+            f"hides the underlying compiler, so the OpenMP runtime and MKL ABI "
+            f"cannot be derived from it. Resolve the flavor's native compilers "
+            f"first (rpm_builder.RPMBuilder.math_flavor() does this)."
+        )
+    if binary not in _FAMILY_BY_NAME:
+        raise ValueError(
+            f"compiler_family: {role}={name!r} is not a known compiler. Add it "
+            f"to math_common._FAMILY_BY_NAME with its OpenMP runtime family "
+            f"('gnu' -> libgomp, 'intel' -> libiomp5, 'llvm' -> libomp) rather "
+            f"than letting it fall through to a default, which would pick an "
+            f"OpenMP runtime and MKL threading layer at random."
+        )
+    return _FAMILY_BY_NAME[binary]
+
+
+def compiler_family(flavor: Dict) -> str:
+    """Return 'gnu', 'intel' or 'llvm' for the flavor's native compilers.
+
+    Every OpenMP flag, OpenMP runtime library, MKL threading layer and MKL
+    interface library in the stack derives from this one answer.
+
+    Raises ValueError if the flavor's C, C++ and Fortran compilers do not
+    belong to the same family, if any of them is an MPI wrapper, or if one is
+    unrecognised. Raising is deliberate: every one of those cases previously
+    produced a silently wrong link line, and spec generation is cheap enough
+    that a misconfigured flavor should fail there rather than at runtime on a
+    user's machine.
+    """
+    compilers = flavor.get('compilers', {}) or {}
+    seen = {}
+    for role in ('cc', 'cxx', 'fc'):
+        if compilers.get(role):
+            seen[role] = _family_of(compilers[role], role)
+    if not seen:
+        raise ValueError(
+            "compiler_family: flavor defines no cc/cxx/fc compilers; cannot "
+            "determine the OpenMP runtime or MKL ABI."
+        )
+    families = set(seen.values())
+    if len(families) > 1:
+        detail = ', '.join(f'{r}={compilers[r]} -> {f}' for r, f in seen.items())
+        raise ValueError(
+            f"compiler_family: flavor mixes compiler families ({detail}). One "
+            f"process cannot host two OpenMP runtimes, and MKL's interface "
+            f"library encodes a single Fortran ABI."
+        )
+    return families.pop()
+
+
+def openmp_flag(flavor: Dict) -> str:
+    """Compile flag that enables OpenMP for this flavor's compilers."""
+    return '-qopenmp' if compiler_family(flavor) == 'intel' else '-fopenmp'
+
+
+def openmp_runtime_lib(flavor: Dict) -> str:
+    """Link flag for the OpenMP runtime this flavor's compilers emit against."""
+    family = compiler_family(flavor)
+    if family == 'intel':
+        return '-liomp5'
+    if family == 'llvm':
+        # macOS builds link GCC's runtime (see doc/MACOS_BUILD.md); Linux
+        # clang uses LLVM's own. Currently unreachable — every SCLS flavor is
+        # gnu or intel — but preserved rather than silently changed.
+        return '-lgomp' if flavor.get('platform') == 'macos' else '-lomp'
+    return '-lgomp'
+
+
+def mkl_threading_lib(flavor: Dict) -> str:
+    """MKL threading layer matching this flavor's OpenMP runtime."""
+    family = compiler_family(flavor)
+    if family == 'intel':
+        return 'mkl_intel_thread'
+    if family == 'llvm':
+        raise ValueError(
+            "mkl_threading_lib: MKL with an LLVM toolchain is not defined for "
+            "this stack. MKL ships GNU and Intel threading layers only; "
+            "pairing either with libomp mixes OpenMP runtimes. Choose a gnu or "
+            "intel flavor, or add an explicit policy here."
+        )
+    return 'mkl_gnu_thread'
+
+
+def mkl_threading_mode(flavor: Dict, recipe: Optional[Dict] = None) -> str:
+    """'threaded' or 'sequential' — whether MKL uses a threading layer.
+
+    This is what the flavor's `math.threading:` field means. It does NOT choose
+    *which* OpenMP runtime is used; that follows the compiler. The field is
+    also cross-checked against the compiler family, so a flavor that claims
+    `threading: intel` while compiling with GCC fails here instead of shipping
+    a mixed runtime.
+    """
+    declared = str((flavor.get('math', {}) or {}).get('threading', 'openmp'))
+    if declared not in ('openmp', 'intel', 'sequential'):
+        raise ValueError(
+            f"mkl_threading_mode: unknown math.threading: {declared!r}. Valid "
+            f"values are 'openmp' (GNU/LLVM toolchains), 'intel' (Intel "
+            f"toolchain) and 'sequential' (no MKL threading layer)."
+        )
+    family = compiler_family(flavor)
+    if declared == 'sequential':
+        if recipe and (recipe.get('features', {}) or {}).get('openmp'):
+            raise ValueError(
+                "mkl_threading_mode: flavor declares math.threading: sequential "
+                "but the recipe sets features.openmp: true. Sequential MKL and "
+                "an OpenMP-threaded consumer is a contradiction — pick one."
+            )
+        return 'sequential'
+    if declared == 'intel' and family != 'intel':
+        raise ValueError(
+            f"mkl_threading_mode: flavor declares math.threading: intel but "
+            f"compiles with the {family} toolchain. The MKL threading layer "
+            f"must match the compiler's OpenMP runtime."
+        )
+    if declared == 'openmp' and family == 'intel':
+        raise ValueError(
+            "mkl_threading_mode: flavor declares math.threading: openmp but "
+            "compiles with the intel toolchain; say `intel` so the intent and "
+            "the compiler agree."
+        )
+    return 'threaded'
 
 
 def get_mkl_interface_lib(flavor: Dict) -> str:
@@ -11,14 +189,20 @@ def get_mkl_interface_lib(flavor: Dict) -> str:
       - 'mkl_gf_{lp64,ilp64}'    — gfortran (GCC) name mangling
       - 'mkl_intel_{lp64,ilp64}' — Intel ifort/ifx name mangling
     Mixing them within a single flavor is incorrect and produces either
-    link-time unresolved symbols or subtle runtime corruption, so this
-    is the single source of truth used across math_common, rpm_builder,
-    unix_builder, and build_common.
+    link-time unresolved symbols or subtle runtime corruption. Derived from
+    compiler_family, which asserts that cc/cxx/fc agree — so this stays a
+    Fortran-ABI decision even though it is expressed once for the flavor.
     """
-    cc = flavor.get('compilers', {}).get('cc', 'gcc')
     interface = flavor.get('math', {}).get('interface', 'lp64')
-    family = 'intel' if cc in ('icx', 'icpx', 'icc') else 'gf'
-    return f'mkl_{family}_{interface}'
+    family = compiler_family(flavor)
+    if family == 'llvm':
+        raise ValueError(
+            "get_mkl_interface_lib: MKL with an LLVM toolchain is not defined "
+            "for this stack — see mkl_threading_lib for the reasoning. Keeping "
+            "the policy to a single sentence means this raises too rather than "
+            "quietly picking the gfortran ABI."
+        )
+    return f"mkl_{'intel' if family == 'intel' else 'gf'}_{interface}"
 
 
 def get_mkl_serial_link_line(flavor: Dict) -> str:
@@ -27,16 +211,11 @@ def get_mkl_serial_link_line(flavor: Dict) -> str:
     Used by %{mkl_linker_flags} expansion and anywhere else a package
     needs the raw MKL BLAS+LAPACK link line without ScaLAPACK/BLACS.
     """
-    cc = flavor.get('compilers', {}).get('cc', 'gcc')
     iface = get_mkl_interface_lib(flavor)
-    if cc in ('icx', 'icpx', 'icc'):
-        threading = 'mkl_intel_thread'
-        omp_rt = 'iomp5'
-    else:
-        threading = 'mkl_gnu_thread'
-        omp_rt = 'gomp'
-    return (f'-l{iface} -l{threading} -lmkl_core '
-            f'-l{omp_rt} -lpthread -lm -ldl')
+    if mkl_threading_mode(flavor) == 'sequential':
+        return f'-l{iface} -lmkl_sequential -lmkl_core -lpthread -lm -ldl'
+    return (f'-l{iface} -l{mkl_threading_lib(flavor)} -lmkl_core '
+            f'{openmp_runtime_lib(flavor)} -lpthread -lm -ldl')
 
 
 def get_mkl_mpi_link_line(flavor: Dict) -> str:
@@ -56,12 +235,8 @@ def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
     """Generate math library link line based on flavor and recipe settings"""
     # Get flavor settings
     math_config = flavor.get('math', {})
-    omp_threading = math_config.get('threading', 'openmp')  # Fixed: was flavor.get('math', 'threading')
     linalg = math_config.get('linalg', 'reference')
     interface = math_config.get('interface', 'lp64')
-
-    # Get compiler to determine OpenMP library
-    compiler = flavor.get('compilers', {}).get('cc', 'gcc')
 
     # Get recipe features
     features = recipe.get('features', {})
@@ -94,27 +269,22 @@ def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
         if needs_scalapack:
             args.append('-Wl,-rpath,%{prefix}/lib -L%{prefix}/lib -lscalapack')
 
-        # Interface library (compiler-specific: mkl_gf for GCC, mkl_intel for ICX)
+        # Interface library (Fortran ABI — see math_common.compiler_family)
         args.append(f'-l{get_mkl_interface_lib(flavor)}')
 
-        # Threading layer
-        if use_omp:
-            if compiler == 'gcc' or (compiler == 'clang' and omp_threading == 'openmp'):
-                args.append('-lmkl_gnu_thread')
-            elif compiler in ['icx', 'icpx', 'icc']:
-                args.append('-lmkl_intel_thread')
+        # Threading layer and OpenMP runtime both follow the compiler family.
+        threaded = use_omp and mkl_threading_mode(flavor, recipe) == 'threaded'
+
+        if threaded:
+            args.append(f'-l{mkl_threading_lib(flavor)}')
         else:
             args.append('-lmkl_sequential')
 
         # Core library
         args.append('-lmkl_core')
 
-        # OpenMP runtime
-        if use_omp:
-            if compiler == 'gcc' or (compiler == 'clang' and omp_threading == 'openmp'):
-                args.append('-lgomp')
-            elif compiler in ['icx', 'icpx', 'icc']:
-                args.append('-liomp5')
+        if threaded:
+            args.append(openmp_runtime_lib(flavor))
 
         # System libraries
         args.append('-lpthread -lm -ldl')
@@ -130,10 +300,11 @@ def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
         # Apple Accelerate framework
         args.append('-framework Accelerate')
 
-        # OpenMP runtime (if needed)
+        # OpenMP runtime — follows the compiler family. On macOS this
+        # resolves to libgomp for both gnu and llvm toolchains (the llvm case
+        # links GCC's runtime; see openmp_runtime_lib).
         if use_omp:
-            # On macOS with clang, we use libgomp from GCC
-            args.append('-lgomp')
+            args.append(openmp_runtime_lib(flavor))
 
         # System libraries
         args.append('-lpthread -lm')
@@ -147,17 +318,9 @@ def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
 
         args.append('-lopenblas')
 
-        # OpenMP runtime
+        # OpenMP runtime — follows the compiler family
         if use_omp:
-            if compiler == 'gcc':
-                args.append('-lgomp')
-            elif compiler in ['icx', 'icpx', 'icc']:
-                args.append('-liomp5')
-            elif compiler == 'clang':
-                if flavor.get('platform') == 'macos':
-                    args.append('-lgomp')
-                else:
-                    args.append('-lomp')
+            args.append(openmp_runtime_lib(flavor))
 
         # System libraries
         args.append('-lpthread -lm -ldl')
@@ -170,18 +333,9 @@ def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
         # LAPACK and BLAS
         args.append('-llapack -lblas')
 
-        # OpenMP runtime
+        # OpenMP runtime — follows the compiler family
         if use_omp:
-            if compiler == 'gcc':
-                args.append('-lgomp')
-            elif compiler in ['icx', 'icpx', 'icc']:
-                args.append('-liomp5')
-            elif compiler == 'clang':
-                # Platform-specific
-                if flavor.get('platform') == 'macos':
-                    args.append('-lgomp')  # Use GCC's OpenMP on macOS
-                else:
-                    args.append('-lomp')  # LLVM's OpenMP on Linux
+            args.append(openmp_runtime_lib(flavor))
 
         # System libraries
         args.append('-lpthread -lm -ldl')
@@ -191,9 +345,6 @@ def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
 
 def get_math_compile_flags(flavor: Dict, recipe: Dict) -> str:
     """Generate math-related compile flags based on flavor and recipe settings"""
-    # Get compiler
-    compiler = flavor.get('compilers', {}).get('cc', 'gcc')
-
     # Get recipe features
     features = recipe.get('features', {})
     use_omp = features.get('openmp', False)
@@ -208,19 +359,12 @@ def get_math_compile_flags(flavor: Dict, recipe: Dict) -> str:
     if linalg == 'mkl':
         args.append('-I%{mklroot}/include')
 
-    # OpenMP flags
+    # OpenMP flag — follows the compiler family
     if use_omp:
-        if compiler in ['icx', 'icpx', 'icc']:
-            args.append('-qopenmp')
-        elif compiler in ['gcc', 'g++', 'gfortran']:
-            args.append('-fopenmp')
-        elif compiler in ['clang', 'clang++']:
-            # Yes, clang uses -fopenmp, but needs appropriate runtime library
-            args.append('-fopenmp')
-            # On macOS, might need to specify OpenMP headers location
-            if flavor.get('platform') == 'macos':
-                # Assuming GCC is installed in standard location
-                args.append('-I%{prefix}/gcc/lib/gcc/x86_64-apple-darwin*/*/include')
+        args.append(openmp_flag(flavor))
+        if compiler_family(flavor) == 'llvm' and flavor.get('platform') == 'macos':
+            # clang needs GCC's omp.h on macOS (see doc/MACOS_BUILD.md)
+            args.append('-I%{prefix}/gcc/lib/gcc/x86_64-apple-darwin*/*/include')
 
     return ' '.join(args)
 

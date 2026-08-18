@@ -1,5 +1,6 @@
 name: strumpack
 version: 8.0.0
+release: 2
 summary: STRUctured Matrix PACKage - sparse and dense rank-structured linear solvers
 homepage: https://portal.nersc.gov/project/sparse/strumpack
 license: BSD-3-Clause
@@ -44,6 +45,25 @@ configure:
     - "-DTPL_ENABLE_SCOTCH=ON"
     - "-DTPL_ENABLE_PTSCOTCH=ON"
     - "-DTPL_ENABLE_ZFP=ON"
+    # STRUMPACK decides whether to compile its OpenMP tasking code paths
+    # (`omp taskloop`, `omp task depend/priority`) from two try_compile
+    # probes in CMakeLists.txt. Both probes returned FALSE in the mkl
+    # flavor's build environment on every distro we ship (el9, el10,
+    # amzn2023), while the gcc and debug flavors — same recipe, same host,
+    # same compiler — detected both. The result was a silently
+    # tasking-free libstrumpack on the mkl flavor: the multifrontal
+    # factorization falls back to coarser scheduling and stops scaling
+    # with thread count. Because try_compile skips a probe whose result
+    # variable is already in the cache, seeding both here pins the
+    # decision instead of leaving it to a probe we have seen misfire.
+    # Every SCLS toolchain is GCC 6+ or oneAPI icx, both of which have
+    # supported taskloop and task depend/priority since OpenMP 4.5, so
+    # this asserts a capability the toolchain genuinely has. Note that a
+    # toolchain lacking it would NOT fail loudly: an unrecognised pragma
+    # is only a warning unless -Werror=unknown-pragmas is set, which no
+    # flavor sets. Re-check StrumpackConfig.h after a toolchain change.
+    - "-DSTRUMPACK_USE_OPENMP_TASKLOOP=TRUE"
+    - "-DSTRUMPACK_USE_OPENMP_TASK_DEPEND=TRUE"
   # LP64/ILP64 integer interface
   lp64_args:
     - "-DSTRUMPACK_USE_BLAS64=OFF"
