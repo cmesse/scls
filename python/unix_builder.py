@@ -231,6 +231,21 @@ class UnixBuilder:
             self.fcflags += f" {self.math_flags}"
             self.ldflags += f" {self.math_ldflags}"
 
+        # The OpenMP flag is owned by features.openmp, not features.math —
+        # see the matching block in rpm_builder for why the distinction
+        # matters to the cmake standard-libraries line, and why this is
+        # scoped to cmake rather than every features.openmp recipe.
+        configure_type_is_cmake = (
+            self.recipe.get('configure', {}).get('type') == 'cmake')
+        if self.openmp and configure_type_is_cmake:
+            omp = openmp_flag(self.flavor)
+            if omp not in self.cflags:
+                self.cflags += f" {omp}"
+            if omp not in self.cxxflags:
+                self.cxxflags += f" {omp}"
+            if omp not in self.fcflags:
+                self.fcflags += f" {omp}"
+
         # Set environment variables
         if not skip_compiler_env:
             env['CFLAGS'] = self.cflags

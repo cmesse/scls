@@ -773,17 +773,35 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path,
         # needing LD_LIBRARY_PATH.
         #
         # Additionally, many test/demo binaries need MKL symbols transitively
-        # (e.g. via libblaspp.so → libmkl_gf_lp64.so, or libvtkCommonCore.so
-        # → libgomp.so). We inject the MKL libs + gomp via
-        # CMAKE_CXX_STANDARD_LIBRARIES / CMAKE_C_STANDARD_LIBRARIES, which
+        # (e.g. via libblaspp.so → libmkl_gf_lp64.so). We inject the MKL libs
+        # via CMAKE_CXX_STANDARD_LIBRARIES / CMAKE_C_STANDARD_LIBRARIES, which
         # cmake appends at the END of every link command (after target libs).
         # Putting them in CMAKE_EXE_LINKER_FLAGS doesn't work because cmake
         # 4.x strips -l flags from there (they're not "flags").
         # Single interface library, selected by Fortran ABI — see
         # math_common.get_mkl_interface_lib for the rule. Mixing
         # mkl_intel_* and mkl_gf_* in one link line is incorrect.
+        #
+        # The OpenMP runtime is deliberately LEFT OUT for packages compiled
+        # with OpenMP. A literal -lgomp here makes every cmake try_compile
+        # that links an OpenMP imported target link with no OpenMP runtime at
+        # all and fail on undefined GOMP_* — silently compiling out whatever
+        # the probe gated, while the outer library link stays fine. That is
+        # how scls-mkl-strumpack shipped without its OpenMP tasking on three
+        # distros; see doc/MKL_ABI_POLICY.md. Do not "restore" it here.
+        #
+        # These packages still get the runtime by two routes. SCLS puts
+        # -fopenmp/-qopenmp in CFLAGS/CXXFLAGS/FCFLAGS for every CMAKE recipe
+        # with features.openmp (rpm_builder/unix_builder inject it; the scope
+        # is cmake because this helper is the only thing it backstops), and
+        # the compiler driver adds the runtime to every link it performs.
+        # Upstream's own find_package(OpenMP) adds it again where used.
+        # Packages WITHOUT features.openmp keep the runtime in this slot,
+        # because neither route applies to them.
         from math_common import get_mkl_serial_link_line
-        std_libs = get_mkl_serial_link_line(flavor)
+        uses_openmp = bool((recipe.get('features', {}) or {}).get('openmp'))
+        std_libs = get_mkl_serial_link_line(
+            flavor, with_openmp_runtime=not uses_openmp)
         extra_link_dirs = (
             f" -L{mkl_root}/lib/intel64"
             f" -Wl,-rpath,{mkl_root}/lib/intel64"

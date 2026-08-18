@@ -1242,6 +1242,32 @@ fi
                 self.cxxflags += f" {self.math_flags}"
                 self.fcflags += f" {self.math_flags}"
 
+        # The OpenMP flag is owned by features.openmp, not by features.math.
+        # It used to arrive only via get_math_compile_flags, which runs only
+        # when features.math is truthy — so gklib, metis, parmetis and vtk
+        # declared openmp: true and were compiled without it. That gap
+        # matters now that build_common.get_cmake_args omits the OpenMP
+        # runtime from CMAKE_<LANG>_STANDARD_LIBRARIES for exactly these
+        # recipes: the compiler driver is what puts the runtime on the link.
+        #
+        # Scoped to cmake because that is the only build system this
+        # backstops. custom_makefile renders openmp_flag into its own
+        # Makefile.inc, custom recipes drive their own configure (petsc pins
+        # its OpenMP runtime explicitly; slepc inherits PETSc's), and openblas
+        # (type none) manages its own flags via USE_OPENMP=1. Widening this
+        # to every features.openmp recipe would change openblas — a
+        # foundational package — for no benefit to C5.
+        configure_type_is_cmake = (
+            self.recipe.get('configure', {}).get('type') == 'cmake')
+        if features.get('openmp') and configure_type_is_cmake:
+            omp = openmp_flag(self.math_flavor())
+            if omp not in self.cflags:
+                self.cflags += f" {omp}"
+            if omp not in self.cxxflags:
+                self.cxxflags += f" {omp}"
+            if omp not in self.fcflags:
+                self.fcflags += f" {omp}"
+
         # For the mkl flavor, every package may need MKL headers (e.g. C++
         # bindings, headers that #include <mkl.h> transitively), regardless
         # of whether the recipe sets `features.math`. Inject the MKL flags

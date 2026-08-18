@@ -235,12 +235,24 @@ change a compiler-capability probe.
 
 **Mitigations, in preference order:**
 
-1. Remove the OpenMP runtime from `CMAKE_<LANG>_STANDARD_LIBRARIES` and let
-   `-fopenmp` / `-qopenmp` in `CFLAGS`/`CXXFLAGS` supply it. Fixes every
-   affected package at once, but changes the link line of the whole mkl and
-   intel stack, so it needs a full rebuild plus a `readelf -d` check that
-   packages with `features.math` and `features.openmp: false` have not lost
-   their OpenMP `NEEDED` entry. **Not applied — open decision.**
+1. **Applied.** `build_common.get_cmake_args` omits the OpenMP runtime from
+   `CMAKE_<LANG>_STANDARD_LIBRARIES` for cmake recipes with
+   `features.openmp`, and `-fopenmp`/`-qopenmp` in `CFLAGS`/`CXXFLAGS`
+   supplies it instead. The omission is *conditional* precisely so that
+   packages with `features.math` and `features.openmp: false` — armadillo,
+   arpack-ng, blaspp, blaze, cereal, exodus, lapackpp, netcdf, scalapack,
+   superlu — keep their existing link line byte-for-byte; they are the set
+   that would otherwise lose an OpenMP `NEEDED` entry, and they are disjoint
+   from the set whose probes were poisoned.
+
+   `%{mkl_linker_flags}` and `get_mkl_mpi_link_line` are deliberately
+   untouched; only the cmake standard-libraries slot drops the runtime.
+
+   **Outstanding gate:** `readelf -d` on a rebuilt `metis` (math-false) and
+   `strumpack` (math-true) for both `mkl` and `intel`, confirming the shared
+   objects still carry `NEEDED libgomp.so.1` / `libiomp5.so`. Only a Linux
+   build host can run this; the change is source-verified and
+   generation-gated, not runtime-verified.
 2. Pin the probe result per recipe, as `recipes/strumpack.yaml` does with
    `-DSTRUMPACK_USE_OPENMP_TASKLOOP=TRUE`. Deterministic and cheap, but
    per-package and only viable where the capability is genuinely present.

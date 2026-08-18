@@ -205,17 +205,29 @@ def get_mkl_interface_lib(flavor: Dict) -> str:
     return f"mkl_{'intel' if family == 'intel' else 'gf'}_{interface}"
 
 
-def get_mkl_serial_link_line(flavor: Dict) -> str:
+def get_mkl_serial_link_line(flavor: Dict,
+                             with_openmp_runtime: bool = True) -> str:
     """Canonical MKL serial (non-ScaLAPACK) link line for the given flavor.
 
     Used by %{mkl_linker_flags} expansion and anywhere else a package
     needs the raw MKL BLAS+LAPACK link line without ScaLAPACK/BLACS.
+
+    with_openmp_runtime=False omits the trailing OpenMP runtime (-lgomp /
+    -liomp5) while keeping MKL's threading layer. Only one caller wants
+    this: build_common.get_cmake_args, when the package is compiled with
+    -fopenmp/-qopenmp and so gets the runtime from the compiler driver.
+    A literal -lgomp in CMAKE_<LANG>_STANDARD_LIBRARIES breaks every
+    cmake try_compile that links an OpenMP imported target — see
+    doc/MKL_ABI_POLICY.md. The default is True so %{mkl_linker_flags}
+    and get_mkl_mpi_link_line are unaffected.
     """
     iface = get_mkl_interface_lib(flavor)
     if mkl_threading_mode(flavor) == 'sequential':
+        # Sequential MKL has no threading layer and no runtime to omit.
         return f'-l{iface} -lmkl_sequential -lmkl_core -lpthread -lm -ldl'
+    omp_rt = f'{openmp_runtime_lib(flavor)} ' if with_openmp_runtime else ''
     return (f'-l{iface} -l{mkl_threading_lib(flavor)} -lmkl_core '
-            f'{openmp_runtime_lib(flavor)} -lpthread -lm -ldl')
+            f'{omp_rt}-lpthread -lm -ldl')
 
 
 def get_mkl_mpi_link_line(flavor: Dict) -> str:
