@@ -191,6 +191,18 @@ Supported strategies (set under `update:` in the recipe):
 
 When bumping a version, also update `changelogs/<package>.md`, and re-check `files/<package>.txt` and any patches for drift (patch hunks, hard-coded version directories like `lib/cmake/<pkg>-<x.y.z>/`, new installed files). Prefer `%{version}` in file manifests when a directory embeds the upstream version.
 
+## AI Collaboration
+
+Multi-AI work in this repository follows [`doc/AI_COLLABORATION_PROTOCOL.md`](doc/AI_COLLABORATION_PROTOCOL.md) — read it before invoking an auditor or writing to the exchange. Short version:
+
+- **Roles:** Claude explores and proposes; Codex and Grok audit read-only. Invoke them with `.claude/scripts/ask_codex.sh` / `.claude/scripts/ask_grok.sh` (prompt as an argument, or `-` for stdin).
+- **Exchange:** AI-to-AI scratch lives in `tmp/ai_exchange/<slug>.md`, one topic per file. It is git-ignored and ephemeral. Pin the topic with `AI_EXCHANGE_SLUG=<topic>`.
+- **Durable record:** `devlog/dlYYYYMMDD_topic.md` (tracked) is where a session's conclusions must land, alongside `changelogs/<package>.md` for version history and `doc/*.md` for standing policy. `todo/` is git-ignored here, so it is local planning only — never the sole home of a finding.
+- **Three-AI round:** `/cross-review` — Claude pre-registers its own findings, `scripts/cross_review.sh` dispatches both auditors blind, then Claude verifies every citation and writes the reconciliation table.
+- **Auto-review:** opt-in post-commit auditor, installed by `scripts/install_autoreview_hook.sh` and gated on `SCLS_AUTOREVIEW=1`. `scripts/review_status.sh` shows the backlog and any open P0 flags.
+- **Evidence discipline:** "reviewed" is not "verified". Name the gate that actually ran. The macOS dev host cannot run `rpmbuild`, so RPM claims top out at `--spec-only` generation and are written as pending a Linux build host.
+- **Edit safety:** investigation is read-only by default; `recipes/`, `flavors/`, `files/`, `patches/`, and `python/` are edited only after explicit approval.
+
 ## Testing
 
 Individual package tests are defined in recipe files under the `test:` section. Run tests during build by including test commands in the recipe.
