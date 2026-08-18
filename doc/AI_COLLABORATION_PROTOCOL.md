@@ -60,7 +60,7 @@ An artifact is ephemeral **iff no human ever needs to return to it**. The bounda
 
 ### What is tracked in git, and what is not
 
-This differs from BELFEM and matters for where a conclusion is safe:
+This matters for where a conclusion is safe. Only the AI-only exchange is ephemeral; everything an AI or a human might come back to is tracked:
 
 | Path | Tracked in git? | Tier |
 |------|-----------------|------|
@@ -68,9 +68,9 @@ This differs from BELFEM and matters for where a conclusion is safe:
 | `./devlog/` | **Yes** | AI+human, durable |
 | `changelogs/<package>.md` | **Yes** | AI+human, durable |
 | `doc/*.md` | **Yes** | AI+human, durable |
-| `./todo/` | **No** (`todo/` is git-ignored) | AI+human, local-only |
+| `./todo/` | **Yes** | AI+human, durable |
 
-Because `todo/` is git-ignored in SCLS, it is **local scratch planning, not a durable record**. A conclusion that exists only in `todo/` is lost to every other machine and to the repo history. **`./devlog/` is the tracked durable record** — if a finding is not in `devlog/`, `changelogs/`, or `doc/`, treat it as lost.
+`./todo/` is tracked in SCLS, so a live plan or build tracker reaches every machine — including the Linux build host, which is where most of the work in a `todo/` file actually happens. It is still **forward-looking planning, not the record of a conclusion**: `todo/` says what is intended, `devlog/` says what was found and decided. A finding that exists only as a to-do item is a finding nobody wrote down — if it is not in `devlog/`, `changelogs/`, or `doc/`, treat it as lost.
 
 ### Communication Channel — `./tmp/ai_exchange/<slug>.md` (AI-only, ephemeral)
 
@@ -198,7 +198,7 @@ At the end of every meaningful session, create a devlog summary in `./devlog/` a
 - `./devlog/` — *what was investigated and decided, and why* (backward-looking, session-scoped)
 - `changelogs/<package>.md` — *what changed in a package's shipped version* (user-facing, per-package). A version bump must land here regardless of whether a devlog is written
 - `doc/*.md` — *standing policy* that outlives any one session. If a session establishes a rule rather than a fact, it belongs in a policy doc, and the devlog links to it
-- `./todo/` — forward-looking planning, **git-ignored and local-only**. Never the sole home of a conclusion
+- `./todo/` — forward-looking planning and live trackers, **tracked**. Never the sole home of a conclusion: a plan records intent, a devlog records what was established
 
 **Todo-file checkboxes (standing rule):** whenever a `./todo/` file lists steps, give each step a GitHub checkbox (`- [ ]`). Keep the boxes live: tick a box (`- [x]`) the moment its step completes, and **strike through** (`~~step text~~`) a step that becomes obsolete rather than deleting it, so abandoned approaches stay visible.
 
@@ -352,7 +352,7 @@ A poor prompt is vague:
 | `./devlog/README.md` | AI+human | Devlog index, one line per entry | **Tracked**, persistent |
 | `changelogs/<package>.md` | AI+human | Per-package shipped-version history | **Tracked**, persistent |
 | `doc/*.md` | AI+human | Standing policy (license, MKL ABI, macOS, this protocol) | **Tracked**, persistent |
-| `./todo/*.md` | AI+human | Forward-looking task planning | Git-ignored, local-only |
+| `./todo/*.md` | AI+human | Forward-looking task planning and live build trackers | **Tracked**, persistent |
 
 ---
 

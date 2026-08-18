@@ -9,7 +9,6 @@ tmp/
 debbuild/
 patched/
 tex/
-todo/
 .claude/ai_exchange_pos.txt
 
 scls.html

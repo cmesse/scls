@@ -187,6 +187,64 @@ DEB install is blocked with a clean SONAME-mismatch error):
    changed; their artifacts still resolve correctly. Rebuilding the entire
    build matrix on every Intel-side bump is unnecessary churn.
 
+## A second, unrelated hazard: `-lgomp` in `CMAKE_<LANG>_STANDARD_LIBRARIES`
+
+This one is not a SONAME problem, but it lives in the same link line and is
+easy to mistake for one, so it is recorded here.
+
+`build_common.get_cmake_args` builds `CMAKE_C_STANDARD_LIBRARIES` and
+`CMAKE_CXX_STANDARD_LIBRARIES` from `math_common.get_mkl_serial_link_line`,
+which ends in the OpenMP runtime (`-lgomp` on GNU flavors, `-liomp5` on
+Intel). On non-MKL flavors the same variable is just `-lm`.
+
+**Effect:** when that variable contains `-lgomp`, any CMake `try_compile`
+that links an OpenMP imported target (`OpenMP::OpenMP_CXX`) links with *no
+OpenMP runtime at all* and fails on undefined `GOMP_*` symbols. The value is
+not forwarded into the try-compile project, but its presence drops the
+imported target's runtime from the probe link, and nothing replaces it.
+Measured with cmake 4.3.2 against upstream STRUMPACK's own probe source:
+
+| `CMAKE_CXX_STANDARD_LIBRARIES` | probe | probe link line |
+|---|---|---|
+| unset / `-lm` / `-lm -ldl` / a bogus `-l<name>` | passes | ends with libgomp |
+| `-lmkl_gf_lp64 -lmkl_core -lpthread -lm -ldl` (no `-lgomp`) | passes | ends with libgomp |
+| `-lgomp` / `-lm -lgomp` / the full MKL line | **fails** | no OpenMP runtime |
+
+**Why it is nasty:** the *outer* library link is unaffected, so the package
+still builds and still gets `NEEDED libgomp.so.1`. Only the configure-time
+feature probes lie. Upstream then compiles out whatever the probe gated,
+silently, and the loss shows up as missing parallelism rather than as a
+build or install failure.
+
+**Worked example:** `scls-mkl-strumpack-8.0.0-1` shipped on el9, el10 and
+amzn2023 with `STRUMPACK_USE_OPENMP_TASKLOOP` and
+`STRUMPACK_USE_OPENMP_TASK_DEPEND` compiled out, while the gcc and debug
+builds of the same recipe had both. See
+`devlog/dl20260817_strumpack_openmp_tasking.md`.
+
+**Exposure:** any cmake package on an mkl or intel flavor whose configure
+runs a `try_compile` against an OpenMP imported target. Checked clean so
+far: `sundials`, `superlu_dist` (installed config headers byte-identical
+between the published gcc and mkl RPMs). Unchecked: `butterflypack`,
+`gklib`, `metis`, `parmetis`, `slate`, `vtk`, `zfp`.
+
+**Detection:** diff the installed config header of a cmake package between
+its gcc and mkl RPMs. Any feature `#undef` on mkl but `#define` on gcc is a
+candidate — the compiler is identical, so the flavor cannot legitimately
+change a compiler-capability probe.
+
+**Mitigations, in preference order:**
+
+1. Remove the OpenMP runtime from `CMAKE_<LANG>_STANDARD_LIBRARIES` and let
+   `-fopenmp` / `-qopenmp` in `CFLAGS`/`CXXFLAGS` supply it. Fixes every
+   affected package at once, but changes the link line of the whole mkl and
+   intel stack, so it needs a full rebuild plus a `readelf -d` check that
+   packages with `features.math` and `features.openmp: false` have not lost
+   their OpenMP `NEEDED` entry. **Not applied — open decision.**
+2. Pin the probe result per recipe, as `recipes/strumpack.yaml` does with
+   `-DSTRUMPACK_USE_OPENMP_TASKLOOP=TRUE`. Deterministic and cheap, but
+   per-package and only viable where the capability is genuinely present.
+
 ## Source-of-truth references
 
 - `python/math_common.py:get_mkl_interface_lib` — picks `mkl_gf_*` vs
@@ -199,3 +257,8 @@ DEB install is blocked with a clean SONAME-mismatch error):
   the consumer's `DT_NEEDED` version-less.
 - `python/rpm_builder.py:get_intel_oneapi_setup` — MKL build-time env
   (`MKLROOT`, `LD_LIBRARY_PATH`, `LIBRARY_PATH`, `CPATH`).
+- `python/build_common.py:get_cmake_args` — emits
+  `CMAKE_<LANG>_STANDARD_LIBRARIES`; see the `-lgomp` hazard above.
+- `python/math_common.py:compiler_family` — single source of truth for the
+  compiler family, and therefore for the OpenMP runtime, MKL threading
+  layer and MKL interface library. Everything else derives from it.
