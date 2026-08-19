@@ -148,6 +148,16 @@ Two install hooks exist and they handle `%{buildroot}` / `%{prefix}` differently
 
 See [`doc/MKL_ABI_POLICY.md`](doc/MKL_ABI_POLICY.md). Applies to every flavor with `math.linalg: mkl` (`mkl`, `intel`, `gcc-mkl-cuda`). The MKL major SONAME (`libmkl_core.so.3` etc.) is baked into every consumer's `DT_NEEDED` at link time, and SCLS's `AutoReqProv: no` policy (deliberate — keeps deps deterministic and prevents `/usr/lib64/liblapack` sneak-in) means RPM/DEB metadata does not capture that SONAME. SONAME mismatches therefore surface at runtime, not install time; the mitigation is a CI rebuild on the affected build host when Intel bumps the MKL major. Linking against the unversioned `libmkl_*.so` symlink does *not* future-proof this — the SONAME is read from the resolved library's `DT_SONAME` at link time, regardless of the filename passed to `-l`.
 
+### GKlib is static by design
+
+See [`doc/GKLIB_STATIC_POLICY.md`](doc/GKLIB_STATIC_POLICY.md). GKlib builds as
+`libGKlib.a` and is absorbed whole into `libmetis.so` (639 `gk_*` symbols), giving
+downstreams the single-library `-lmetis` interface METIS 5.1.0 had. It is not shipped
+shared: upstream publishes no releases, we pin a commit, and no SOVERSION is set, so a
+shared build would carry an unversioned SONAME that `AutoReqProv: no` could never catch.
+GKlib is therefore a build-time dependency only — nothing resolves against it at runtime.
+A GKlib change means rebuilding metis and parmetis.
+
 ### Licensing
 
 See [`doc/LICENSE_POLICY.md`](doc/LICENSE_POLICY.md) for the full package policy and rationale. Short version: distributed binary flavors avoid GPL-3 linkable libraries (FFTW is the canonical reason); GPL-3 build tools are fine when only executed during the build; GPL-2, LGPL, and CeCILL-C scientific libraries are allowed with source and notice compliance; GMP/MPFR/MPC use system `*-devel` packages on mainline Linux binary flavors and are built in-stack only on `lbl` and `macos`. Source RPMs and (on macOS) source-plus-binary DMGs are how SCLS satisfies the source-availability obligations.
@@ -189,7 +199,7 @@ Supported strategies (set under `update:` in the recipe):
 
 `max_major: N` is an orthogonal constraint: the checker filters out releases whose major component exceeds `N` and reports the highest within-pin version as the latest, surfacing the higher major separately as "blocked by pin". Use it to hold back ABI-breaking upstream bumps until downstreams have been re-validated. It can be combined with an explicit `strategy:` or layered on top of auto-detection (just `update: { max_major: N }`).
 
-When bumping a version, also update `changelogs/<package>.md`, and re-check `files/<package>.txt` and any patches for drift (patch hunks, hard-coded version directories like `lib/cmake/<pkg>-<x.y.z>/`, new installed files). Prefer `%{version}` in file manifests when a directory embeds the upstream version.
+When bumping a version, also update `changelogs/<package>.md`, and re-check `files/<package>.txt` and any patches for drift (patch hunks, hard-coded version directories like `lib/cmake/<pkg>-<x.y.z>/`, new installed files). Version-stamped *directories* need no manifest edit: `rpm_builder.get_file_list()` collapses them to a single `%files` entry and `glob_dir_version()` rewrites the trailing version to a glob (`share/cmake-4.4` -> `share/cmake-[0-9]*`), which RPM expands against the buildroot. Version-stamped *files* (e.g. `bin/vtkWrapPython-9.6`) are listed individually and still need the manifest regenerated. Note `%{version}` is not a substitute where the directory carries only part of the version — RPM expands it to the full recipe version (`4.4.2`) while the directory is `4.4`.
 
 ## AI Collaboration
 
