@@ -3,9 +3,13 @@
 # prune_old_packages.sh — keep only the newest build artifact per package.
 #
 # Every rebuild leaves the previous version's .rpm / .src.rpm / .deb sitting in
-# the output tree. They accumulate, they make "which one is current?" ambiguous,
-# and `./scls install` picks by mtime, so a stale file that got touched can be
-# installed by accident.
+# the output tree, where they accumulate and make "which one is current?"
+# ambiguous.
+#
+# `./scls install <pkg>` now prunes the artifacts it supersedes for that package
+# on its own, so day to day this script is not needed. It remains useful for
+# bulk cleanup: packages built but never installed, other flavors, and anything
+# left over from before that behaviour existed.
 #
 # This groups artifacts by (kind, flavor, package, arch) — so scls-debug-cmake
 # and scls-mkl-cmake are tracked separately, as are the binary and source RPMs —

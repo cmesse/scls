@@ -183,6 +183,67 @@ def load_changelog(package_name: str, changelogs_dir: Path = Path("changelogs"))
     return ""
 
 
+def _version_sort_key(text):
+    """Natural-order key for a version-release string, matching `sort -V`.
+
+    Splits into digit and non-digit runs so 4.10.0 sorts above 4.9.0, which a
+    plain string compare gets backwards.
+    """
+    key = []
+    for chunk in re.findall(r'\d+|\D+', text):
+        key.append((1, int(chunk)) if chunk.isdigit() else (0, chunk))
+    return key
+
+
+def _rpm_nvr_batch(paths):
+    """Return {path: (name, version-release)} for the given RPM files."""
+    paths = list(paths)
+    if not paths:
+        return {}
+    q = subprocess.run(
+        ['rpm', '-qp', '--queryformat', '%{NAME}\t%{VERSION}-%{RELEASE}\n']
+        + [str(p) for p in paths],
+        capture_output=True, text=True
+    )
+    out = {}
+    lines = [l for l in q.stdout.splitlines() if '\t' in l]
+    if len(lines) != len(paths):
+        # Fall back to per-file queries if the batch output does not line up
+        for p in paths:
+            one = subprocess.run(
+                ['rpm', '-qp', '--queryformat', '%{NAME}\t%{VERSION}-%{RELEASE}', str(p)],
+                capture_output=True, text=True
+            )
+            if '\t' in one.stdout:
+                name, vr = one.stdout.strip().split('\t', 1)
+                out[p] = (name, vr)
+        return out
+    for p, line in zip(paths, lines):
+        name, vr = line.split('\t', 1)
+        out[p] = (name, vr)
+    return out
+
+
+def _newest_rpms_by_name(rpm_files):
+    """Split RPMs into (newest_per_name, superseded).
+
+    Selection is by version-release, not mtime: a stale artifact whose
+    timestamp happens to be recent must never win over a newer build.
+    """
+    info = _rpm_nvr_batch(rpm_files)
+    by_name = {}
+    for path, (name, vr) in info.items():
+        by_name.setdefault(name, []).append((vr, path))
+    newest, superseded = [], []
+    for name, entries in by_name.items():
+        entries.sort(key=lambda e: _version_sort_key(e[0]))
+        newest.append(entries[-1][1])
+        superseded.extend(p for _, p in entries[:-1])
+    # Anything rpm could not identify is passed through rather than dropped
+    newest.extend(p for p in rpm_files if p not in info)
+    return sorted(newest), sorted(superseded)
+
+
 def _partition_rpms_for_install(rpm_files):
     """Split RPM files into (to_install, to_reinstall).
 
@@ -2161,17 +2222,37 @@ fi
             rpm_files.update(
                 (self.rpm_base / "RPMS").rglob(f"{subpkg['rpm_name']}-[0-9]*.rpm")
             )
-        # Sort by modification time (newest first)
-        rpm_files = sorted(rpm_files, key=lambda p: p.stat().st_mtime, reverse=True)
-
         if not rpm_files:
             raise BuildError(f"No built RPMs found for {self.scls_name} in {self.rpm_base / 'RPMS'}")
+
+        # Keep only the newest build of each package name. Previously every
+        # version found was handed to dnf in one transaction, which worked only
+        # because dnf picked the highest itself.
+        rpm_files, superseded = _newest_rpms_by_name(rpm_files)
 
         print(f"\nInstalling RPMs:")
         for rpm in rpm_files:
             print(f"  {rpm}")
 
         _dnf_install_rpms(rpm_files)
+
+        # Only once the install succeeded: drop the artifacts it superseded, so
+        # the output tree holds one build per package and the next install has
+        # nothing stale to choose from. Deliberately after the transaction --
+        # if the install fails the older RPM is still there to fall back on.
+        # Set SCLS_KEEP_OLD_ARTIFACTS=1 to keep them.
+        if superseded and not os.environ.get('SCLS_KEEP_OLD_ARTIFACTS'):
+            print(f"\nRemoving superseded artifacts:")
+            for rpm in superseded:
+                for artifact in (rpm, *self._matching_srpms(rpm)):
+                    if artifact.exists():
+                        artifact.unlink()
+                        print(f"  {artifact.relative_to(self.project_root)}")
+
+    def _matching_srpms(self, rpm_path):
+        """Source RPMs corresponding to a binary RPM, so both are pruned together."""
+        stem = rpm_path.name.rsplit('.', 2)[0]  # strip .<arch>.rpm
+        return list((self.rpm_base / "SRPMS").glob(f"{stem}.src.rpm"))
 
     def get_library_symlink_fixes(self) -> List[str]:
         """Get shell commands to fix library symlinks in RPM %post section"""

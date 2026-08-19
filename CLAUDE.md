@@ -63,6 +63,15 @@ Commands:
 ./scls list                  # List installed packages
 ```
 
+`./scls install <package>` installs only the newest build of each package name,
+selected by version-release rather than mtime, and once the transaction succeeds
+it deletes the artifacts it superseded (binary and matching source RPM, or .deb).
+That keeps one build per package in the output tree so the next install has
+nothing stale to choose from. Pruning happens *after* the install, never before,
+so a failed install still has the previous artifact to fall back on. Set
+`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them. For bulk cleanup across packages and
+flavors, use `scripts/prune_old_packages.sh` (dry run by default).
+
 ### Direct builder invocation
 
 ```bash

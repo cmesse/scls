@@ -1624,16 +1624,23 @@ exit 0
         (main + each subpackage) is installed in a single transaction so
         apt resolves inter-subpackage Depends atomically.
         """
+        from rpm_builder import _version_sort_key
+
         latest: Dict[str, Path] = {}
+        superseded: List[Path] = []
         target_names = [b['scls_name'] for b in self._binary_packages()]
         for name in target_names:
             pattern = f"{name}_*_{self.architecture}.deb"
+            # Order by version-release, not mtime: a stale artifact whose
+            # timestamp happens to be recent must never win over a newer build.
+            # Filename shape is <name>_<version>-<release>_<arch>.deb.
             matches = sorted(
                 self.deb_out_dir.glob(pattern),
-                key=lambda p: p.stat().st_mtime, reverse=True,
+                key=lambda p: _version_sort_key(p.name.split('_')[1]),
             )
             if matches:
-                latest[name] = matches[0]
+                latest[name] = matches[-1]
+                superseded.extend(matches[:-1])
         if not latest:
             raise BuildError(
                 f"No built .deb found for {self.scls_name} in {self.deb_out_dir}"
@@ -1644,6 +1651,17 @@ exit 0
                 f"{self.deb_out_dir}; subpackages alone are not installable."
             )
         _apt_install_debs(list(latest.values()), label="apt-get install")
+
+        # Only once the install succeeded: drop the .debs it superseded, so the
+        # output tree holds one build per package. After the transaction, not
+        # before, so a failed install still has the older .deb to fall back on.
+        # Set SCLS_KEEP_OLD_ARTIFACTS=1 to keep them.
+        if superseded and not os.environ.get('SCLS_KEEP_OLD_ARTIFACTS'):
+            print("\nRemoving superseded artifacts:")
+            for deb in superseded:
+                if deb.exists():
+                    deb.unlink()
+                    print(f"  {deb.name}")
 
     def check_system_build_deps(self) -> None:
         """Verify non-SCLS entries in Build-Depends are installed on the host.
