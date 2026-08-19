@@ -1,5 +1,6 @@
 name: butterflypack
 version: 4.1.0
+release: 2
 summary: Rapid solving of large-scale dense linear systems using butterfly compression
 homepage: https://github.com/liuyangzhuan/ButterflyPACK
 license: BSD-3-Clause

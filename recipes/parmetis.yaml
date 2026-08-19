@@ -1,5 +1,6 @@
 name: parmetis
 version: 4.0.3
+release: 2
 summary: Parallel Graph Partitioning and Fill-reducing Matrix Ordering
 homepage: https://github.com/KarypisLab/ParMETIS
 license: Apache-2.0

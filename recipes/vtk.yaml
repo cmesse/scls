@@ -1,11 +1,13 @@
 name: vtk
-version: 9.6.2
+version: 9.7.0
 summary: A high-level 3D visualization library
 homepage: https://vtk.org/
 license: BSD-3-Clause
 
 source:
-  url: https://vtk.org/files/release/9.6/VTK-%{version}.tar.gz
+  # The X.Y directory is the release series, not the full version, so it has
+  # to be bumped together with version: above. There is no major.minor macro.
+  url: https://vtk.org/files/release/9.7/VTK-%{version}.tar.gz
   directory: VTK-%{version}
 
 update:

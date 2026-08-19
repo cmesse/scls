@@ -1,5 +1,6 @@
 name: sundials
-version: 7.7.0
+version: 7.8.0
+release: 1
 summary: Nonlinear and Differential/Algebraic Equation Solvers
 homepage: https://computing.llnl.gov/projects/sundials
 license: BSD-3-Clause
@@ -10,10 +11,6 @@ source:
 patches:
   all:
     - sundials-use-system-gtest.patch
-    # PETSc 3.25 changed the SNESMonitorSet destroy-callback signature from
-    # void**-taking to void*-taking (PetscCtxDestroyFn). Fix the outdated cast
-    # in the cv_petsc_ex7 example so it compiles against current PETSc.
-    - sundials-petsc-3.25-snesmonitorset.patch
 
 requires:
   all:

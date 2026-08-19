@@ -12,8 +12,8 @@
  add_library(SCOTCH::scotch ALIAS scotch)
  set_target_properties(scotch PROPERTIES VERSION ${SCOTCH_VERSION_LONG}
    SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE})
-@@ -589,8 +591,9 @@
-   target_compile_definitions(scotch PRIVATE SCOTCH_DEBUG_ALL)
+@@ -584,8 +586,9 @@
+   add_dependencies(scotch ptscotch_h ptscotchf_h)
  endif()
  
 -add_library(scotcherr library_error.c)
@@ -23,7 +23,7 @@
  set_target_properties(scotcherr PROPERTIES VERSION ${SCOTCH_VERSION_LONG}
    SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE})
  target_include_directories(scotcherr PUBLIC
-@@ -600,7 +603,7 @@
+@@ -595,7 +598,7 @@
  
  add_dependencies(scotcherr scotch_h)
  
@@ -32,7 +32,7 @@
  add_library(SCOTCH::scotcherrexit ALIAS scotcherrexit)
  set_target_properties(scotcherrexit PROPERTIES VERSION ${SCOTCH_VERSION_LONG}
    SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE})
-@@ -609,6 +612,7 @@
+@@ -604,6 +607,7 @@
    $<BUILD_INTERFACE:${GENERATED_INCLUDE_DIR}>
    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
  
@@ -40,7 +40,7 @@
  add_dependencies(scotcherrexit scotch_h)
  
  #################
-@@ -830,10 +834,12 @@
+@@ -826,10 +830,12 @@
    vdgraph_store.c)
  
  if(BUILD_PTSCOTCH)
@@ -54,7 +54,7 @@
    set_target_properties(ptscotch PROPERTIES
      VERSION ${SCOTCH_VERSION_LONG}
      SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE}
-@@ -858,9 +864,11 @@
+@@ -854,9 +860,11 @@
      target_link_libraries(ptscotch PRIVATE Threads::Threads ${THREADS_PTHREADS_WIN32_LIBRARY})
    endif()
  
@@ -67,7 +67,7 @@
    set_target_properties(ptscotcherr PROPERTIES VERSION ${SCOTCH_VERSION_LONG}
      SOVERSION ${SCOTCH_VERSION}.${SCOTCH_RELEASE})
    target_include_directories(ptscotcherr PUBLIC
-@@ -871,8 +879,9 @@
+@@ -867,8 +875,9 @@
  
    add_dependencies(ptscotcherr ptscotch_h scotch_h)
  

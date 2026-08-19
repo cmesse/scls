@@ -1,9 +1,9 @@
 --- a/cmake/SundialsSetupTesting.cmake
 +++ b/cmake/SundialsSetupTesting.cmake
-@@ -160,7 +160,8 @@ endif()
- # Check if GTest is needed
- #
- if(SUNDIALS_TEST_ENABLE_GTEST)
+@@ -164,7 +164,8 @@
+   set(INSTALL_GTEST
+       OFF
+       CACHE BOOL "" FORCE)
 -  # find_package(GTest)
 +  # Try to find system GTest first
 +  find_package(GTest)

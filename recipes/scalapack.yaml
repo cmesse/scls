@@ -1,5 +1,6 @@
 name: scalapack
 version: 2.2.3
+release: 2
 summary: A subset of LAPACK routines redesigned for heterogeneous computing
 homepage: https://www.netlib.org/scalapack/
 

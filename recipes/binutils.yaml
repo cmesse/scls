@@ -1,5 +1,5 @@
 name: binutils
-version: 2.46.0
+version: 2.47.0
 summary: A collection of binary utilities
 homepage: https://www.gnu.org/software/binutils/
 license: GPL-3.0-or-later

@@ -1,5 +1,6 @@
 name: slepc
 version: 3.25.1
+release: 2
 summary: Scalable Library for Eigenvalue Problem Computations
 homepage: https://slepc.upv.es/
 license: BSD-2-Clause

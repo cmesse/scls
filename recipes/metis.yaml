@@ -1,5 +1,6 @@
 name: metis
 version: 5.2.1
+release: 2
 summary: Serial Graph Partitioning and Fill-reducing Matrix Ordering
 homepage: https://glaros.dtc.umn.edu/gkhome/views/metis
 license: Apache-2.0

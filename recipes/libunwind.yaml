@@ -1,5 +1,6 @@
 name: libunwind
 version: 1.8.3
+release: 2
 summary: Portable C library for determining call-chains from a program's execution
 homepage: https://www.nongnu.org/libunwind/
 license: MIT

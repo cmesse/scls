@@ -1,5 +1,8 @@
 # Mumps Changelog
 
+## Version 5.9.1-1 - Tue Aug 18 2026
+- Updated to version 5.9.1
+
 ## Version 5.9.0-1 - Tue Jun 09 2026
 - Updated to version 5.9.0
 

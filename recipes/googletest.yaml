@@ -1,5 +1,5 @@
 name: googletest
-version: 1.17.0
+version: 1.18.0
 summary: GoogleTest - Google Testing and Mocking Framework
 homepage: https://github.com/google/googletest
 license: BSD-3-Clause

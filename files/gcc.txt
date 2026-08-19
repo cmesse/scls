@@ -1,4 +1,5 @@
 %{prefix}/bin/c++
+%{prefix}/bin/cc
 %{prefix}/bin/cpp
 %{prefix}/bin/g++
 %{prefix}/bin/gcc

@@ -1,5 +1,6 @@
 name: gklib
 version: 0.0.1
+release: 2
 summary: A library of various helper routines and frameworks used by KarypisLab software
 homepage: https://github.com/KarypisLab/GKlib
 license: Apache-2.0
@@ -29,7 +30,16 @@ configure:
     # Built as a static library with -fPIC so it can be linked into libmetis.so.
     # METIS's CMakeLists is patched to pull all GKlib symbols into libmetis.so,
     # keeping the same single-library interface as METIS 5.1.0.
-    - -DBUILD_SHARED_LIBS=OFF
+    #
+    # Static is a deliberate ABI decision, not a packaging convenience -- see
+    # doc/GKLIB_STATIC_POLICY.md. Upstream ships no releases (we pin a commit
+    # and invent the version) and sets no SOVERSION, so a shared GKlib would
+    # carry an unversioned SONAME and every commit bump would redefine the ABI
+    # undetectably under AutoReqProv: no. Do not switch this to shared.
+    #
+    # Upstream's switch is SHARED, not BUILD_SHARED_LIBS; it already defaults
+    # to OFF, so this is belt-and-braces against a future default flip.
+    - -DSHARED=OFF
     - -DCMAKE_POSITION_INDEPENDENT_CODE=ON
     - -DOPENMP=ON
   optimization:

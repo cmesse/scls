@@ -1,5 +1,5 @@
 name: gcc
-version: 16.1.0
+version: 16.2.0
 summary: The GNU Compiler Collection
 homepage: https://gcc.gnu.org/
 license: GPL-3.0-or-later WITH GCC-exception-3.1
@@ -126,6 +126,9 @@ install:
   post:
     # Create convenience symlinks for compilers (gcc, g++, c++, gfortran)
     - "cd %{prefix}/bin && ln -sf %{host}-gcc gcc"
+    # cc is the historical name for the C compiler; autotools' AC_PROG_CC and
+    # plenty of hand-written Makefiles fall back to it when CC is unset.
+    - "cd %{prefix}/bin && ln -sf %{host}-gcc cc"
     - "cd %{prefix}/bin && ln -sf %{host}-g++ g++"
     - "cd %{prefix}/bin && ln -sf %{host}-c++ c++"
     - "cd %{prefix}/bin && ln -sf %{host}-gfortran gfortran"

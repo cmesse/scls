@@ -1,5 +1,5 @@
 name: netcdf
-version: 4.10.0
+version: 4.10.1
 summary: Libraries for the Unidata network Common Data Form
 homepage: https://www.unidata.ucar.edu/software/netcdf/
 license: NetCDF

@@ -1,5 +1,6 @@
 name: hdf5
 version: 1.14.6
+release: 2
 summary: A general purpose library and file format for storing scientific data
 homepage: https://www.hdfgroup.org/solutions/hdf5
 
@@ -32,6 +33,11 @@ configure:
 
   args:
     - --enable-parallel
+    # HDF5 needs this explicitly; features.fortran: true above does not reach
+    # configure (it only drives the registry entry and bootstrap BuildRequires).
+    # Without it the package shipped no Fortran interface while the registry
+    # advertised one.
+    - --enable-fortran
   flavor_env:
     macos:
       CFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"

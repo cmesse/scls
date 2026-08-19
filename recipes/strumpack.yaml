@@ -1,6 +1,6 @@
 name: strumpack
 version: 8.0.0
-release: 2
+release: 3
 summary: STRUctured Matrix PACKage - sparse and dense rank-structured linear solvers
 homepage: https://portal.nersc.gov/project/sparse/strumpack
 license: BSD-3-Clause

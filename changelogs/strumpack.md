@@ -1,5 +1,12 @@
 # Strumpack Changelog
 
+## Version 8.0.0-3 - Tue Aug 18 2026
+- Rebuild for the OpenMP runtime fix: the runtime (`-lgomp` / `-liomp5`) is no
+  longer passed in `CMAKE_<LANG>_STANDARD_LIBRARIES`, so upstream's configure-time
+  OpenMP probes link correctly instead of failing on undefined `GOMP_*` and
+  silently compiling out the features they gate. No source change; the mkl and
+  intel flavors are the ones whose generated build differs.
+
 ## Version 8.0.0-2 - Mon Aug 17 2026
 - Pin STRUMPACK_USE_OPENMP_TASKLOOP and STRUMPACK_USE_OPENMP_TASK_DEPEND to
   TRUE instead of letting upstream's try_compile probes decide. Both probes

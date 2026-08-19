@@ -1,14 +1,20 @@
 name: exodus
-version: 2025.10.14
+version: 2026.08.11
 summary: EXODUS - Advanced finite element data file format
 homepage: https://github.com/sandialabs/seacas
 license: BSD-3-Clause
 
-# Version uses dots but tag uses dashes
+# Version uses dots but the upstream tag uses dashes, so %{version} cannot be
+# interpolated here. BOTH the url and extract_dir below are literal and MUST be
+# bumped by hand whenever version: changes -- otherwise the build silently
+# downloads the previous release and packages it under the new version number.
+# The update checker will not catch this: it compares version: against upstream
+# and never looks at the url. Use `update_checker.py exodus --verify-downloads`
+# to HEAD-check the derived URL after a bump.
 source:
-  url: https://github.com/sandialabs/seacas/archive/refs/tags/v2025-10-14.tar.gz
+  url: https://github.com/sandialabs/seacas/archive/refs/tags/v2026-08-11.tar.gz
   # Extracted directory uses dashes too
-  extract_dir: seacas-2025-10-14
+  extract_dir: seacas-2026-08-11
 
 update:
   strategy: github_tag

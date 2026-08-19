@@ -1,5 +1,6 @@
 name: superlu_dist
 version: 9.2.1
+release: 2
 summary: Distributed memory sparse direct solver
 homepage: https://github.com/xiaoyeli/superlu_dist
 license: BSD-3-Clause

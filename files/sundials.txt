@@ -127,6 +127,7 @@
 %{prefix}/include/sunmatrix/sunmatrix_dense.h
 %{prefix}/include/sunmatrix/sunmatrix_sparse.h
 %{prefix}/include/sunmemory/sunmemory_system.h
+%{prefix}/include/sunnonlinsol/sunnonlinsol_auto.h
 %{prefix}/include/sunnonlinsol/sunnonlinsol_fixedpoint.h
 %{prefix}/include/sunnonlinsol/sunnonlinsol_newton.h
 %{prefix}/include/sunnonlinsol/sunnonlinsol_petscsnes.h
@@ -184,6 +185,8 @@
 %{prefix}/lib/libsundials_sunmatrixdense.so.*
 %{prefix}/lib/libsundials_sunmatrixsparse.so
 %{prefix}/lib/libsundials_sunmatrixsparse.so.*
+%{prefix}/lib/libsundials_sunnonlinsolauto.so
+%{prefix}/lib/libsundials_sunnonlinsolauto.so.*
 %{prefix}/lib/libsundials_sunnonlinsolfixedpoint.so
 %{prefix}/lib/libsundials_sunnonlinsolfixedpoint.so.*
 %{prefix}/lib/libsundials_sunnonlinsolnewton.so

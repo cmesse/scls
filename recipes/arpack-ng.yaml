@@ -1,5 +1,6 @@
 name: arpack-ng
 version: 3.9.1
+release: 2
 summary: Fortran 77 subroutines designed to solve large scale eigenvalue problems.
 homepage: https://github.com/opencollab/arpack-ng
 license: BSD

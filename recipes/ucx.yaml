@@ -52,8 +52,15 @@ configure:
   # UCX 1.20.0 still uses it in src/tools/perf/perftest.c, and UCX's
   # configure injects a broad -Werror into BASE_CFLAGS. Keep warnings as
   # errors generally, but do not fail on this compatibility warning.
+  #
+  # Must be the bare -Wno- form, not -Wno-error=. GCC hard-errors on
+  # -Wno-error=<name> when it does not know <name> ("no option
+  # -Wdeprecated-openmp"), which breaks configure's very first compiler test
+  # on any GCC older than 16 -- el9's system GCC 11 included. An unknown
+  # bare -Wno- is ignored instead, and at worst emits a note that -Werror
+  # does not escalate.
   env:
-    - CFLAGS: "+=-Wno-error=deprecated-openmp"
+    - CFLAGS: "+=-Wno-deprecated-openmp"
   args:
     - --enable-optimizations
     - --enable-mt

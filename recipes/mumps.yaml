@@ -1,5 +1,5 @@
 name: mumps
-version: 5.9.0
+version: 5.9.1
 summary: A MUltifrontal Massively Parallel sparse direct Solver
 homepage: https://mumps-solver.org
 license: CeCILL-C

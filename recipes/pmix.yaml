@@ -1,5 +1,6 @@
 name: pmix
 version: 5.0.10
+release: 2
 summary: An extended/exascale implementation of the PMIx Standard
 homepage: https://github.com/openpmix/openpmix
 license: BSD

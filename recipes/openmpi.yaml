@@ -1,5 +1,6 @@
 name: openmpi
 version: 5.0.10
+release: 2
 summary: A powerful implementation of MPI/SHMEM
 homepage: https://www.open-mpi.org
 license: BSD
@@ -9,6 +10,9 @@ license: BSD
 rpm_files_auto: true
 
 source:
+  # The vX.Y directory is the release series, not the full version, so it has to
+  # be bumped together with version: above -- there is no major.minor macro. The
+  # same trap silently 404'd hwloc and vtk during the 2026-08 upgrade.
   url: https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-%{version}.tar.bz2
 
 # GCC 16's inliner treats __opal_attribute_always_inline__ as mandatory and
@@ -46,6 +50,7 @@ flavor_overrides:
   lbl:
     version: 4.1.6
     source:
+      # Series directory again -- keep v4.1 in step with the 4.1.x version above.
       url: https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-%{version}.tar.bz2
 
 requires:

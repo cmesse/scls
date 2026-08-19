@@ -1,5 +1,6 @@
 name: slate
 version: 2025.05.28
+release: 2
 summary: Software for Linear Algebra Targeting Exascale
 homepage: https://icl.bitbucket.io/slate/
 license: BSD-3-Clause
