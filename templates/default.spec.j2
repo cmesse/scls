@@ -340,11 +340,24 @@ EOF
 # Auto-generate file list from BUILDROOT
 # List all files (not directories) under the prefix
 find %{buildroot}%{prefix} -type f -o -type l | sed 's|^%{buildroot}||' > %{_builddir}/filelist.txt
-# Claim shared-ownership (%dir) on subdirs of lib/ and share/. Using %dir lets
-# multiple packages coexist under paths like lib/cmake/ or share/locale/ — without
-# it, RPM treats the entry as exclusive file ownership and transactions conflict.
-find %{buildroot}%{prefix}/lib -mindepth 1 -maxdepth 1 -type d | sed 's|^%{buildroot}|%dir |' >> %{_builddir}/filelist.txt 2>/dev/null || true
-find %{buildroot}%{prefix}/share -mindepth 1 -maxdepth 1 -type d -not -name scls -not -name man -not -name doc | sed 's|^%{buildroot}|%dir |' >> %{_builddir}/filelist.txt 2>/dev/null || true
+# Claim shared-ownership (%dir) on every directory this package creates below
+# the first level of the prefix. Using %dir lets multiple packages coexist under
+# paths like lib/cmake/ or share/locale/ — without it, RPM treats the entry as
+# exclusive file ownership and transactions conflict.
+#
+# Depth matters: an unowned directory is never removed when the package is
+# erased, so a versioned tree (lib/cmake/vtk-9.6, include/vtk-9.6) is left
+# behind on upgrade and a stale find_package() config keeps resolving. Claiming
+# only -maxdepth 1 under lib/ and share/ left ~180 vtk directories unowned.
+#
+# The first level (bin, lib, include, share) is deliberately NOT claimed: those
+# belong to the environment package, and on Linux %{prefix}/lib is a symlink to
+# lib64, so claiming it as a directory would conflict at install time.
+find %{buildroot}%{prefix} -mindepth 2 -type d \
+    -not -path "%{buildroot}%{prefix}/share/scls*" \
+    -not -path "%{buildroot}%{prefix}/share/man*" \
+    -not -path "%{buildroot}%{prefix}/share/doc*" \
+    | sed 's|^%{buildroot}|%dir |' >> %{_builddir}/filelist.txt 2>/dev/null || true
 {% endif %}
 
 %post

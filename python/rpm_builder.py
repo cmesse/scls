@@ -6,6 +6,7 @@ FIXED: Direct configure call instead of %configure macro to avoid unwanted argum
 
 import copy
 import os
+import re
 import sys
 import argparse
 import shutil
@@ -52,6 +53,20 @@ from math_common import (
     get_cuda_path,
     nv_hpc_compiler_path,
     get_nv_gpu_targets )
+
+
+# Dependencies needed to build a package but never to run it, so they land in
+# BuildRequires only. Mostly build tools -- plus gklib, which ships a static
+# archive that is absorbed whole into libmetis.so, so nothing ever resolves
+# against it at runtime. See doc/GKLIB_STATIC_POLICY.md.
+BUILD_ONLY_DEPS = {'cmake', 'autoconf', 'automake', 'libtool', 'pkg-config', 'gklib'}
+
+# Packages built as part of a flavor but deliberately kept out of the flavor
+# meta-package, so `dnf install scls-<flavor>` does not pull them in. This is a
+# narrower set than BUILD_ONLY_DEPS: cmake is build-only as a dependency but is
+# still a tool users want installed, whereas gklib is an internal build artifact
+# with no user-facing value (its code already lives inside libmetis.so).
+META_EXCLUDED = {'gklib'}
 
 
 def ensure_changelog_exists(package_name: str, version: str, release: str = "1",
@@ -221,6 +236,43 @@ def _dnf_install_rpms(rpm_files):
         if result.returncode != 0:
             raise BuildError(
                 f"RPM installation failed with return code {result.returncode}")
+
+
+# Trailing "-<version>" on a directory name, e.g. cmake-4.4, lapack-3.12.0.
+# The stem is captured so it can be kept literal in the emitted glob.
+_VERSIONED_DIR_RE = re.compile(r'^(?P<stem>.+)-[0-9][0-9.]*$')
+
+
+def glob_dir_version(pkg_dir: str) -> str:
+    """
+    Replace a trailing version on a collapsed directory with a glob.
+
+        share/cmake-4.4        -> share/cmake-[0-9]*
+        lib/cmake/lapack-3.1.0 -> lib/cmake/lapack-[0-9]*
+        lib/cmake/GTest        -> lib/cmake/GTest        (unchanged)
+
+    Upstreams like cmake and vtk install into <major>.<minor>-stamped
+    directories, so the tracked file list under files/ names a directory that
+    stops existing the moment the recipe version is bumped. %{version} cannot
+    stand in for it: RPM expands that to the full recipe version (4.4.2) while
+    the directory carries only part of it (4.4).
+
+    RPM expands %files globs against the buildroot, which holds nothing but
+    this package's own install, so a glob here can never reach another
+    package's files. The stem stays literal and the version must start with a
+    digit, so sibling directories that merely share a prefix are not swallowed
+    (lapack-[0-9]* does not match lapacke-3.12.0).
+
+    Only collapsed directories go through this. Individually listed files keep
+    their literal names, so version-stamped executables such as
+    bin/vtkWrapPython-9.6 are unaffected.
+    """
+    parent, _, base = pkg_dir.rpartition('/')
+    match = _VERSIONED_DIR_RE.match(base)
+    if not match:
+        return pkg_dir
+    globbed = f"{match.group('stem')}-[0-9]*"
+    return f"{parent}/{globbed}" if parent else globbed
 
 
 class RPMBuilder:
@@ -1649,18 +1701,16 @@ fi
         if 'requires' in self.recipe:
             recipe_requires = self.recipe['requires']
 
-            # Build tools that are only needed at build time, not runtime.
+            # Dependencies that are only needed at build time, not runtime.
             # Apply this filter to both the dict and list forms — most
             # recipes declare cmake under `requires: {all: [cmake, ...]}`
             # and we don't want to pull cmake into every package's runtime
             # closure.
-            build_only_tools = {'cmake', 'autoconf', 'automake', 'libtool', 'pkg-config'}
-
             def _add_recipe_reqs(names):
                 for req in names:
                     scls_req = f"scls-{self.flavor_name}-{req}"
                     build_requires.append(scls_req)
-                    if req not in build_only_tools:
+                    if req not in BUILD_ONLY_DEPS:
                         requires.append(scls_req)
 
             if isinstance(recipe_requires, dict):
@@ -2037,7 +2087,7 @@ fi
         # Add collapsed directories
         # In RPM, listing a directory path (without %dir) includes it recursively
         for pkg_dir in sorted(seen_dirs.keys()):
-            rpm_files.append(f"%{{prefix}}/{pkg_dir}")
+            rpm_files.append(f"%{{prefix}}/{glob_dir_version(pkg_dir)}")
 
         if skipped_macos:
             print(f"  Skipped {len(skipped_macos)} macOS-specific files")
@@ -2309,7 +2359,10 @@ def build_flavor_meta_package(flavor: str, spec_only: bool = False) -> None:
             packages.insert(0, pkg)  # foundation packages first
 
     scls_name = f"scls-{flavor}"
-    requires = [f"scls-{flavor}-{pkg}" for pkg in packages]
+    # META_EXCLUDED packages are built and installed on the build host, but are
+    # not part of what a user gets from `dnf install scls-<flavor>`.
+    requires = [f"scls-{flavor}-{pkg}" for pkg in packages
+                if pkg not in META_EXCLUDED]
 
     description = flavor_config.get('description',
                                     f'SCLS {flavor} flavor — complete installation')

@@ -52,9 +52,15 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 PROJECT_ROOT = SCRIPT_DIR.parent
 SYSTEM_PACKAGE_MAP_PATH = PROJECT_ROOT / "packaging" / "system_packages.yaml"
 
-# Build tools that belong in Build-Depends only, not Depends. Matches the
-# set rpm_builder uses so recipe `requires:` stays format-agnostic.
-BUILD_ONLY_TOOLS = {'cmake', 'autoconf', 'automake', 'libtool', 'pkg-config'}
+# Dependencies that belong in Build-Depends only, not Depends. Matches the set
+# rpm_builder uses so recipe `requires:` stays format-agnostic. Mostly build
+# tools -- plus gklib, whose static archive is absorbed into libmetis.so, so
+# nothing resolves against it at runtime. See doc/GKLIB_STATIC_POLICY.md.
+BUILD_ONLY_DEPS = {'cmake', 'autoconf', 'automake', 'libtool', 'pkg-config', 'gklib'}
+
+# Built as part of a flavor but kept out of the flavor meta-package. Narrower
+# than BUILD_ONLY_DEPS: cmake is a tool users want, gklib is internal.
+META_EXCLUDED = {'gklib'}
 
 
 def load_system_package_map() -> Dict[str, str]:
@@ -400,7 +406,8 @@ class DebBuilder(UnixBuilder):
     def _collect_recipe_scls_deps(self) -> Tuple[List[str], List[str]]:
         """Recipe `requires:` list, transformed to scls-<flavor>-<name>.
 
-        BUILD_ONLY_TOOLS (cmake, autoconf, automake, libtool, pkg-config) are
+        BUILD_ONLY_DEPS (cmake, autoconf, automake, libtool, pkg-config,
+        gklib) are
         treated as build-time only and omitted from runtime Depends in both
         the list and dict forms. Most recipes declare cmake under
         `requires: {all: [cmake, ...]}` and we don't want to pull cmake into
@@ -416,7 +423,7 @@ class DebBuilder(UnixBuilder):
             for req in names:
                 scls_req = f"scls-{self.flavor_name}-{_deb_name(req)}"
                 build_requires.append(scls_req)
-                if req not in BUILD_ONLY_TOOLS:
+                if req not in BUILD_ONLY_DEPS:
                     requires.append(scls_req)
 
         if isinstance(recipe_requires, dict):
@@ -1853,7 +1860,10 @@ def build_flavor_meta_package(flavor: str) -> Path:
             packages.insert(0, pkg)
 
     scls_name = f"scls-{flavor}"
-    depends = [f"scls-{flavor}-{_deb_name(pkg)}" for pkg in packages]
+    # META_EXCLUDED packages are built and installed on the build host, but are
+    # not part of what a user gets from installing the flavor meta-package.
+    depends = [f"scls-{flavor}-{_deb_name(pkg)}" for pkg in packages
+               if pkg not in META_EXCLUDED]
 
     # Version: use the environment recipe's version, matching rpm_builder.
     env_recipe = load_recipe('environment')
