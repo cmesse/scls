@@ -15,6 +15,25 @@
   hosts already have, and eliminates one class of "regenerate silently to
   empty" mode should automake's LEX rule ever fire. The real root cause is
   still unknown; document as it is understood.
+- Add an `install.post` assertion that the PRRTE tools (`prte`, `prterun`,
+  `prted`, `pterm`, `prte_info`) and `libprrte.so` are present in the install
+  tree, failing the build loudly when they are not. This is the guard the
+  packagers cannot provide: openmpi sets `rpm_files_auto: true`, so
+  templates/default.spec.j2 derives the RPM file list from a find(1) over the
+  buildroot, and deb_builder wraps the destdir wholesale -- both treat
+  "whatever got installed" as the manifest, so a short install produces a
+  smaller-but-valid package and exits 0. The check is scoped to OpenMPI 5.x
+  with a shell case on the recipe version, since the lbl flavor pins 4.1.6 and
+  uses ORTE rather than PRRTE; lbl renders it as a no-op. Verified on Rocky
+  9.8 by a full rpmbuild of the debug flavor.
+
+  Note for future entries: changelog text is copied verbatim into the spec's
+  changelog section, and RPM expands macros there. Of the spec section names,
+  "install" written with a leading percent sign is the only dangerous one --
+  it is a defined macro whose expansion starts with a newline, so it lands at
+  column 0 and rpmbuild reads it as a real section header, failing with
+  "second" that section. The others (files, prep, build, check, package) are
+  not macros and pass through inert. Write that one without the sigil.
 
 ## Version 5.0.10-2 - Tue Aug 18 2026
 - Rebuild against hwloc 2.14.0, ucx 1.20.1, libevent 2.1.13 and pmix. No recipe or source change; the release is

@@ -172,6 +172,42 @@ configure:
 build:
   parallel: true
 
+install:
+  # Assert the PRRTE tools actually landed in the install tree.
+  #
+  # OpenMPI 5.x mpirun is a thin launcher that execs ${prefix}/bin/prterun.
+  # If PRRTE is missing, libmpi.so is still present, so every downstream
+  # package still *links* fine -- the failure only surfaces at run time as
+  # "mpirun was unable to find an underlying prterun", and only for code
+  # that actually launches ranks.
+  #
+  # Neither packager would catch this on its own. openmpi sets
+  # rpm_files_auto (above), so templates/default.spec.j2 builds %files by
+  # find(1) over the buildroot, and deb_builder wraps the destdir wholesale.
+  # Both take "whatever got installed" as the manifest, so a short install
+  # yields a smaller-but-valid package and exits 0. That is how the
+  # 2026-08 Ubuntu 24.04 rebuilds shipped a broken 5.0.10-2 intermittently
+  # (see devlog/dl20260824_openmpi_prrte_and_sundials_ldpath.md). The root
+  # cause is still unknown, so gate on the symptom instead: this turns a
+  # silent ~400-file drop into a loud build failure on every distro.
+  #
+  # Scoped to 5.x because the lbl flavor pins 4.1.6, which uses ORTE
+  # (orterun/orted) rather than PRRTE. %{version} is substituted at
+  # spec-generation time from the flavor-resolved recipe, so lbl renders
+  # `case 4.1.6 in 5.*)` and the check is a no-op there.
+  post:
+    - >-
+      case %{version} in 5.*)
+      for f in bin/prte bin/prterun bin/prted bin/pterm bin/prte_info lib/libprrte.so; do
+      test -e %{prefix}/$f ||
+      { echo "ERROR: PRRTE component '$f' is missing from the openmpi install tree."
+      ; echo "OpenMPI 5.x mpirun execs bin/prterun and cannot launch any rank without it."
+      ; echo "The packager would ship this silently because openmpi builds its file list"
+      ; echo "from the buildroot rather than from a manifest. Rebuild openmpi."
+      ; exit 1; };
+      done ;;
+      esac
+
 test:
   commands:
     - "make check 2>&1 | tee check.log"

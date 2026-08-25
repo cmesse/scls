@@ -138,15 +138,148 @@ Diff since last commit (5 files, 51 insertions, 2 deletions):
 Plus pre-existing untracked `flavor.conf` changes from the flavor-switching we
 did during diagnosis.
 
+## Follow-up on a Rocky 9.8 host (2026-08-24)
+
+The RedHat-side question above was investigated on Rocky Linux 9.8. Summary:
+**not observed on RHEL, but RHEL is structurally just as exposed.** Two of the
+claims made earlier in this document turned out to be wrong; they are corrected
+below rather than edited out, so the reasoning stays auditable.
+
+### Empirically clean — 7/7 builds good
+
+| Artifact | Total files | PRRTE files | `prterun` |
+|---|---|---|---|
+| `scls-{debug,gcc,mkl}-openmpi-5.0.10-1` (May 2026) | 2969-2970 | 323 | present |
+| `scls-{debug,gcc,mkl}-openmpi-5.0.10-2` (Aug 2026) | 3016-3017 | 364 | present |
+
+All three installed flavors print `mpirun (Open MPI) 5.0.10`, carry
+`bin/prterun -> prte`, and ship `libprrte.so.3.0.13`. Every openmpi package ever
+built on this host contains all five PRRTE tools.
+
+Note the file-count baseline **differs from the Ubuntu numbers quoted above**:
+~3017 is correct on RHEL, not ~3078. Do not port that threshold across distros
+-- check for `prterun` directly instead.
+
+### Why RHEL has not tripped it
+
+Both preconditions for the flex mechanism are absent here:
+
+1. `flex-2.6.4-9.el9` is installed, so `3rd-party/prrte/Makefile` carries
+   `LEX = flex`; the `LEX=:` no-op fallback cannot engage.
+2. In the leftover build tree, `hostfile_lex.c` (12:26:15) is newer than
+   `hostfile_lex.l` (12:21:29), so automake's LEX rule never fires at all.
+
+### Correction 1 — the packagers do NOT protect RHEL
+
+It is tempting to assume the RPM path is safe because SCLS ships `files/*.txt`
+manifests and rpmbuild fails loudly on a listed-but-missing file. That is true
+for 51 of 55 recipes. **openmpi is not one of them.** It sets
+`rpm_files_auto: true` (`recipes/openmpi.yaml:10`), which
+`templates/default.spec.j2:342` implements as:
+
+```
+find %{buildroot}%{prefix} -type f -o -type l | sed 's|^%{buildroot}||' > %{_builddir}/filelist.txt
+```
+
+`%files` is therefore *whatever the buildroot happens to contain*. A short
+install yields a smaller-but-valid RPM and `rpmbuild` exits 0 -- the same silent
+failure mode as the `.deb`. The unprotected set is exactly four recipes:
+`openmpi`, `ucx`, `vtk`, `libunwind`.
+
+Nor do tests catch it: openmpi's `test:` is `make check`, which runs the in-tree
+unit tests before install and never invokes `prterun`.
+
+Related: `files/openmpi.txt` is stale -- a 4.x-era manifest listing `orterun`,
+`orted`, `ortecc`, `mpiCC`, with **zero** PRRTE entries (1015 lines against 3017
+files shipped). It is inert today because `rpm_files_auto` bypasses it, but
+anyone flipping that flag off to regain a safety net would break the build
+immediately.
+
+### Correction 2 — the `make -j install` race hypothesis cannot be right
+
+Open question 1 previously blamed a `make -j8 install-recursive` race. Neither
+install path is parallel:
+
+- **RPM:** `rpm --eval '%make_install'` on Rocky 9.8 gives
+  `/usr/bin/make install DESTDIR=... INSTALL="/usr/bin/install -p"` -- no `-j`.
+  (`_smp_mflags` is `-j8`, but `%make_install` does not reference it.)
+- **deb:** `python/deb_builder.py:572` runs
+  `['make', 'install', f'DESTDIR={self.destdir}']` -- no `-j`.
+
+Only the *build* step is parallel. If a race is responsible, it is in
+`make -j8` build, not install, and `make -j1 install` would not have fixed it.
+
+### Guard added
+
+Since the root cause is still unknown on either distro, `recipes/openmpi.yaml`
+now gates on the symptom: an `install.post` assertion that `prte`, `prterun`,
+`prted`, `pterm`, `prte_info` and `libprrte.so` exist in the install tree,
+exiting non-zero with an explanatory message when they do not. It renders into
+`%install` ahead of the filelist step (line 151 vs 184 in the generated spec),
+so a short install fails the build instead of shipping.
+
+Scoped to 5.x via `case %{version} in 5.*)`, because the lbl flavor pins 4.1.6
+and uses ORTE, not PRRTE; lbl renders `case 4.1.6 in 5.*)` and no-ops.
+`%{version}` is substituted at generation time by both `rpm_builder.check_args`
+and `unix_builder.check_args`, so the guard is live on RPM, deb and macOS paths
+alike.
+
+Verified on Rocky 9.8: `rpmspec -P` parses the generated spec; the shell logic
+was exercised standalone against a complete tree (passes), a PRRTE-less tree
+(fails), a dangling `prterun` symlink with `prte` removed (fails), and a 4.1.6
+tree with only ORTE (no-ops). **Not yet verified by a full `rpmbuild` run** --
+that is the outstanding gate.
+
+### Trap hit while adding the guard: `%install` in changelog prose
+
+The first `rpmbuild` of the guarded spec failed with:
+
+```
+error: line 300: second %install
+```
+
+This was **not** the guard. `changelogs/<package>.md` is copied verbatim into
+the spec's changelog section, and the changelog entry written for this work
+described the guard as rendering "into `%install`". RPM expands macros in
+changelog text, and `%install` is a *defined macro* whose expansion begins with
+a newline (`rpm --eval '%install'` prints an empty line then `%install`). The
+newline pushes the token to column 0, where the parser reads it as a genuine
+section header -- hence "second %install".
+
+It is specific to that one word. Tested on Rocky 9.8, every other spec section
+name is inert in changelog prose because none of them is a macro:
+
+| Written in changelog | `rpm --eval` result | Effect |
+|---|---|---|
+| `%install` | newline + `%install` | **breaks the spec parse** |
+| `%files`, `%prep`, `%build`, `%check`, `%clean`, `%package`, `%changelog`, `%post`, `%pre`, `%postun`, `%preun`, `%description` | returned unexpanded | harmless |
+
+So `changelogs/petsc.md:9`, which mentions `%files`, is fine and needs no edit.
+Only the percent-prefixed word "install" has to be avoided in changelog prose.
+
+Worth knowing because the failure surfaces at a line number deep in the
+changelog, hundreds of lines away from whatever you actually just changed,
+which makes it read like a defect in the new build logic.
+
+Process note: this got through because the spec was validated with `rpmspec -P`
+*before* the changelog entry was written, so the text that broke it was never in
+the spec that passed. Generate the spec last, after every file the generator
+reads.
+
 ## Open questions for future work
 
-1. **What actually triggers the intermittent PRRTE drop?** Best guess is a
-   `make -j` install-recursive race in `3rd-party/prrte/src/tools/`. Cheap
-   next diagnostic: capture a full `make V=1 install` log on a broken build,
-   grep for the `install-recursive` line under `3rd-party/prrte/` and for any
-   swallowed non-zero exit. If reproducible, force `make -j1 install`
-   in the openmpi recipe and see if the failure vanishes.
-2. **Is Rocky truly immune, or has it just not been observed?** The failure
-   is intermittent even on Ubuntu, so the honest answer is "sample size too
-   small to say either way." If it appears on a Rocky host, the diagnosis
-   commands above apply identically (`rpm -ql` instead of `dpkg -L`).
+1. **What actually triggers the intermittent PRRTE drop?** Still unknown, and
+   now without a leading hypothesis -- see Correction 2. The install is serial
+   on both distros, so look at the parallel *build* instead: capture
+   `make V=1 -j8` output on a broken build and check whether
+   `3rd-party/prrte/src/tools/` linked at all, or whether a subdir failure was
+   swallowed. The new guard makes a recurrence loud, which should also make it
+   easier to catch in the act.
+2. **Is Rocky affected?** Structurally yes, empirically not observed in 7/7
+   builds -- see above. The two flex preconditions are absent on Rocky, which
+   may be the whole explanation, or may be coincidence given the failure is
+   intermittent even on Ubuntu.
+3. **Should `ucx`, `vtk` and `libunwind` get the same treatment?** They share
+   `rpm_files_auto: true` and therefore the same silent-drop exposure. No
+   failure has been observed for any of them; the question is whether a
+   critical-file assertion is worth adding pre-emptively.
