@@ -32,6 +32,10 @@ make:                     make
 git:                      git
 sed:                      sed
 pkgconf-pkg-config:       pkg-config
+# flex ships pre-generated *.c for its own *.l inputs in openmpi's PRRTE,
+# but automake regenerates on any mtime skew and the LEX=: fallback drops
+# the launcher tools silently -- see the note in recipes/openmpi.yaml.
+flex:                     flex
 
 # Runtime libraries
 gmp:                      libgmp10

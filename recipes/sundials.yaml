@@ -89,7 +89,17 @@ build:
 
 test:
   commands:
-    - "cd build && ctest --output-on-failure"
+    # Prepend the in-tree build library directories to LD_LIBRARY_PATH so ctest
+    # (and the PRE_TEST GoogleTest discovery step) resolves against the freshly
+    # built libsundials_* instead of any older SUNDIALS installed under
+    # %{prefix}/lib. CMake's build RPATH puts external link paths (which
+    # include %{prefix}/lib, pulled in by GTest/MPI/PETSc) ahead of the
+    # in-tree build dirs, so on a stack that already carries an older SUNDIALS
+    # the loader picks the stale library and any new symbol lookup fails.
+    - |
+      cd build && \
+      libdirs=$(find "$PWD/src" -name 'lib*.so*' -exec dirname {} \; | sort -u | tr '\n' ':') && \
+      LD_LIBRARY_PATH="${libdirs}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ctest --output-on-failure
 
 registry:
   cflags: "-I%{prefix}/include"

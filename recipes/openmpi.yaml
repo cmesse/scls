@@ -1,6 +1,6 @@
 name: openmpi
 version: 5.0.10
-release: 2
+release: 3
 summary: A powerful implementation of MPI/SHMEM
 homepage: https://www.open-mpi.org
 license: BSD
@@ -83,7 +83,19 @@ requires:
 # present — making the produced binary depend on what the build host
 # happens to have installed. lbl uses --with-X=external for these, so
 # they must be the system packages, not SCLS stack deps.
+#
+# flex is required by every flavor: PRRTE's src/util/hostfile and
+# src/mca/rmaps/rank_file scanners are lex sources. The tarball ships
+# pre-generated *.c alongside the *.l, but automake's LEX rule fires
+# whenever a stray mtime makes the .l look newer than the .c, and with
+# LEX=: (the no-op fallback used when flex is absent) the regenerated .c
+# lands empty. Downstream, PRRTE's tools (prte/prterun/prted/pterm) fail
+# to link one of the frameworks that pulls those scanners in, `make
+# install` silently skips src/tools/, and the resulting openmpi package
+# has libmpi but no runtime launcher.
 rpm_build_requires:
+  all:
+    - flex
   lbl:
     - slurm-devel
     - pmix-devel

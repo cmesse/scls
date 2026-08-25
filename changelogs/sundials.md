@@ -2,6 +2,13 @@
 
 ## Version 7.8.0-1 - Wed Aug 19 2026
 - Updated to version 7.8.0
+- Prepend the in-tree build library directories to LD_LIBRARY_PATH when running
+  ctest. 7.8.0 introduces new libsundials_core symbols (e.g.
+  SUNLogger_SetQueueAndFlushMsgFns) that the unit tests exercise, and CMake's
+  build RPATH places the external link paths (which include %{prefix}/lib
+  through GTest/MPI/PETSc) ahead of the in-tree build dirs. On a stack that
+  already carries an older SUNDIALS, the loader therefore picked the stale
+  installed library and the new symbol lookup failed, aborting `ctest`.
 - Added the new sunnonlinsolauto module to the file manifest: 7.8.0 ships
   sunnonlinsol_auto.h and libsundials_sunnonlinsolauto. Nothing was removed.
 - Dropped sundials-petsc-3.25-snesmonitorset.patch: 7.8.0 fixes this upstream,
