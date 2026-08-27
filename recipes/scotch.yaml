@@ -19,11 +19,18 @@ patches:
     - scotch-include_headers.patch
     # Force shared library builds with proper rpath
     - scotch-shared.patch
+    # Serialize parser_ll_c behind parser_yy_c (parallel-build race on bison-less hosts)
+    - scotch-parser-race.patch
 
 requires:
   all:
     - cmake
     - openmpi
+
+rpm_build_requires:
+  all:
+    - bison
+    - flex
 
 features:
   fortran: true

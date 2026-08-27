@@ -1,0 +1,28 @@
+Serialize parser_ll_c behind parser_yy_c to avoid a parallel-build race.
+
+CMake declares parser_yy.c / parser_ly.h as outputs of the parser_yy_c
+target. The flex custom_command for parser_ll_c lists parser_ly.h in its
+DEPENDS, which pulls the parser_yy.c rule into parser_ll_c.dir/build.make
+as well as parser_yy_c.dir/build.make. Under `make -j`, both submakes
+schedule the shared rule concurrently and race on the destination —
+manifesting on bison-less hosts as a duplicated "Generating parser_yy.c,
+parser_ly.h" line followed by:
+
+    Error copying file ".../last_resort/parser_ly.h" to
+      ".../build/src/libscotch/.": No such file or directory
+
+Adding a target-level dependency forces make to finish parser_yy_c
+(populating parser_yy.c / parser_ly.h in the binary dir) before
+parser_ll_c starts. Once the files exist, the no-prereq copy rule in
+parser_ll_c's submake is skipped, and the race disappears.
+
+--- a/src/libscotch/CMakeLists.txt
++++ b/src/libscotch/CMakeLists.txt
+@@ -143,6 +143,7 @@ else()
+     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/last_resort/parser_ll.c" "${CMAKE_CURRENT_SOURCE_DIR}/last_resort/parser_lh.h" "${CMAKE_CURRENT_BINARY_DIR}/.")
+ endif(FLEX_FOUND)
+ add_custom_target(parser_ll_c DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/parser_ll.c ${CMAKE_CURRENT_BINARY_DIR}/parser_lh.h)
++add_dependencies(parser_ll_c parser_yy_c)
+
+ ###############
+ #  libScotch  #
