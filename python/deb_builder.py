@@ -1763,7 +1763,16 @@ exit 0
         if self.destdir.exists():
             destdir_prefix = self.destdir / str(self.prefix).lstrip('/')
             destdir_include = destdir_prefix / 'include'
-            destdir_lib = destdir_prefix / 'lib'
+            # lib AND lib64: the live prefix gets its lib -> lib64 symlink
+            # from the environment package, but a staged destdir has only
+            # whatever the package's own install step wrote. cmake recipes
+            # that land in lib64 would otherwise fail the is_dir() guard
+            # below and stage nothing, leaving the live prefix's older copy
+            # of this same package first on LD_LIBRARY_PATH.
+            destdir_libs = [
+                d for d in (destdir_prefix / 'lib', destdir_prefix / 'lib64')
+                if d.is_dir()
+            ]
 
             def _prepend(var: str, value: str) -> None:
                 existing = env.get(var, '')
@@ -1771,7 +1780,7 @@ exit 0
 
             if destdir_include.is_dir():
                 _prepend('CPATH', str(destdir_include))
-            if destdir_lib.is_dir():
+            for destdir_lib in destdir_libs:
                 _prepend('LIBRARY_PATH', str(destdir_lib))
                 _prepend('LD_LIBRARY_PATH', str(destdir_lib))
 

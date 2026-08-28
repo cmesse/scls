@@ -36,6 +36,8 @@ pkgconf-pkg-config:       pkg-config
 # but automake regenerates on any mtime skew and the LEX=: fallback drops
 # the launcher tools silently -- see the note in recipes/openmpi.yaml.
 flex:                     flex
+# bison: scotch's parser sources regenerate when patched *.y mtimes skew.
+bison:                    bison
 
 # Runtime libraries
 gmp:                      libgmp10

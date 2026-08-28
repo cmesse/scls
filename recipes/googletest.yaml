@@ -19,6 +19,17 @@ features:
 
 configure:
   type: cmake
+  env:
+    # googletest is self-contained -- it compiles nothing against %{prefix}.
+    # setup_environment() prepends %{prefix}/include to CPATH, and gcc searches
+    # CPATH *before* -isystem directories, which is how CMake hands
+    # googletest/include to the gmock target (internal_utils.cmake marks the
+    # gtest interface includes SYSTEM). On an in-place upgrade the already
+    # installed gtest headers therefore shadow the in-tree ones and gmock is
+    # compiled against the old ABI (1.17's MutexBase* MutexLock ctor, no
+    # GTEST_INTERNAL_DEPRECATE_AND_INLINE). Clearing CPATH lets the source tree
+    # win; an empty CPATH adds no directories (it is not treated as ".").
+    CPATH: ""
   args:
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DBUILD_SHARED_LIBS=ON"

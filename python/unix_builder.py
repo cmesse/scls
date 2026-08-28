@@ -274,8 +274,22 @@ class UnixBuilder:
         if self.math:
             self.math_flags = get_math_compile_flags(self.flavor, self.recipe)
             self.math_ldflags = get_math_link_line(self.flavor, self.recipe)
+            # Both strings come out of math_common carrying %{mklroot} and
+            # %{prefix} placeholders (math_common.py:242,275-276,282,310,326,
+            # 372,379) and both are appended verbatim to C/CXX/FC/LDFLAGS
+            # below, so both need expanding. Expanding only math_ldflags'
+            # %{mklroot} left two live defects: gfortran received a literal
+            # -I%{mklroot}/include (a -Wmissing-include-dirs warning, and no
+            # MKL headers), and every ScaLAPACK consumer linked
+            # -Wl,-rpath,%{prefix}/lib, baking a literal "%{prefix}/lib" into
+            # the shipped RUNPATH (observed on libmumps_common.so and
+            # libpetsc.so for the mkl flavor). rpm_builder.py:1349-1350 always
+            # expanded both, so this was a unix/deb-path-only divergence.
             mklroot = os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
-            self.math_ldflags = self.math_ldflags.replace('%{mklroot}', mklroot)
+            for macro, value in (('%{mklroot}', mklroot),
+                                 ('%{prefix}', str(self.prefix))):
+                self.math_flags = self.math_flags.replace(macro, value)
+                self.math_ldflags = self.math_ldflags.replace(macro, value)
 
         # Resolve install_prefix (shared across all types)
         if 'configure' in self.recipe and 'install_prefix' in self.recipe['configure']:
@@ -652,13 +666,24 @@ class UnixBuilder:
         # Add prefix lib directory to library path so test executables
         # can find shared libraries without requiring rpath in test binaries
         # On macOS, use DYLD_FALLBACK_LIBRARY_PATH (not stripped by SIP)
+        #
+        # APPENDED, never prepended. The live prefix holds the *previous*
+        # build of the package under test, and SCLS sonames are major-only
+        # (libscotch.so.7.0 covers 7.0.11 and 7.0.13 alike), so a prepended
+        # prefix/lib silently shadows the artifact we just built with the
+        # copy already installed. Tests then exercise the old library and
+        # fail on symbols the new one added (scotch 7.0.13's
+        # SCOTCH_archCmpltws) or on struct-layout skew between new binaries
+        # and old internals. Callers that need to win over the live prefix
+        # -- DebBuilder.test() staging its destdir -- prepend before
+        # delegating here, and that ordering must survive.
         lib_dir = str(self.prefix / "lib")
         if self.platform == 'macos':
             lib_var = 'DYLD_FALLBACK_LIBRARY_PATH'
         else:
             lib_var = 'LD_LIBRARY_PATH'
         if lib_var in env:
-            env[lib_var] = f"{lib_dir}:{env[lib_var]}"
+            env[lib_var] = f"{env[lib_var]}:{lib_dir}"
         else:
             env[lib_var] = lib_dir
 
