@@ -87,7 +87,7 @@
 %{prefix}/lib/libslepc.so.*
 %{prefix}/lib/pkgconfig/SLEPc.pc
 %{prefix}/lib/pkgconfig/slepc.pc
-%{prefix}/lib/slepc/conf/modules/slepc/%{version}
+%{prefix}/lib/slepc/conf/modules/slepc/3.25.1
 %{prefix}/lib/slepc/conf/slepc_common
 %{prefix}/lib/slepc/conf/slepc_rules
 %{prefix}/lib/slepc/conf/slepc_rules_util.mk
@@ -160,6 +160,7 @@
 %{prefix}/share/slepc/examples/src/eps/tests/output/test26_2_alt.out
 %{prefix}/share/slepc/examples/src/eps/tests/output/test27_1.out
 %{prefix}/share/slepc/examples/src/eps/tests/output/test27_2.out
+%{prefix}/share/slepc/examples/src/eps/tests/output/test27_2_evsl.out
 %{prefix}/share/slepc/examples/src/eps/tests/output/test28_1.out
 %{prefix}/share/slepc/examples/src/eps/tests/output/test28_2.out
 %{prefix}/share/slepc/examples/src/eps/tests/output/test28_3.out
@@ -296,6 +297,7 @@
 %{prefix}/share/slepc/examples/src/eps/tutorials/ex55.c
 %{prefix}/share/slepc/examples/src/eps/tutorials/ex56.c
 %{prefix}/share/slepc/examples/src/eps/tutorials/ex57.c
+%{prefix}/share/slepc/examples/src/eps/tutorials/ex58.c
 %{prefix}/share/slepc/examples/src/eps/tutorials/ex6f.F90
 %{prefix}/share/slepc/examples/src/eps/tutorials/ex7.c
 %{prefix}/share/slepc/examples/src/eps/tutorials/ex9.c
@@ -373,11 +375,15 @@
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex56_1_complex_alt.out
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex57_1.out
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex57_2.out
+%{prefix}/share/slepc/examples/src/eps/tutorials/output/ex58_1.out
+%{prefix}/share/slepc/examples/src/eps/tutorials/output/ex58_2.out
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex5_1.out
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex5_2.out
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex6f_1.out
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex7_1.out
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex7_3.out
+%{prefix}/share/slepc/examples/src/eps/tutorials/output/ex7_4.out
+%{prefix}/share/slepc/examples/src/eps/tutorials/output/ex7_5.out
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex7_ciss_1.out
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex9_1.out
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex9_1_alt.out
@@ -399,6 +405,7 @@
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex9_8_alt_2.out
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex9_9.out
 %{prefix}/share/slepc/examples/src/eps/tutorials/output/ex9_9_alt.out
+%{prefix}/share/slepc/examples/src/eps/tutorials/rdb200vecs.bin
 %{prefix}/share/slepc/examples/src/lme/makefile
 %{prefix}/share/slepc/examples/src/lme/tests/makefile
 %{prefix}/share/slepc/examples/src/lme/tests/output/test1_1.out
@@ -654,6 +661,8 @@
 %{prefix}/share/slepc/examples/src/pep/tutorials/output/ex16_1_alt.out
 %{prefix}/share/slepc/examples/src/pep/tutorials/output/ex16_1_alt_2.out
 %{prefix}/share/slepc/examples/src/pep/tutorials/output/ex16_1_alt_3.out
+%{prefix}/share/slepc/examples/src/pep/tutorials/output/ex16_2.out
+%{prefix}/share/slepc/examples/src/pep/tutorials/output/ex16_2_alt.out
 %{prefix}/share/slepc/examples/src/pep/tutorials/output/ex16f_1.out
 %{prefix}/share/slepc/examples/src/pep/tutorials/output/ex17_1.out
 %{prefix}/share/slepc/examples/src/pep/tutorials/output/ex28_1.out
@@ -1011,7 +1020,10 @@
 %{prefix}/share/slepc/examples/src/sys/mat/tests/makefile
 %{prefix}/share/slepc/examples/src/sys/mat/tests/output/test1_1.out
 %{prefix}/share/slepc/examples/src/sys/mat/tests/output/test1_2.out
+%{prefix}/share/slepc/examples/src/sys/mat/tests/output/test2_1.out
+%{prefix}/share/slepc/examples/src/sys/mat/tests/output/test2_1_complex.out
 %{prefix}/share/slepc/examples/src/sys/mat/tests/test1.c
+%{prefix}/share/slepc/examples/src/sys/mat/tests/test2.c
 %{prefix}/share/slepc/examples/src/sys/tests/makefile
 %{prefix}/share/slepc/examples/src/sys/tests/output/test1_1.out
 %{prefix}/share/slepc/examples/src/sys/tests/output/test2_1.out

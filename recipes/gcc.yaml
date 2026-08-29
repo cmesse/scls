@@ -6,7 +6,7 @@ license: GPL-3.0-or-later WITH GCC-exception-3.1
 bootstrap: true  # Build with system compilers (this IS the GCC we're building)
 
 source:
-  url: https://ftp.gnu.org/gnu/gcc/gcc-%{version}/gcc-%{version}.tar.xz
+  url: https://ftpmirror.gnu.org/gcc/gcc-%{version}/gcc-%{version}.tar.xz
 
 patches:
   macos:

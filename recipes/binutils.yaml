@@ -1,5 +1,5 @@
 name: binutils
-version: 2.47.0
+version: 2.47
 summary: A collection of binary utilities
 homepage: https://www.gnu.org/software/binutils/
 license: GPL-3.0-or-later
@@ -9,7 +9,7 @@ include_flavors:
   - lbl
 
 source:
-  url: https://ftp.gnu.org/gnu/binutils/binutils-%{version}.tar.xz
+  url:  https://sourceware.org/pub/binutils/releases/binutils-%{version}.tar.xz
 
 features:
   fortran: false
