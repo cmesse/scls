@@ -14,6 +14,10 @@
 # ask_codex.sh / ask_grok.sh wrappers; --quick appends to tmp/ai_exchange/autoreview.md
 # under a lock and raises tmp/ai_exchange/AUTOREVIEW_P0.flag on P0/CRITICAL findings.
 # Env: AI_EXCHANGE_SLUG (exchange topic, default "scratch"), DIFF_CAP (default 400 lines).
+# Depth: --jury/--relay REQUIRE an explicit CODEX_MODEL, CODEX_EFFORT, GROK_MODEL and GROK_EFFORT
+# (see the depth-selection table in doc/AI_COLLABORATION_PROTOCOL.md); --quick pins its own cheap
+# tier and forces it onto the auditors, so the unattended hook cannot be retuned by an exported
+# value in whatever shell happened to commit.
 #
 # Portability note: macOS is the primary dev host and ships no flock(1) and only
 # bash 3.2 at /bin/bash, so the serialization below uses an atomic mkdir lock and
@@ -39,6 +43,50 @@ case "${1:-}" in
 esac
 TARGET="${1:-}"
 SLUG="${AI_EXCHANGE_SLUG:-scratch}"
+
+# --- Depth selection ---------------------------------------------------------
+# Resolved before the subject is built so a missing depth costs no git work and no
+# vendor call. Note the ${VAR:-} guards: this script runs under `set -u`, so a bare
+# expansion of an unset name would abort with "unbound variable" instead of the
+# message that tells the caller what to do.
+if [ "$MODE" = "quick" ]; then
+    # Unattended, per-commit, and paid for on every commit — the cheap rung, pinned here
+    # rather than left to the wrapper defaults, which are tuned for interactive audits.
+    CODEX_MODEL="gpt-5.6-luna"; CODEX_EFFORT="medium"
+    GROK_MODEL="grok-4.6";      GROK_EFFORT="medium"
+else
+    MISSING=""
+    for V in CODEX_MODEL CODEX_EFFORT GROK_MODEL GROK_EFFORT; do
+        [ -n "${!V:-}" ] || MISSING="$MISSING $V"
+    done
+    if [ -n "$MISSING" ]; then
+        echo "cross_review.sh: --$MODE needs an explicit depth. Unset:$MISSING" >&2
+        echo "A jury round without a recorded depth cannot be compared to any other round." >&2
+        echo "Pick a row from the depth-selection table in doc/AI_COLLABORATION_PROTOCOL.md, e.g." >&2
+        echo "  CODEX_MODEL=gpt-5.6-terra CODEX_EFFORT=high GROK_MODEL=grok-4.6 GROK_EFFORT=high \\" >&2
+        echo "  AI_EXCHANGE_SLUG=$SLUG scripts/cross_review.sh --$MODE${TARGET:+ $TARGET}" >&2
+        exit 1
+    fi
+
+    # Presence is not enough. The wrappers reject a bad value, but they reject it one leg
+    # at a time: a typo would fail the Codex leg, let the Grok leg run and bill, and leave
+    # the round exiting 0 with a synthetic "Audit FAILED" entry that reads like a vendor
+    # outage. Refuse the whole round here instead, before anything is dispatched.
+    case "$CODEX_MODEL" in
+        gpt-5.6-sol|gpt-5.6-terra|gpt-5.6-luna|gpt-5.5|gpt-5.4|gpt-5.4-mini) ;;
+        *) echo "cross_review.sh: bad CODEX_MODEL '$CODEX_MODEL' (see the depth table)" >&2; exit 1 ;;
+    esac
+    case "$GROK_MODEL" in
+        grok-4.6|grok-4.5) ;;
+        *) echo "cross_review.sh: bad GROK_MODEL '$GROK_MODEL' (see the depth table)" >&2; exit 1 ;;
+    esac
+    for V in CODEX_EFFORT GROK_EFFORT; do
+        case "${!V}" in
+            low|medium|high|xhigh) ;;
+            *) echo "cross_review.sh: bad $V '${!V}' — allowed: low medium high xhigh" >&2; exit 1 ;;
+        esac
+    done
+fi
 
 timestamp() { date '+%Y-%m-%d %H:%M:%S %Z'; }
 upper() { printf '%s' "$1" | tr 'a-z' 'A-Z'; }
@@ -110,14 +158,31 @@ build_prompt() {  # $1 = priming
 }
 
 run_auditor() {  # $1 = codex|grok, $2 = exchange slug
-    AI_EXCHANGE_SLUG="$2" "$SCRIPTS/ask_$1.sh" - < "$PROMPT_FILE"
+    # Prefix assignment, not plain assignment: the values resolved above are shell variables,
+    # not exported ones, so without this the wrappers would fall back to their own defaults and
+    # --quick would quietly keep running at the interactive tier. Prefix form also beats an
+    # exported value inherited from the committing shell.
+    AI_EXCHANGE_SLUG="$2" \
+    CODEX_MODEL="$CODEX_MODEL" \
+    CODEX_EFFORT="$CODEX_EFFORT" \
+    GROK_MODEL="$GROK_MODEL" \
+    GROK_EFFORT="$GROK_EFFORT" \
+    "$SCRIPTS/ask_$1.sh" - < "$PROMPT_FILE"
 }
 
 # cat the temp-slug exchange file into stdout, or an honest failure entry; then remove it.
 collect() {  # $1 = temp slug file, $2 = voice name, $3 = exit code
+    # The failure header carries the depth too: a round that produced no audit still has to
+    # say what it asked for, or the record cannot distinguish "asked shallowly" from
+    # "vendor was down".
+    local tModel tEffort
+    case "$2" in
+        CODEX) tModel="$CODEX_MODEL"; tEffort="$CODEX_EFFORT" ;;
+        *)     tModel="$GROK_MODEL";  tEffort="$GROK_EFFORT"  ;;
+    esac
     if [ -s "$1" ]; then cat "$1"
-    else printf '\n---\n\n# %s %s\n## Audit FAILED\nWrapper exit %s — no usable audit produced (see %s/_cross_review.log).\n' \
-                "$2" "$(timestamp)" "$3" "$EXDIR"
+    else printf '\n---\n\n# %s %s  (model=%s, effort=%s)\n## Audit FAILED\nWrapper exit %s — no usable audit produced (see %s/_cross_review.log).\n' \
+                "$2" "$(timestamp)" "$tModel" "$tEffort" "$3" "$EXDIR"
     fi
     rm -f "$1"
 }
@@ -190,4 +255,4 @@ quick)
     release_lock
     ;;
 esac
-echo "cross_review.sh: done ($MODE, $DESC)" >&2
+echo "cross_review.sh: done ($MODE, $DESC; codex=$CODEX_MODEL/$CODEX_EFFORT grok=$GROK_MODEL/$GROK_EFFORT)" >&2

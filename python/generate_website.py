@@ -113,7 +113,7 @@ def generate_flavor_descriptions(flavors):
         descriptions.append({
             'package': 'scls-gcc',
             'label': 'GCC + OpenBLAS',
-            'description': 'Default production stack with GCC, OpenBLAS, OpenMPI, LP64 integers, and x86-64-v3 optimization flags.',
+            'description': 'Default production stack with GCC, OpenBLAS, OpenMPI, LP64 integers, and <code>x86-64-v3</code> optimization flags.',
         })
 
     if 'mkl' in by_name:
@@ -127,7 +127,7 @@ def generate_flavor_descriptions(flavors):
         descriptions.append({
             'package': 'scls-debug',
             'label': 'GCC + Reference BLAS/LAPACK',
-            'description': 'Diagnostic stack compiled with -Og -g and linked against Netlib reference BLAS/LAPACK for valgrind, sanitizers, and debuggers.',
+            'description': 'Diagnostic stack compiled with <code>-Og -g</code> and linked against Netlib reference BLAS/LAPACK for Valgrind, sanitizers, and debuggers.',
         })
 
     return descriptions

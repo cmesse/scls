@@ -311,15 +311,60 @@ Each script:
 1. Resolves the per-task AI-only exchange path `./tmp/ai_exchange/<slug>.md` (slug from `$AI_EXCHANGE_SLUG`, else a sanitized session tag `sess_<id>` from `$CLAUDE_CODE_SESSION_ID`, else `scratch`), creating it if absent, and instructs the auditor to read the existing thread first
 2. Prepends the role preamble (the auditor reads `CLAUDE.md` and this protocol)
 3. Runs the auditor CLI read-only, rooted at the SCLS repo
-4. Appends a `# CODEX` / `# GROK <timestamp>` entry to the resolved exchange file
+4. Appends a `# CODEX` / `# GROK <timestamp>  (model=…, effort=…)` entry to the resolved exchange file
 5. Echoes the response to stdout so Claude sees it inline
 
 To pin a topic file explicitly, set `AI_EXCHANGE_SLUG=<topic>` before invoking either wrapper.
 
+### 9.1 Depth Selection
+
+Both wrappers take a model and a reasoning effort, and stamp both into the exchange entry. Choose
+them before dispatch; do not let them default. The defaults exist so a bare invocation still works,
+not as a tier — they were chosen to reproduce what the vendor configs gave on the day the wrappers
+pinned them (2026-08-30), and an unchosen knob is marked `[defaulted]` in the record precisely so it
+is not mistaken for a choice. That correspondence is an observation of a local config, not something
+this repository can check; if the vendor config drifts, the wrapper defaults stay put.
+
+| Subject | Codex | Grok |
+|---|---|---|
+| Prose sweep of an ordinary guide, README, or changelog; citation and doc-claim mechanics | `gpt-5.6-luna`, `medium` | not used |
+| Prose sweep of a dense policy document (license policy, MKL ABI policy, this protocol) | `gpt-5.6-terra`, `medium` | not used |
+| Single narrow claim (one macro expansion, one dependency, one manifest line), round 1 | `gpt-5.6-terra`, `medium` | `high` |
+| Recipe, flavor, or builder-diff audit, round 1 | `gpt-5.6-terra`, `high` | `high` |
+| Round ≥ 2, a round-1 split verdict, or a policy-boundary subject (license redistribution, MKL SONAME, cross-builder divergence, anything that reaches a published repository) | `gpt-5.6-terra`, `xhigh` | `xhigh` |
+| Unattended post-commit `--quick` | `gpt-5.6-luna`, `medium` | `grok-4.6`, `medium` |
+
+Grok's model column is `grok-4.6` throughout; only the effort varies.
+
+```bash
+CODEX_MODEL=gpt-5.6-terra CODEX_EFFORT=high AI_EXCHANGE_SLUG=<slug> .claude/scripts/ask_codex.sh - < prompt.md
+GROK_MODEL=grok-4.6 GROK_EFFORT=high        AI_EXCHANGE_SLUG=<slug> .claude/scripts/ask_grok.sh  - < prompt.md
+```
+
+Four things the table encodes:
+
+- **The key is the subject's scope and the round number, not the confidence of the claim under
+  audit.** The claim's confidence is the thing being tested; ordering a cheap round because you feel
+  sure is exactly backwards when you are confidently wrong.
+- **The second rung raises effort, not model.** Moving both knobs at once makes it impossible to
+  learn which one helped. `gpt-5.6-sol` is allowlisted as an escape hatch but is named by no row,
+  pending a measured comparison on a real SCLS diff.
+- **Effort is capped at `xhigh`.** This is a cost-and-conservatism policy, not a proven
+  constraint: `max` has shown no measured benefit, and `ultra` is documented by the vendor as
+  delegating to subagents — a different execution shape than the single-agent read-only audit the
+  wrappers assume. Raise the cap only with a measurement.
+- **Effort is not a substitute for a sharp prompt.** A narration-stub answer ("I'll check…") is a
+  prompt-shape defect; no effort setting fixes it.
+
+`scripts/cross_review.sh --jury` and `--relay` refuse to run unless all four variables are set, and
+name this table when they do. `--quick` pins the cheap row itself and forces it onto the auditors,
+so the unattended post-commit hook cannot be retuned by whatever shell happened to commit.
+
 ### Workflow
 
 1. **Write a Claude query entry** to `./tmp/ai_exchange/<slug>.md` first (standard `# CLAUDE` header, §2 format), stating your claim and confidence.
-2. **Call the script** with a focused audit prompt referencing specific files/lines.
+2. **Call the script** with a focused audit prompt referencing specific files/lines, and with the
+   depth from §9.1 set explicitly.
 3. **Read the response** from stdout (or from the delta hook on the next prompt).
 4. **Write a resolution entry** (`# CLAUDE … ## Resolution`) summarising what was confirmed, refuted, or left open.
 

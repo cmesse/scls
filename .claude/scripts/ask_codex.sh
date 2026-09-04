@@ -8,6 +8,24 @@
 #   AI_EXCHANGE_SLUG=petsc_mkl_link ask_codex.sh "..."      # pin the per-task topic file
 #   CODEX_BIN=/path/to/codex ask_codex.sh "..."             # override the CLI location
 #
+# Depth selection (doc/AI_COLLABORATION_PROTOCOL.md, "Depth Selection"):
+#   CODEX_MODEL   gpt-5.6-sol|gpt-5.6-terra|gpt-5.6-luna|gpt-5.5|gpt-5.4|gpt-5.4-mini
+#                 (default gpt-5.6-terra). Only terra and luna are named by the depth table.
+#                 gpt-5.6-sol and everything below luna are escape hatches, not tiers — sol in
+#                 particular is allowlisted but deliberately unnamed, pending a measured
+#                 comparison against terra.
+#   CODEX_EFFORT  low|medium|high|xhigh (default medium)
+#
+#   CODEX_MODEL=gpt-5.6-terra CODEX_EFFORT=high ask_codex.sh "..."
+#
+# The defaults were chosen to reproduce what ~/.codex/config.toml gave on 2026-08-30, before
+# this wrapper pinned anything, so that turning the knobs on changed the record and not the
+# depth. That is an observation of one machine's config on one day, not a guarantee: if the
+# vendor config drifts, the defaults here stay put and the two simply diverge. Leaving either
+# unset still works, but the entry is stamped [defaulted] and a warning goes to stderr — an
+# unchosen tier must be visible in the record, because "the jury agreed" means little without
+# knowing how hard it looked.
+#
 # The script prepends a role preamble so Codex knows its audit context, then appends
 # the formatted response under a # CODEX header to the per-task AI-only exchange file
 # ./tmp/ai_exchange/<slug>.md (audience tier: AI-only, ephemeral — see the protocol §2/§10).
@@ -32,6 +50,48 @@ if [ ! -x "$CODEX" ]; then
 fi
 # Script lives in <root>/.claude/scripts/ — project root is two levels up.
 SCLS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# --- Depth selection: model + reasoning effort -------------------------------
+# Validated here, before the prompt is read, so a typo costs nothing: no stdin is
+# consumed and no request is billed. `codex exec` has no --effort flag; effort is a
+# config overlay (-c model_reasoning_effort=...), which is why the two knobs are passed
+# by different mechanisms below.
+CODEX_MODEL_CHOSEN=1
+CODEX_EFFORT_CHOSEN=1
+if [ -z "${CODEX_MODEL:-}" ]; then CODEX_MODEL="gpt-5.6-terra"; CODEX_MODEL_CHOSEN=0; fi
+if [ -z "${CODEX_EFFORT:-}" ]; then CODEX_EFFORT="medium";      CODEX_EFFORT_CHOSEN=0; fi
+
+case "$CODEX_MODEL" in
+    gpt-5.6-sol|gpt-5.6-terra|gpt-5.6-luna|gpt-5.5|gpt-5.4|gpt-5.4-mini) ;;
+    *)
+        echo "ask_codex.sh: unknown CODEX_MODEL '$CODEX_MODEL'" >&2
+        echo "Allowed: gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna gpt-5.5 gpt-5.4 gpt-5.4-mini" >&2
+        exit 1
+        ;;
+esac
+
+# Capped at xhigh on purpose: `max` buys no demonstrated accuracy here, and `ultra`
+# delegates to subagents, which is a different execution shape than the single-agent
+# read-only audit this wrapper is built around.
+case "$CODEX_EFFORT" in
+    low|medium|high|xhigh) ;;
+    *)
+        echo "ask_codex.sh: unknown CODEX_EFFORT '$CODEX_EFFORT'" >&2
+        echo "Allowed: low medium high xhigh (max and ultra are deliberately excluded)" >&2
+        exit 1
+        ;;
+esac
+
+# Per-knob provenance, so the stamp says WHICH knob was left unchosen — a trailing
+# "(defaulted)" on the whole line cannot distinguish the two.
+CODEX_MODEL_TAG="$CODEX_MODEL"
+CODEX_EFFORT_TAG="$CODEX_EFFORT"
+if [ "$CODEX_MODEL_CHOSEN" -eq 0 ]; then CODEX_MODEL_TAG="$CODEX_MODEL [defaulted]"; fi
+if [ "$CODEX_EFFORT_CHOSEN" -eq 0 ]; then CODEX_EFFORT_TAG="$CODEX_EFFORT [defaulted]"; fi
+if [ "$CODEX_MODEL_CHOSEN" -eq 0 ] || [ "$CODEX_EFFORT_CHOSEN" -eq 0 ]; then
+    echo "ask_codex.sh: depth not selected by the caller — using model=$CODEX_MODEL effort=$CODEX_EFFORT" >&2
+    echo "Pick a row from the depth-selection table in doc/AI_COLLABORATION_PROTOCOL.md and set CODEX_MODEL / CODEX_EFFORT." >&2
+fi
 
 # Resolve the per-task AI-only exchange file: ./tmp/ai_exchange/<slug>.md
 # slug precedence: explicit $AI_EXCHANGE_SLUG > session tag from $CLAUDE_CODE_SESSION_ID > "scratch".
@@ -120,9 +180,14 @@ trap 'rm -f "$TMPOUT" "$TMPERR" "$TMPPROMPT"' EXIT
 # codex-exec hang on an open stdin cannot occur.
 printf '%s\n' "$FULL_PROMPT" > "$TMPPROMPT"
 
+# The two depth flags are OPTIONS and must stay ahead of the positional `-`: after it,
+# `-c` would swallow the prompt marker as its value. They add four short argv words, which
+# is unrelated to the E2BIG hazard above — that was the prompt itself on argv.
 "$CODEX" exec \
     --sandbox read-only \
     -C "$SCLS_ROOT" \
+    -m "$CODEX_MODEL" \
+    -c model_reasoning_effort="$CODEX_EFFORT" \
     --output-last-message "$TMPOUT" \
     - < "$TMPPROMPT" \
     >/dev/null 2>"$TMPERR"
@@ -144,7 +209,7 @@ TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S %Z')
 
 {
     printf '\n---\n\n'
-    printf '# CODEX %s\n' "$TIMESTAMP"
+    printf '# CODEX %s  (model=%s, effort=%s)\n' "$TIMESTAMP" "$CODEX_MODEL_TAG" "$CODEX_EFFORT_TAG"
     printf '%s\n' "$RESULT"
 } >> "$EXCHANGE"
 

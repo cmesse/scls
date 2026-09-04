@@ -11,6 +11,15 @@ source:
 patches:
   macos:
     - libatomic-darwin-posix-lock-visibility.patch
+    # Iain Sandoe's Darwin branch (https://github.com/iains/gcc-16-branch) as
+    # vendored by Homebrew (homebrew-core Patches/gcc/gcc-16.2.0.diff, byte
+    # identical). Upstream GCC has no aarch64-apple-darwin target, so without
+    # it the build cannot even configure on Apple Silicon. Gated to arm64 so
+    # the validated Intel build is untouched. Version-locked: re-fetch the
+    # matching Homebrew diff on every GCC bump. No Apple Silicon build
+    # evidence yet — see changelogs/gcc.md.
+    - file: gcc-16.2.0-darwin-aarch64-homebrew.patch
+      arch: arm64
 
 update:
   strategy: gnu_ftp

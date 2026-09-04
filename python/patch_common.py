@@ -3,6 +3,7 @@ Improved patching functions for SCLS build system
 """
 
 import os
+import platform
 import subprocess
 import shutil
 from pathlib import Path
@@ -11,7 +12,29 @@ from typing import Dict, List, Optional
 from build_common import BuildError, resolve_flavor_key
 
 
-def get_patches_from_recipe(recipe: Dict, flavor: Dict = None) -> List[Dict]:
+def normalize_arch(name) -> str:
+    """Fold the spellings of one CPU architecture onto a single token.
+
+    Python's platform.machine() reports 'arm64' on macOS and 'aarch64' on
+    Linux for the same architecture, and 'x86_64' / 'amd64' likewise, so a
+    recipe's arch: key and the host answer must be compared after folding.
+    Unknown names pass through lowercased so a typo shows up as a
+    never-matching patch rather than a crash.
+    """
+    n = str(name or '').lower()
+    if n in ('arm64', 'aarch64'):
+        return 'arm64'
+    if n in ('x86_64', 'amd64'):
+        return 'x86_64'
+    return n
+
+
+def host_arch() -> str:
+    """Normalized architecture of the build host (see normalize_arch)."""
+    return normalize_arch(platform.machine())
+
+
+def get_patches_from_recipe(recipe: Dict, flavor: Dict = None, arch: str = None) -> List[Dict]:
     """
     Extract patch information from recipe - supports multiple formats:
     1. patches: [list] format (simple list of patches)
@@ -22,6 +45,13 @@ def get_patches_from_recipe(recipe: Dict, flavor: Dict = None) -> List[Dict]:
     - ilp64: applied when flavor math.interface == 'ilp64'
     - lp64: applied when flavor math.interface == 'lp64' (or default)
     - <flavor_name>: applied for specific flavor (e.g., macos, debug, mkl)
+
+    Any dict-style entry may additionally carry `arch: <name>` or
+    `arch: [<name>, ...]`; the entry is then applied only when the build
+    architecture (`arch` argument, default the host's) is in that set. This
+    is an orthogonal filter inside a flavor list, not a flavor key: the
+    macos flavor covers both Intel and Apple Silicon hosts, and a patch such
+    as the aarch64-apple-darwin GCC branch belongs to one of them only.
     """
     patches = []
 
@@ -38,6 +68,8 @@ def get_patches_from_recipe(recipe: Dict, flavor: Dict = None) -> List[Dict]:
         math_config = flavor.get('math', {})
         interface = math_config.get('interface', 'lp64')
 
+    current_arch = host_arch() if arch is None else normalize_arch(arch)
+
     def add_patch_entry(patch_entry):
         """Helper to add a patch entry in either string or dict format"""
         if isinstance(patch_entry, str):
@@ -47,6 +79,25 @@ def get_patches_from_recipe(recipe: Dict, flavor: Dict = None) -> List[Dict]:
                 'source': 'recipe_patches'
             })
         elif isinstance(patch_entry, dict):
+            if 'arch' in patch_entry:
+                # An explicit key must carry a real value: a bare `arch:`
+                # (YAML null) is almost certainly a mistake, and silently
+                # treating it as "every architecture" would apply a
+                # platform-specific patch everywhere.
+                wanted = patch_entry['arch']
+                if isinstance(wanted, str):
+                    wanted = [wanted]
+                if (not isinstance(wanted, (list, tuple))
+                        or not all(isinstance(a, str) for a in wanted)):
+                    raise BuildError(
+                        f"Patch {patch_entry.get('file')}: 'arch' must be a "
+                        f"string or a list of strings, got {wanted!r}"
+                    )
+                allowed = {normalize_arch(a) for a in wanted}
+                if current_arch not in allowed:
+                    print(f"Skipping {patch_entry.get('file')}: arch "
+                          f"{sorted(allowed)} does not match build arch {current_arch}")
+                    return
             patches.append({
                 'file': patch_entry['file'],
                 'strip': patch_entry.get('strip', 1),
@@ -171,15 +222,17 @@ def infer_patch_level(patch_file: Path) -> int:
         return 1
 
 
-def get_all_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("patches"), flavor: Dict = None) -> List[Dict]:
+def get_all_patches(recipe: Dict, package_name: str, patches_dir: Path = Path("patches"), flavor: Dict = None, arch: str = None) -> List[Dict]:
     """
     Get all patches for a package, with smart auto-discovery
     Priority: recipe-specified patches first, then auto-discovered
+
+    `arch` is forwarded to get_patches_from_recipe (None = build host).
     """
     patches = []
 
     # First, get patches specified in recipe (if any)
-    recipe_patches = get_patches_from_recipe(recipe, flavor)
+    recipe_patches = get_patches_from_recipe(recipe, flavor, arch)
     patches.extend(recipe_patches)
 
     patch_config = recipe.get('patches')

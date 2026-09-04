@@ -50,9 +50,10 @@
 
     <meta name="generator" content="SCLS Website Generator {{ generation_time }}">
 
-    <link rel="stylesheet" media="all" href="https://belfem.lbl.gov/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" media="all" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet">
     <script type="text/javascript">
         function displayEmail() {
             var asciiEmail = '&#99;&#109;&#101;&#115;&#115;&#101;&#64;&#108;&#98;&#108;&#46;&#103;&#111;&#118;';
@@ -61,15 +62,16 @@
         }
     </script>
     <style>
+        /* --- Hero ------------------------------------------------------ */
         .scls-hero {
             display: flex;
-            gap: 2rem;
+            gap: 40px;
             align-items: flex-start;
-            margin: 1rem 0 2rem 0;
+            margin: 0;
         }
         .scls-hero-logo {
-            flex: 0 0 240px;
-            max-width: 240px;
+            flex: 0 0 220px;
+            max-width: 220px;
         }
         .scls-hero-logo img {
             width: 100%;
@@ -80,42 +82,44 @@
             flex: 1;
             min-width: 0;
         }
-        @media (max-width: 800px) {
-            .scls-hero {
-                flex-direction: column;
-                gap: 1rem;
-            }
-            .scls-hero-logo {
-                flex: 0 0 auto;
-                max-width: 200px;
-                margin: 0 auto;
-            }
+        .scls-hero-text .lead {
+            margin-bottom: 1em;
+        }
+
+        /* --- Package tables -------------------------------------------- */
+        .table-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-bottom: 8px;
         }
         .package-table {
             border-collapse: collapse;
             width: 100%;
-        }
-        .package-table th {
-            background-color: #f0f0f0;
+            background: var(--surface);
+            font-size: 14.5px;
+            line-height: 1.5;
         }
         .package-table th,
         .package-table td {
+            border: 1px solid var(--rule);
+            padding: 8px 10px;
             vertical-align: top;
         }
+        .package-table thead th {
+            background-color: var(--surface-alt);
+            color: var(--navy);
+            font-weight: 600;
+        }
         .package-table tbody tr:nth-child(even) {
-            background-color: #f9f9f9;
+            background-color: var(--page-bg);
         }
-        .command {
-            background-color: #f7f7f7;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 0.75rem;
-            white-space: pre-wrap;
-            overflow-wrap: anywhere;
-        }
+        .package-table td.center,
         .package-table td.center-check {
             text-align: center;
-            font-size: 1.2em;
+        }
+        .package-table td.center-check {
+            color: var(--teal);
+            font-size: 1.05em;
         }
         .flavor-header {
             writing-mode: vertical-rl;
@@ -125,47 +129,93 @@
             min-width: 30px;
         }
         .package-name {
-            font-weight: bold;
+            font-weight: 600;
+        }
+
+        /* --- Shell commands -------------------------------------------- */
+        .command {
+            background-color: var(--surface-alt);
+            border: 1px solid var(--rule);
+            border-radius: var(--radius);
+            padding: 12px 14px;
+            margin: 0 0 1em;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            font-size: 14px;
+            line-height: 1.55;
+        }
+        .command code {
+            display: block;
+            padding: 0;
+            border: none;
+            background: none;
+            white-space: inherit;
+        }
+
+        @media (max-width: 800px) {
+            .scls-hero {
+                flex-direction: column;
+                gap: 24px;
+            }
+            .scls-hero-logo {
+                flex: 0 0 auto;
+                max-width: 180px;
+            }
         }
     </style>
 </head>
 
 <body onload="displayEmail();">
 <header>
-<nav>
-    <a href="index.html" title="BELFEM">BELFEM</a>
-    <a href="scls.html" title="SCLS">SCLS</a>
-    <a href="publications.html" title="Publications">Publications</a>
-    <a href="contact.html" title="Contact">Contact</a>
-</nav>
+    <a href="index.html" class="brand" title="BELFEM">BELFEM</a>
+    <nav>
+        <a href="index.html" title="BELFEM">BELFEM</a>
+        <a href="scls.html" title="SCLS" class="active" aria-current="page">SCLS</a>
+        <a href="examples.html" title="Examples">Examples</a>
+        <a href="publications.html" title="Publications">Publications</a>
+        <a href="contact.html" title="Contact">Contact</a>
+    </nav>
 </header>
-<main class="container">
-    <h1>Scientific Core Library Stack {{ release_version }}</h1>
+<main>
+<section class="section">
     <div class="scls-hero">
         <div class="scls-hero-logo">
-            <img src="https://belfem.lbl.gov/signet.gif" alt="SCLS Logo">
+            <img src="signet.gif" alt="SCLS Logo">
         </div>
         <div class="scls-hero-text">
-            <p>SCLS packages a coherent stack of scientific libraries &mdash; BLAS/LAPACK, MPI, sparse solvers, PETSc, HDF5, and their dependencies &mdash; as RPMs for Enterprise Linux, as DEBs for Ubuntu 24.04 LTS, and as source-built installs for macOS and other Unix systems. After enabling a public binary repository, one package-manager command installs a complete, mutually compatible flavor.</p>
+            <div class="eyebrow">Scientific Software Stack</div>
+            <h1>Scientific Core Library Stack {{ release_version }}</h1>
+            <p class="lead">SCLS packages a coherent stack of scientific libraries &mdash; BLAS/LAPACK, MPI, sparse solvers, PETSc, HDF5, and their dependencies. It provides RPMs for Enterprise Linux, DEBs for Ubuntu 24.04 LTS, and source-built installs for macOS and other Unix systems. After enabling a public binary repository, one package-manager command installs a complete, mutually compatible flavor.</p>
 
             <p>Public Linux binary flavors install under <code>/opt/scls/&lt;flavor&gt;</code>, so several stacks can coexist on the same host without interfering with the operating system. Source-built site flavors may choose their own prefix, and the macOS flavor installs directly under <code>/opt/scls</code>.</p>
 
             <p>Send comments, questions, or suggestions to Christian Messe: <b id="email">[javascript protected email]</b><noscript> cmesse (at) lbl.gov</noscript></p>
         </div>
     </div>
+</section>
 
-    <h2>Purpose</h2>
+<section class="section-band">
+    <div class="section-head">
+        <h2>Purpose</h2>
+        <span class="caption">What SCLS solves</span>
+    </div>
     <p>SCLS exists for the practical problem of getting scientific libraries to build, install, and work together on real machines. It targets environments where the system packages are too old, incomplete, inconsistent across dependencies, or simply unavailable for the platform in front of you.</p>
-    <p>SCLS is intended for scientists, research software engineers, and HPC maintainers who need PETSc, HDF5, NetCDF, OpenMPI, sparse solvers, and math libraries to agree on compilers, ABI, MPI, BLAS/LAPACK, rpaths, and install layout.</p>
+    <p>SCLS is intended for scientists, research software engineers, and HPC maintainers who need PETSc, HDF5, NetCDF, OpenMPI, sparse solvers, and math libraries to agree on compiler and ABI choices, MPI, BLAS/LAPACK, rpaths, and install layout.</p>
     <p>The stack covers the core numerical infrastructure used by downstream scientific software: BLAS/LAPACK, MPI-enabled math libraries, sparse solvers, graph partitioners, I/O libraries, and the dependencies needed to make them coexist. SCLS is not three separate build systems: RPM packages, DEB packages, and direct Unix installs are generated from the same package recipes and flavor definitions, which keeps Linux and macOS behavior aligned.</p>
-    <p>SCLS ships as OS-level packages where possible rather than as Docker images or Spack environments. Docker is a good fit when an application brings its entire runtime with it, but containers add isolation that scientific and HPC workloads usually do not want &mdash; they complicate MPI launches and move responsibility for the stack from the OS package manager to a runtime. Spack excels when every user wants their own bespoke concretization of a large software graph, but it optimizes for combinatorial flexibility rather than a stable, shared stack. RPMs and DEBs map cleanly onto existing sysadmin workflows, give normal install/uninstall semantics, and let multiple users and projects share a single managed binary installation in a predictable prefix.</p>
-    <p>On macOS, SCLS does not piggyback on Homebrew for similar reasons. Homebrew installs everything into a single shared prefix (<code>/usr/local</code> on Intel Macs, <code>/opt/homebrew</code> on Apple Silicon) where user-level tools and scientific libraries share the same namespace, making version pinning and controlled scientific stacks awkward. Keeping the macOS stack in the SCLS-owned <code>/opt/scls</code> prefix gives it the same isolation and activation model as the Linux binaries, so downstream code, activation, and environment variables behave consistently across platforms.</p>
+    <p>SCLS ships as OS-level packages where possible rather than as Docker images or Spack environments. Docker is useful when an application brings its whole runtime with it, but containers can complicate MPI launches and shift stack management from the OS package manager to a container runtime. Spack is well suited to per-user, bespoke concretizations of a large software graph; SCLS instead favors a stable shared stack. RPMs and DEBs fit existing sysadmin workflows, provide normal install and uninstall semantics, and let users and projects share one managed binary installation in a predictable prefix.</p>
+    <p>On macOS, SCLS does not use Homebrew as the stack manager for the same reason. Homebrew puts user tools and scientific libraries in one shared prefix (<code>/usr/local</code> on Intel Macs and <code>/opt/homebrew</code> on Apple Silicon), which makes a controlled, version-pinned scientific stack awkward. Keeping the macOS stack in the SCLS-owned <code>/opt/scls</code> prefix gives it the same isolation and activation model as the Linux binaries, so downstream code and environment variables behave consistently across platforms.</p>
     <p>The intended result is not maximum configurability. It is a coherent, reproducible stack that downstream codes can link against without constant manual repair.</p>
 
-    <h2>Design Philosophy</h2>
+</section>
+
+<section class="section-band">
+    <div class="section-head section-head--accent">
+        <h2>Design Philosophy</h2>
+        <span class="caption">Curated, opinionated defaults</span>
+    </div>
     <p>SCLS is deliberately opinionated. It is a curated build and packaging system, not a general-purpose meta-build framework. It makes a small number of project-wide choices so the resulting libraries share the same compiler assumptions, math backend, integer model, MPI implementation, and installation layout:</p>
     <ul>
-        <li>GCC is the default toolchain for its open availability, reliability, and strong Fortran support.</li>
+        <li>GCC is the default toolchain because it is widely available, reliable, and has strong Fortran support.</li>
         <li>The math backend is selected by flavor (OpenBLAS for <code>gcc</code>, Intel MKL for <code>mkl</code>, reference BLAS/LAPACK for <code>debug</code>), not toggled package by package.</li>
         <li>OpenMPI is the default MPI implementation.</li>
         <li>Shared libraries are the normal target.</li>
@@ -175,26 +225,38 @@
     </ul>
     <p>The stack also deliberately leaves some things out:</p>
     <ul>
-        <li><strong>No Python in the stack.</strong> Interpreter choice (system, pyenv, conda, spack, modules) is site- and user-specific, so recipes disable Python and other language bindings by default. Users bring their own interpreter and link against the installed C/C++ libraries.</li>
-        <li><strong>No Boost.</strong> Modern C++ (C++17/20) covers most of what scientific code used to need from Boost, and the libraries SCLS cares about either never required it or have dropped the dependency.</li>
+        <li><strong>No Python in the stack.</strong> Interpreter choice (system, pyenv, conda, Spack, modules) is site- and user-specific, so recipes disable Python and other language bindings by default. Users bring their own interpreter and link it to the installed C/C++ libraries.</li>
+        <li><strong>No Boost.</strong> Modern C++ (C++17/20) covers most of what scientific code once used Boost for, and the libraries SCLS targets either never required it or have dropped the dependency.</li>
         <li><strong>No GPL-3 linkable libraries in binary flavors</strong>, so downstream codes can link SCLS without copyleft concerns. GPL-3 build tools are fine because they run during the build and are not linked into the delivered libraries; GPL-2, LGPL, and CeCILL-C scientific libraries are allowed when their source and redistribution obligations are practical to satisfy. See the <a href="https://github.com/cmesse/scls/blob/main/doc/LICENSE_POLICY.md">license policy</a> for details.</li>
     </ul>
     <p>This bias toward curation is intentional. If a project needs many custom feature toggles for a single package, SCLS is probably the wrong tool. If it needs PETSc, HDF5, OpenBLAS, NetCDF, MUMPS, and related libraries to build and coexist predictably, SCLS is built for that job.</p>
 
-    <h2>Flavors</h2>
+</section>
+
+<section class="section-band">
+    <div class="section-head">
+        <h2>Flavors</h2>
+        <span class="caption">Compiler, math backend, and prefix</span>
+    </div>
     <p>A <em>flavor</em> is the unit of consistency in SCLS. It defines the target platform, compiler family, optimization flags, math backend, MPI choice, integer model, and install prefix for the entire stack. Public Linux binary flavors install into distinct <code>/opt/scls/&lt;flavor&gt;</code> prefixes; source-built flavors declare their own prefix.</p>
     <ul>
         {% for flavor in flavor_groups %}
         <li><code><b>{{ flavor.package }}</b></code> &mdash; {{ flavor.label }}. {{ flavor.description }}</li>
         {% endfor %}
     </ul>
-    <p>The public binary repositories currently target Enterprise Linux 9 and 10, Amazon Linux 2023, and Ubuntu 24.04 LTS. The same repository can also build local RPMs on other RHEL-family systems, local DEBs on Debian-family systems, or direct Unix installs on macOS and non-RPM/non-DEB Unix systems.</p>
-    <p>Additional source-build flavors include <code>lbl</code> for a site-specific LBL prefix, <code>intel</code> for Intel compiler builds, <code>gcc-mkl-cuda</code> for CUDA-enabled experiments, and <code>macos</code>. See the <a href="https://github.com/cmesse/scls/tree/main/flavors"><code>flavors/</code></a> directory for the complete set.</p>
+    <p>The public binary repositories currently target Enterprise Linux 9 and 10, Amazon Linux 2023, and Ubuntu 24.04 LTS. The SCLS source tree can also build local RPMs on other RHEL-family systems, local DEBs on Debian-family systems, and direct Unix installs on macOS and other Unix systems.</p>
+    <p>Additional source-build flavors include <code>lbl</code> for an LBL-specific prefix, <code>intel</code> for Intel compiler builds, <code>gcc-mkl-cuda</code> for CUDA-enabled experiments, and <code>macos</code>. See the <a href="https://github.com/cmesse/scls/tree/main/flavors"><code>flavors/</code></a> directory for the complete list.</p>
     <p>CUDA binaries are not distributed, because a CUDA-linked stack would tie users to a specific driver and toolkit version. Users who need GPU acceleration can use the <code>gcc-mkl-cuda</code> source-build flavor and link against a locally installed CUDA toolkit.</p>
-    <p>On macOS the stack uses OpenBLAS rather than Apple's Accelerate framework. The <code>macos</code> flavor builds its own GCC for Fortran support (SCLS ships a GCC build script for exactly this purpose), and pairing GCC-built Fortran with Accelerate is fragile &mdash; Accelerate is tuned for Apple's Clang toolchain and its ABI story is awkward from the GCC side. OpenBLAS is well-understood with GCC, keeps the math behavior identical to the Linux binary flavors, and is tuned for compute throughput rather than the performance/power tradeoffs that shape Accelerate.</p>
-    <p>The Unix build script also provides GPL-3 build tools and selected LGPL-3 arbitrary-precision dependencies that are left out of the public Linux binary flavors. See the second package table below.</p>
+    <p>On macOS, the stack uses OpenBLAS rather than Apple's Accelerate framework. The <code>macos</code> flavor builds its own GCC for Fortran support. Pairing GCC-built Fortran with Accelerate is fragile: Accelerate is tuned for Apple's Clang toolchain, and its ABI is awkward to use from GCC. OpenBLAS works reliably with GCC, keeps math behavior aligned with the Linux binary flavors, and favors compute throughput over the performance and power tradeoffs that shape Accelerate.</p>
+    <p>The Unix build script also includes GPL-3 build tools and selected LGPL-3 arbitrary-precision dependencies that are excluded from the public Linux binary flavors. See the source-only package table below.</p>
 
-    <h2>Installation on Enterprise Linux 9 / 10 and Amazon Linux 2023</h2>
+</section>
+
+<section class="section-band">
+    <div class="section-head section-head--accent">
+        <h2>Installation on Enterprise Linux 9 / 10 and Amazon Linux 2023</h2>
+        <span class="caption">RPM binary repositories</span>
+    </div>
     <p>First, install the release package for your distribution (choose one):</p>
     <p>Enterprise Linux 9:</p>
     <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el9/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm">https://belfem.lbl.gov/scls/el9/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm</a></code></pre>
@@ -207,24 +269,37 @@
     <p>RPM builds also provide an optional examples meta-package. Install <code>scls-&lt;flavor&gt;-examples</code> if you want the upstream PETSc, SLEPc, and SUNDIALS example sources on disk.</p>
     <p>After installation, activate the environment:</p>
     <pre class="command"><code>source /opt/scls/&lt;flavor&gt;/share/scls/activate</code></pre>
-    <p>This adds the stack's <code>bin/</code> directory to <code>PATH</code>, exposes package metadata through <code>PKG_CONFIG_PATH</code> and <code>CMAKE_PREFIX_PATH</code>, and sets <code>SCLS</code> / <code>SCLS_FLAVOR</code>. Runtime library lookup is handled by rpaths, not by modifying <code>LD_LIBRARY_PATH</code>. Run <code>scls help</code> once the environment is active for the list of runtime subcommands (<code>scls flavor</code>, <code>scls list</code>, <code>scls info &lt;package&gt;</code>, <code>scls env</code>, <code>scls prefix</code>, <code>scls license</code>, <code>scls deactivate</code>).</p>
+    <p>This adds the stack's <code>bin/</code> directory to <code>PATH</code>, exposes package metadata through <code>PKG_CONFIG_PATH</code> and <code>CMAKE_PREFIX_PATH</code>, and sets <code>SCLS</code> and <code>SCLS_FLAVOR</code>. Runtime library lookup uses rpaths, not <code>LD_LIBRARY_PATH</code>. Once the environment is active, run <code>scls help</code> to list the runtime subcommands: <code>scls flavor</code>, <code>scls list</code>, <code>scls info &lt;package&gt;</code>, <code>scls env</code>, <code>scls prefix</code>, <code>scls license</code>, and <code>scls deactivate</code>.</p>
 
-    <h2>Installation on Ubuntu 24.04 LTS</h2>
-    <p>Ubuntu 24.04 LTS (Noble Numbat) is the supported Debian-family target. Unlike <code>dnf</code>, <code>apt</code> does not install packages directly from a URL, so the keyring + repository-configuration package is fetched first and then installed from the local file:</p>
+</section>
+
+<section class="section-band">
+    <div class="section-head">
+        <h2>Installation on Ubuntu 24.04 LTS</h2>
+        <span class="caption">DEB binary repository</span>
+    </div>
+    <p>Ubuntu 24.04 LTS (Noble Numbat) is the supported Debian-family target. Unlike <code>dnf</code>, <code>apt</code> does not install packages directly from a URL. Download and install the keyring and repository-configuration package first:</p>
     <pre class="command"><code>wget <a href="https://belfem.lbl.gov/scls/ubuntu/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb">https://belfem.lbl.gov/scls/ubuntu/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</a>
 sudo apt install ./scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</code></pre>
-    <p>This drops the SCLS public key under <code>/etc/apt/keyrings/scls-archive-keyring.gpg</code> and a deb822-format <code>scls.sources</code> file under <code>/etc/apt/sources.list.d/</code>. Then refresh apt and install a flavor:</p>
+    <p>This installs the SCLS public key at <code>/etc/apt/keyrings/scls-archive-keyring.gpg</code> and a deb822-format <code>scls.sources</code> file at <code>/etc/apt/sources.list.d/</code>. Then refresh apt and install a flavor:</p>
     <pre class="command"><code>sudo apt update
 sudo apt install scls-&lt;flavor&gt;</code></pre>
-    <p>DEB builds produce per-package example subpackages when recipes define them, such as <code>scls-&lt;flavor&gt;-petsc-examples</code>; unlike the RPM path, there is not currently an all-examples meta-package.</p>
+    <p>DEB builds produce per-package example subpackages when recipes define them, such as <code>scls-&lt;flavor&gt;-petsc-examples</code>. Unlike the RPM distribution, they do not currently provide an all-examples meta-package.</p>
     <p>After installation, activate the environment the same way as on Enterprise Linux:</p>
     <pre class="command"><code>source /opt/scls/&lt;flavor&gt;/share/scls/activate</code></pre>
     <p>The runtime <code>scls</code> command, the per-flavor prefix layout, and the activation script are identical between the RPM and DEB binary distributions.</p>
 
-    <h2>Building from Source and Local Packages</h2>
-    <p>On platforms outside the public Enterprise Linux and Ubuntu repositories, clone the repository and use the <code>./scls</code> wrapper. The wrapper selects RPM mode on supported RHEL-family hosts, including Amazon Linux 2023, DEB mode on Debian-family systems, and direct Unix install mode elsewhere.</p>
-    <p>On Debian-family systems outside the public Ubuntu 24.04 repository, <code>./scls</code> can still build local <code>.deb</code> packages. On macOS and non-RPM/non-DEB Unix systems, the same recipes are installed directly into the selected SCLS prefix through the Unix builder.</p>
-    <p><strong>macOS support is currently beta</strong>, developed and tested on Intel Macs; Apple Silicon is planned but unverified. The flavor assumes you are comfortable with a Unix toolchain &mdash; installing Xcode Command Line Tools, understanding how linker and sysroot settings work, and knowing what to do when a build log points at an SDK or path issue. The <code>macos</code> flavor also builds its own GCC for Fortran support, which adds time to the first build. If the built-in GCC bootstrap (Apple Clang building GCC 15) fails, Homebrew's prebuilt GCC is supported as a fallback. See the <a href="https://github.com/cmesse/scls/blob/main/doc/MACOS_BUILD.md">macOS build guide</a> for prerequisites, the step-by-step flow, and the two Homebrew fallback routes.</p>
+</section>
+
+<section class="section-band">
+    <div class="section-head section-head--accent">
+        <h2>Building from Source and Local Packages</h2>
+        <span class="caption">macOS and other Unix systems</span>
+    </div>
+    <p>Outside the public Enterprise Linux and Ubuntu repositories, clone the SCLS source tree and use the <code>./scls</code> wrapper. It selects RPM mode on supported RHEL-family hosts, including Amazon Linux 2023; DEB mode on Debian-family systems; and direct Unix-install mode elsewhere.</p>
+    <p>On Debian-family systems outside the public Ubuntu 24.04 repository, <code>./scls</code> can still build local <code>.deb</code> packages. On macOS and other Unix systems, the Unix builder installs the packages directly into the selected SCLS prefix.</p>
+    <p><strong>macOS support is currently beta</strong> and has been developed and tested on Intel Macs. Apple Silicon is not yet verified: the <a href="https://github.com/Homebrew/homebrew-core/tree/main/Patches/gcc">Apple Silicon GCC patch maintained by Homebrew</a> is vendored and applied automatically on arm64 hosts, but no Apple Silicon build has been run.</p>
+    <p>The macOS flavor assumes familiarity with a Unix toolchain: installing Xcode Command Line Tools, understanding linker and sysroot settings, and interpreting build logs that point to an SDK or path issue. It builds its own GCC for Fortran support, which adds time to the first build. If that bootstrap fails on an Intel Mac (Apple Clang building GCC 16), Homebrew's prebuilt GCC is supported as a fallback. See the <a href="https://github.com/cmesse/scls/blob/main/doc/MACOS_BUILD.md">macOS build guide</a> for prerequisites, the step-by-step flow, and the two Homebrew fallback routes.</p>
     <p>Quick start:</p>
     <ol>
         <li>Clone the repository:<br>
@@ -248,9 +323,15 @@ cd scls</code></pre></li>
             <pre class="command"><code>source /opt/scls/share/scls/activate</code></pre>
             Use <code>&lt;prefix&gt;/share/scls/activate</code> for any source-built flavor with a custom prefix.</li>
     </ol>
-    <p>The build wrapper itself supports <code>./scls build all</code>, <code>./scls build</code>, <code>./scls install</code>, <code>./scls spec</code> (RPM mode), <code>./scls list</code>, <code>./scls order</code>, and <code>./scls check-updates</code>. Run <code>./scls</code> with no arguments to see the usage summary.</p>
+    <p>The wrapper also supports <code>./scls build</code>, <code>./scls install</code>, <code>./scls spec</code> (RPM mode), <code>./scls list</code>, <code>./scls order</code>, and <code>./scls check-updates</code>. Run <code>./scls</code> with no arguments to see the usage summary.</p>
 
-    <h2>Using the Stack</h2>
+</section>
+
+<section class="section-band">
+    <div class="section-head">
+        <h2>Using the Stack</h2>
+        <span class="caption">Activation and build integration</span>
+    </div>
     <p>Once the environment is active, the stack is visible to ordinary build tools. A minimal PETSc example:</p>
     <pre class="command"><code>source /opt/scls/gcc/share/scls/activate
 mpicc myapp.c -o myapp $(pkg-config --cflags --libs petsc)
@@ -259,11 +340,17 @@ mpirun -n 4 ./myapp</code></pre>
     <pre class="command"><code>cmake -S . -B build -DCMAKE_PREFIX_PATH="$SCLS"
 cmake --build build</code></pre>
    
-    <p>The activation script sets <code>PATH</code>, <code>PKG_CONFIG_PATH</code>, and <code>CMAKE_PREFIX_PATH</code>, and exports <code>SCLS</code> and <code>SCLS_FLAVOR</code> plus <code>PETSC_DIR</code>, <code>SLEPC_DIR</code>, and <code>MPI_HOME</code> when those packages are installed. For PETSc, <code>PETSC_DIR</code> points at the installed SCLS prefix and <code>PETSC_ARCH</code> is intentionally empty because SCLS installs PETSc as a prefix-installed library, not as an in-place PETSc source tree. <code>pkg-config</code>, CMake's <code>find_package</code>, and package-specific configuration scripts therefore work without further setup.</p>
+    <p>The activation script sets <code>PATH</code>, <code>PKG_CONFIG_PATH</code>, and <code>CMAKE_PREFIX_PATH</code>. It exports <code>SCLS</code> and <code>SCLS_FLAVOR</code>, plus <code>PETSC_DIR</code>, <code>SLEPC_DIR</code>, and <code>MPI_HOME</code> when those packages are installed. For PETSc, <code>PETSC_DIR</code> points to the installed SCLS prefix and <code>PETSC_ARCH</code> is intentionally empty: SCLS installs PETSc as a prefix-installed library, not an in-place source tree. <code>pkg-config</code>, CMake's <code>find_package</code>, and package-specific configuration scripts therefore work without further setup.</p>
 
-    <p><code>LD_LIBRARY_PATH</code> is deliberately not modified. Every shared library in the stack is built with an rpath into its install prefix, so binaries find their dependencies at runtime without the activation script having to poison the loader search path of every child process. The activation script does, however, clean any stale SCLS entries left behind by a previously-activated flavor &mdash; switching stacks is a clean re-activation rather than an accumulating stack of path entries.</p>
+    <p><code>LD_LIBRARY_PATH</code> is deliberately not modified. Every shared library in the stack has an rpath to its install prefix, so binaries find their dependencies at runtime without changing the loader search path for every child process. The activation script does remove stale SCLS entries from a previously active flavor, so switching stacks is a clean reactivation rather than an accumulating set of path entries.</p>
 
-    <h2>Git Repository</h2>
+</section>
+
+<section class="section-band">
+    <div class="section-head section-head--accent">
+        <h2>Git Repository</h2>
+        <span class="caption">Source, recipes, and issues</span>
+    </div>
     <p>To build your own flavor, contribute recipes, or file issues:</p>
     <pre class="command"><code><a href="https://github.com/cmesse/scls">https://github.com/cmesse/scls</a></code></pre>
 
@@ -284,8 +371,15 @@ cmake --build build</code></pre>
         'mpc':      'LGPL-3.0+',
     } %}
 
-    <h2>Packages</h2>
+</section>
+
+<section class="section-band">
+    <div class="section-head">
+        <h2>Packages</h2>
+        <span class="caption">Shipped in the binary flavors</span>
+    </div>
     <p>The table below lists packages that ship in the distributed binary flavors. Their licenses are permissive, weak-copyleft, or otherwise accepted under the SCLS binary-distribution policy. GPL-3 linkable libraries are excluded from the public binary flavors.</p>
+    <div class="table-scroll">
     <table class="package-table">
         <thead>
         <tr class="gray-bg">
@@ -326,10 +420,17 @@ cmake --build build</code></pre>
         {% endfor %}
         </tbody>
     </table>
-    <br>
+    </div>
 
-    <h2>Source-Only Packages (GPL-3 / LGPL-3)</h2>
-    <p>The packages below carry GPL-3 or LGPL-3-family licenses and are therefore <em>not</em> included in the public Linux binary flavors. They are targeted primarily at source builds, especially <code>macos</code>, where Xcode and the Command Line Tools do not ship the GNU build-tool chain (autoconf, automake, libtool, m4, bison, texinfo) or the multiprecision dependencies the scientific stack needs. SCLS also ships a recipe for GCC itself, so the <code>macos</code> flavor can produce its own Fortran-capable toolchain from source. Some dependencies, such as GMP, MPFR, and MPC for GCC, may be consumed as GCC extra sources rather than shipped as public Linux binary packages.</p>
+</section>
+
+<section class="section-band">
+    <div class="section-head section-head--accent">
+        <h2>Source-Only Packages (GPL-3 / LGPL-3)</h2>
+        <span class="caption">Excluded from the binary flavors</span>
+    </div>
+    <p>The packages below carry GPL-3- or LGPL-3-family licenses and are therefore <em>not</em> included in the public Linux binary flavors. They are primarily for source builds, especially <code>macos</code>, where Xcode and the Command Line Tools do not provide the GNU build-tool chain (autoconf, automake, libtool, m4, bison, and texinfo) or the multiprecision dependencies the scientific stack needs. SCLS also includes a GCC recipe, so the <code>macos</code> flavor can build its own Fortran-capable toolchain from source. Some dependencies, including GMP, MPFR, and MPC, may be consumed as GCC extra sources rather than installed as public Linux binary packages.</p>
+    <div class="table-scroll">
     <table class="package-table">
         <thead>
         <tr class="gray-bg">
@@ -356,19 +457,30 @@ cmake --build build</code></pre>
         {% endfor %}
         </tbody>
     </table>
-    <br>
+    </div>
 
-    <h2>License</h2>
+</section>
+
+<section class="section-band">
+    <div class="section-head">
+        <h2>License</h2>
+        <span class="caption">BSD-3-Clause-LBNL</span>
+    </div>
     <p>SCLS itself is licensed under the Lawrence Berkeley National Laboratory BSD variant (BSD-3-Clause-LBNL). Individual packages retain their own licenses as shown in the table above.</p>
     <p>This software is provided <b>"AS IS"</b> without warranty of any kind.</p>
+</section>
 </main>
-<footer class="container">
-    &copy; {{ release_year }} The Regents of the University of California, through Lawrence Berkeley National Laboratory<br>
-    (subject to receipt of any required approvals from the U.S. Dept. of Energy).<br>
-    All rights reserved.
-</footer>
-<footer class="container">
-    <small>SCLS is developed at Lawrence Berkeley National Laboratory alongside <a href="index.html">BELFEM</a>. Latest update: {{ generation_date }}</small>
+<footer>
+    <div class="footer-text">
+        <p>&copy; {{ release_year }} The Regents of the University of California, through Lawrence Berkeley National Laboratory
+        (subject to receipt of any required approvals from the U.S. Dept. of Energy). All rights reserved.</p>
+        <p>SCLS is developed at Lawrence Berkeley National Laboratory alongside <a href="index.html">BELFEM</a>. Latest update: {{ generation_date }}</p>
+    </div>
+    <nav>
+        <a href="https://github.com/cmesse/scls">GitHub</a>
+        <a href="https://github.com/cmesse/scls/blob/main/doc/LICENSE_POLICY.md">License Policy</a>
+    </nav>
 </footer>
 </body>
 </html>
+

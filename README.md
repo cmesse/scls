@@ -2,7 +2,7 @@
 
 SCLS, the Scientific Core Library Stack, is an opinionated build and packaging system for scientific computing libraries.
 
-The project exists to solve a specific problem: getting a consistent, usable stack of numerical libraries built and installed across real machines, not idealized ones. That includes modern Enterprise Linux systems with RPM packaging, Debian/Ubuntu systems with DEB packaging, older or awkward Linux environments where native packaging is not an option, and macOS on Intel — with Apple Silicon untested so far, but expected to work after minimal fixes.
+The project exists to solve a specific problem: getting a consistent, usable stack of numerical libraries built and installed across real machines, not idealized ones. That includes modern Enterprise Linux systems with RPM packaging, Debian/Ubuntu systems with DEB packaging, older or awkward Linux environments where native packaging is not an option, and macOS on Intel — Apple Silicon has the required GCC patch vendored but no build evidence yet.
 
 ## Copyright Notice
 
@@ -99,7 +99,7 @@ SCLS also supports a direct Unix builder for environments where native packaging
 
 ### 4. Native macOS builds
 
-SCLS supports direct builds on macOS as well. The `macos` flavor is exercised regularly on Intel developer workstations. Apple Silicon hasn't been tested yet, but the same recipes and flavor machinery should carry over with at most minor fixes — there is nothing Intel-specific in the build model, and the toolchain choices (Homebrew GCC, system clang, OpenBLAS) all have first-class arm64 support.
+SCLS supports direct builds on macOS as well. The `macos` flavor is exercised regularly on Intel developer workstations. Apple Silicon has not been built yet: the `aarch64-apple-darwin` GCC branch that Homebrew carries is vendored in `patches/gcc/` and applied automatically on arm64 hosts, but nobody has run the bootstrap, so treat it as untested rather than as expected to work.
 
 ## How the Repository Works
 
@@ -150,7 +150,7 @@ A flavor defines the target platform, compilers, optimization flags, math backen
 | `debug`         | `/opt/scls/debug`          | GCC      | Reference | `-Og -g`, for valgrind / sanitizers         |
 | `intel`         | `/opt/scls/intel`          | Intel    | Intel MKL | Requires Intel oneAPI compilers             |
 | `lbl`           | custom site prefix         | GCC      | OpenBLAS  | LBL site-specific                           |
-| `macos`         | `/opt/scls`                | GCC      | OpenBLAS  | Intel Macs; Apple Silicon untested          |
+| `macos`         | `/opt/scls`                | GCC      | OpenBLAS  | Intel Macs; Apple Silicon patched, unbuilt  |
 | `gcc-mkl-cuda`  | `/opt/scls/gcc-mkl-cuda`   | GCC      | Intel MKL | CUDA-enabled (NVIDIA HPC SDK); untested     |
 
 ### Deployment Targets
@@ -216,6 +216,7 @@ Other commands:
 ./scls spec petsc          # Generate SPEC file only (RPM mode)
 ./scls list                # List installed packages
 ./scls order               # Show build order
+./scls check-updates       # Check upstream sources for newer versions
 ```
 
 ### Runtime environment

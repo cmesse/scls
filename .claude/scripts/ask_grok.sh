@@ -25,7 +25,17 @@
 #   GROK_TOOLS            Comma-separated tool allowlist (default: read_file,grep,list_dir)
 #                         Shell/write tools MUST stay off this list — see "Headless footgun" below.
 #   GROK_MAX_TURNS        Agent turn budget (default: 30; raise for large multi-file audits)
-#   GROK_EFFORT           Optional effort level: none|minimal|low|medium|high|xhigh|max
+#   GROK_MODEL            grok-4.6|grok-4.5 (default: grok-4.6)
+#   GROK_EFFORT           low|medium|high|xhigh (default: xhigh)
+#                         The old list here also advertised none|minimal|max, which grok-4.6 does
+#                         not offer; max and ultra are excluded on purpose (ultra delegates to
+#                         subagents, against the --no-subagents this wrapper passes).
+#                         The xhigh default was chosen to reproduce what ~/.grok/config.toml gave
+#                         on 2026-08-30, so turning the knob on changed the record, not the depth.
+#                         That is an observation, not a guarantee — if the vendor config drifts,
+#                         this default stays put and the two diverge.
+#                         Historical note: GROK_EFFORT once failed with HTTP 400. That came from
+#                         the retired grok-build backend and expired with it.
 #   GROK_RETRIES          Fresh-session attempts (default: 5; failures can cluster in time)
 #   GROK_MIN_CHARS        Minimum accepted body length after quality gate (default: 200)
 #   GROK_REQUIRE_HEADING  Require a '##' markdown section (default: 1). Set 0 only for diagnostics.
@@ -53,8 +63,10 @@
 #
 # After successful run it appends:
 #     ---
-#     # GROK 2026-06-12 12:34:56 PDT
+#     # GROK 2026-06-12 12:34:56 PDT  (model=grok-4.6, effort=xhigh)
 #     <Grok's full response body>
+# An unchosen knob is stamped [defaulted] so the record distinguishes a selected depth from
+# an inherited one.
 #
 # Then prints the body to stdout.
 #
@@ -112,7 +124,39 @@ GROK_SANDBOX="${GROK_SANDBOX:-read-only}"
 # Expand via GROK_TOOLS only if an audit legitimately needs more (e.g. web_search).
 GROK_TOOLS="${GROK_TOOLS:-read_file,grep,list_dir}"
 GROK_MAX_TURNS="${GROK_MAX_TURNS:-30}"
-GROK_EFFORT="${GROK_EFFORT:-}"
+
+# --- Depth selection: model + reasoning effort -------------------------------
+# Validated before any prompt is read, so a typo costs no billed call.
+GROK_MODEL_CHOSEN=1
+GROK_EFFORT_CHOSEN=1
+if [ -z "${GROK_MODEL:-}" ];  then GROK_MODEL="grok-4.6"; GROK_MODEL_CHOSEN=0;  fi
+if [ -z "${GROK_EFFORT:-}" ]; then GROK_EFFORT="xhigh";   GROK_EFFORT_CHOSEN=0; fi
+
+case "$GROK_MODEL" in
+    grok-4.6|grok-4.5) ;;
+    *)
+        echo "ask_grok.sh: unknown GROK_MODEL '$GROK_MODEL'. Allowed: grok-4.6 grok-4.5" >&2
+        exit 1
+        ;;
+esac
+case "$GROK_EFFORT" in
+    low|medium|high|xhigh) ;;
+    *)
+        echo "ask_grok.sh: unknown GROK_EFFORT '$GROK_EFFORT'" >&2
+        echo "Allowed: low medium high xhigh (none, minimal, max and ultra are excluded)" >&2
+        exit 1
+        ;;
+esac
+
+# Per-knob provenance, so the stamp says WHICH knob was left unchosen.
+GROK_MODEL_TAG="$GROK_MODEL"
+GROK_EFFORT_TAG="$GROK_EFFORT"
+if [ "$GROK_MODEL_CHOSEN" -eq 0 ];  then GROK_MODEL_TAG="$GROK_MODEL [defaulted]";   fi
+if [ "$GROK_EFFORT_CHOSEN" -eq 0 ]; then GROK_EFFORT_TAG="$GROK_EFFORT [defaulted]"; fi
+if [ "$GROK_MODEL_CHOSEN" -eq 0 ] || [ "$GROK_EFFORT_CHOSEN" -eq 0 ]; then
+    echo "ask_grok.sh: depth not selected by the caller — using model=$GROK_MODEL effort=$GROK_EFFORT" >&2
+    echo "Pick a row from the depth-selection table in doc/AI_COLLABORATION_PROTOCOL.md and set GROK_MODEL / GROK_EFFORT." >&2
+fi
 # Failures can cluster (same prompt keeps asking for shell → Cancelled). Default 5
 # with backoff; tools allowlist is the real fix for the shell-cancel streak.
 GROK_RETRIES="${GROK_RETRIES:-5}"
@@ -174,7 +218,7 @@ YOUR MANDATE (different from the primary AI):
 - Every non-trivial claim **must** be backed by specific file paths and line numbers (or an explicit \"I could not read X, here is the limitation\").
 - State confidence explicitly (high / medium / low, with ~% when helpful) and ground it in what you actually verified.
 - **Name the evidence level.** The primary dev host is macOS and cannot run rpmbuild, so claims about RPM install behaviour cannot be settled by reading source. Say plainly when a finding needs an executable gate (a real build, an rpmbuild run, an install test on a Linux host) instead of implying it is settled.
-- Use the exchange format conventions. The wrapper script adds the '# GROK <timestamp>' header itself — do NOT write any '# GROK' header or timestamp yourself. Start directly with '## Audit & Refutation' (or similar ## sections such as '## Verified Claims', '## Refuted / Challenged Claims', '## Open Risks', '## Checklist Items (N/A noted)').
+- Use the exchange format conventions. The wrapper script adds the '# GROK <timestamp> (model=..., effort=...)' header itself — do NOT write any '# GROK' header, timestamp or model/effort stamp yourself. Start directly with '## Audit & Refutation' (or similar ## sections such as '## Verified Claims', '## Refuted / Challenged Claims', '## Open Risks', '## Checklist Items (N/A noted)').
 - This is a **read-only** audit. Available tools are file read/search only (read_file, grep, list_dir).
 - **CRITICAL — no shell, no subprocess:** Do NOT call run_terminal_command / bash / python. In headless mode a shell permission cancel aborts the entire turn and only your lead-in sentence is returned. Never try to run a build, rpmbuild, or the scls wrapper. Do all checks by reading files and reasoning. Do not modify files.
 - Keep lead-in narration to at most one short sentence, then produce the full ## audit body in the same final message. Never end the turn with only \"I'll check…\" / \"Next I'll…\".
@@ -205,10 +249,9 @@ trap 'rm -f "$TMPOUT" "$TMPERR" "$PROMPT_FILE" "$FINISH_FILE" "$META_FILE"' EXIT
 printf '%s\n' "$FULL_PROMPT" > "$PROMPT_FILE"
 printf '%s\n' "$FINISH_PROMPT" > "$FINISH_FILE"
 
-EFFORT_ARGS=()
-if [ -n "$GROK_EFFORT" ]; then
-    EFFORT_ARGS=(--effort "$GROK_EFFORT")
-fi
+# Always set now that GROK_EFFORT is defaulted rather than left empty. Kept as an array
+# for symmetry with PERM_ARGS and because "${arr[@]}" is the set -u-safe expansion.
+EFFORT_ARGS=(--effort "$GROK_EFFORT")
 
 PERM_ARGS=()
 if [ -n "$GROK_PERMISSION_MODE" ]; then
@@ -259,16 +302,43 @@ fix_fused_heading() {
 }
 
 # Quality gate: 0 = usable, 1 = reject (retry/salvage).
-# Rejects: empty, stopReason Cancelled, missing ## (if required), below GROK_MIN_CHARS,
-# pure lead-in narration patterns.
+# Rejects: empty, a cancelled/aborted/refusal stopReason, missing ## (if required),
+# below GROK_MIN_CHARS, pure lead-in narration patterns.
+# grok CLI 1.0.13 reports the TURN stop reason in snake_case.  Documented set
+# (docs/user-guide/14-headless-mode.md): end_turn, max_tokens, max_turn_requests,
+# refusal, cancelled.  Earlier builds used CamelCase (EndTurn, Cancelled), and the
+# docs call the list non-exhaustive.
+#
+# permission_cancelled and aborted are NOT turn stop reasons -- permission_cancelled
+# is a StopCancelled hook-matcher reason (docs/user-guide/10-hooks.md).  They are
+# matched below only as forward-defensive coverage in case the headless projector
+# ever promotes a category token into this field; a 1.0.13 cancel arrives as
+# 'cancelled' and is caught by that arm.
+#
+# Fold spellings to one token so a future casing change cannot silently disable
+# the gates below.  Display still uses the raw value.
+normalize_stop_reason() {
+    printf '%s' "$1" | tr -d '_-' | tr '[:upper:]' '[:lower:]'
+}
+
 quality_gate() {
     local aText="$1"
     local aStop="$2"
     local aLen
+    local tStop
 
-    case "$aStop" in
-        Cancelled|cancelled|Canceled|canceled)
+    tStop=$(normalize_stop_reason "$aStop")
+    case "$tStop" in
+        permissioncancelled)
             echo "quality_gate: stopReason=$aStop (headless permission cancel — usually shell tool)" >&2
+            return 1
+            ;;
+        cancelled|canceled|aborted)
+            echo "quality_gate: stopReason=$aStop (turn did not finish; cause not classified)" >&2
+            return 1
+            ;;
+        refusal)
+            echo "quality_gate: stopReason=$aStop (model refused the prompt)" >&2
             return 1
             ;;
     esac
@@ -299,8 +369,12 @@ quality_gate() {
 run_grok() {
     # Args: extra args before redirect... actually we take all as grok args.
     set +e
+    # --model and --effort belong here, not at the call site: this function also runs the
+    # --resume salvage pass, and a depth set only on the fresh attempt would be silently
+    # dropped exactly when the audit is being rescued.
     "$GROK_BIN" "$@" \
         --cwd "$SCLS_ROOT" \
+        --model "$GROK_MODEL" \
         --sandbox "$GROK_SANDBOX" \
         --tools "$GROK_TOOLS" \
         --no-memory \
@@ -312,19 +386,28 @@ run_grok() {
         "${EFFORT_ARGS[@]}" \
         > "$TMPOUT" 2> "$TMPERR"
     local tExit=$?
-    set -e
+    # NOTE: do NOT re-enable errexit here. The callers wrap this function in
+    # their own set +e / set -e pair; restoring errexit before `return $tExit`
+    # makes a nonzero grok exit kill the whole script at the call site
+    # (observed 2026-08-25: "attempt 1/5" then silent exit, no retries).
     return $tExit
 }
 
 handle_sandbox_or_hard_fail() {
     local aExit="$1"
-    if grep -q "sandbox could not be applied" "$TMPERR"; then
+    if grep -qi "sandbox could not be applied" "$TMPERR"; then
         echo "grok ran WITHOUT the requested sandbox profile '$GROK_SANDBOX':" >&2
         cat "$TMPERR" >&2
         echo "Result discarded (not appended to $EXCHANGE). Fix GROK_SANDBOX and retry." >&2
         exit 1
     fi
     if [ "$aExit" -ne 0 ]; then
+        if grep -qiE "sandbox profile resolve failed|could not enforce its deny list" "$TMPERR"; then
+            echo "grok refused to start: sandbox profile '$GROK_SANDBOX' could not be built." >&2
+            echo "This is a host problem, not an API or auth problem. Common cause: a path on" >&2
+            echo "grok's built-in deny list is unreadable, e.g. /run/podman mode 0700 (the" >&2
+            echo "systemd-tmpfiles default) blocking resolution of /run/podman/podman.sock." >&2
+        fi
         echo "grok invocation failed (exit $aExit):" >&2
         cat "$TMPERR" >&2
         if [ -s "$TMPOUT" ]; then
@@ -388,7 +471,7 @@ for (( ATTEMPT = 1; ATTEMPT <= GROK_RETRIES; ATTEMPT++ )); do
         GROK_EXIT=$?
         set -e
         # Resume can fail if session vanished; treat as soft and continue retry loop.
-        if [ $GROK_EXIT -eq 0 ] && ! grep -q "sandbox could not be applied" "$TMPERR"; then
+        if [ $GROK_EXIT -eq 0 ] && ! grep -qi "sandbox could not be applied" "$TMPERR"; then
             set +e
             RESULT=$(parse_grok_json "$TMPOUT" "$META_FILE")
             PARSE_EXIT=$?
@@ -436,9 +519,9 @@ if [ "$USABLE" -ne 1 ]; then
     exit 1
 fi
 
-# Non-EndTurn but still usable (e.g. max turns with a real body) — warn.
-case "$STOP_REASON" in
-    EndTurn|"")
+# Non-end_turn but still usable (e.g. max turns with a real body) — warn.
+case "$(normalize_stop_reason "$STOP_REASON")" in
+    endturn|"")
         ;;
     *)
         echo "ask_grok.sh: WARNING — stopReason='$STOP_REASON' (accepted after quality gate)." >&2
@@ -451,7 +534,7 @@ TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S %Z')
 
 {
     printf '\n---\n\n'
-    printf '# GROK %s\n' "$TIMESTAMP"
+    printf '# GROK %s  (model=%s, effort=%s)\n' "$TIMESTAMP" "$GROK_MODEL_TAG" "$GROK_EFFORT_TAG"
     printf '%s\n' "$RESULT"
 } >> "$EXCHANGE"
 

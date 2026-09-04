@@ -14,7 +14,8 @@ Follow these steps IN ORDER — the ordering is the protocol (`doc/AI_COLLABORAT
 2. **Pre-register.** Review the target yourself, completely, BEFORE any auditor is invoked. Write your full findings to the exchange file as a `# CLAUDE <timestamp>` entry in the house format: every finding with file:line citations and per-finding confidence (high / medium / low). This entry is FROZEN once written — never edit it afterwards; all later material is appended below it.
 
 3. **Dispatch the auditors.** Run as its own single background Bash command (never nested in a compound/piped command) and wait for it to finish:
-   `AI_EXCHANGE_SLUG=<slug> scripts/cross_review.sh --jury [path]` (or `--relay`).
+   `CODEX_MODEL=<m> CODEX_EFFORT=<e> GROK_MODEL=grok-4.6 GROK_EFFORT=<e> AI_EXCHANGE_SLUG=<slug> scripts/cross_review.sh --jury [path]` (or `--relay`).
+   Pick the depth row from `doc/AI_COLLABORATION_PROTOCOL.md` §9.1 before dispatch; the driver refuses to run without all four variables.
    The auditors run headless and read-only via the existing `ask_codex.sh` / `ask_grok.sh` wrappers and append their entries to the exchange file themselves.
 
 4. **Verification pass.** Read the auditor entries from the exchange file. Re-check EVERY file:line citation against the actual source. Label each finding CONFIRMED / REFUTED / UNVERIFIABLE, quoting the evidence line under each label. Append this as a new `# CLAUDE <timestamp>` entry with a `## Verification` section.

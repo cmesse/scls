@@ -57,10 +57,12 @@ Commands:
 ```bash
 ./scls build <package>       # Build a package
 ./scls build next            # Build the next unbuilt package in dependency order
-./scls install <package>     # Install the last built RPM (Linux RPM mode only)
-./scls install next          # Install the next unbuilt package's RPM
+./scls install <package>     # Install the last built RPM/DEB (Unix mode: direct install)
+./scls install next          # Install the next unbuilt package
 ./scls spec <package>        # Generate SPEC file only (Linux RPM mode)
 ./scls list                  # List installed packages
+./scls order                 # Show the resolved build order for the flavor
+./scls check-updates         # Run the update checker over all recipes
 ```
 
 `./scls install <package>` installs only the newest build of each package name,

@@ -7,8 +7,12 @@ the build flow, and what to do when the GCC bootstrap fails.
 ## Status
 
 - **Intel Macs:** the currently developed and tested platform.
-- **Apple Silicon:** planned but unverified. Most likely to surface bootstrap
-  issues.
+- **Apple Silicon:** the `aarch64-apple-darwin` GCC branch (Iain Sandoe's,
+  as vendored by Homebrew) ships in `patches/gcc/` and is applied only on
+  arm64 hosts. No Apple Silicon bootstrap has been run: the patch applies
+  cleanly to the upstream tarball, and that is the whole of the evidence.
+  Rosetta is not a supported path — a Rosetta shell reports `x86_64`, so the
+  patch is skipped and an Intel toolchain is configured.
 
 macOS support is beta. Expect to read build logs.
 
@@ -93,10 +97,11 @@ The `gcc` step is the single most fragile part of the bootstrap sequence:
   mainline `ld64` in ways that sometimes trip GCC's multi-stage build.
 - Apple Clang occasionally lags mainline LLVM in flags GCC's `configure`
   expects.
-- On Apple Silicon, the ARM64 bootstrap was spotty in GCC 11–13; GCC 14/15
-  are much better but not yet 100 % clean.
+- On Apple Silicon, upstream GCC has no `aarch64-apple-darwin` target at all;
+  SCLS applies the Darwin branch patch for that (see above), and the resulting
+  three-stage bootstrap has not been exercised by SCLS yet.
 
-Apple Clang *can* build GCC 15, and on a matched Xcode + SDK combination the
+Apple Clang *can* build GCC 16, and on a matched Xcode + SDK combination the
 bootstrap works out of the box. If it does not, the next section describes
 the two Homebrew-based fallbacks.
 
@@ -113,8 +118,8 @@ CPU:
 
 | Platform      | Paths                                                      |
 |---------------|------------------------------------------------------------|
-| Intel         | `/usr/local/bin/gcc-15`, `g++-15`, `gfortran-15`           |
-| Apple Silicon | `/opt/homebrew/bin/gcc-15`, `g++-15`, `gfortran-15`        |
+| Intel         | `/usr/local/bin/gcc-16`, `g++-16`, `gfortran-16`           |
+| Apple Silicon | `/opt/homebrew/bin/gcc-16`, `g++-16`, `gfortran-16`        |
 
 Pick one of the two routes below.
 
@@ -127,13 +132,13 @@ Edit `flavors/macos.yaml`. On **Intel Macs**:
 
 ```yaml
 compilers:
-  cc:  /usr/local/bin/gcc-15
-  cxx: /usr/local/bin/g++-15
-  fc:  /usr/local/bin/gfortran-15
+  cc:  /usr/local/bin/gcc-16
+  cxx: /usr/local/bin/g++-16
+  fc:  /usr/local/bin/gfortran-16
 
 bootstrap_compilers:
-  cc:  /usr/local/bin/gcc-15
-  cxx: /usr/local/bin/g++-15
+  cc:  /usr/local/bin/gcc-16
+  cxx: /usr/local/bin/g++-16
 
 bootstrap_packages:
   - m4
@@ -143,8 +148,8 @@ bootstrap_packages:
   # remove `- gcc` so SCLS does not build its own GCC
 ```
 
-On **Apple Silicon**, use `/opt/homebrew/bin/gcc-15`, `g++-15`, and
-`gfortran-15` in the same three places.
+On **Apple Silicon**, use `/opt/homebrew/bin/gcc-16`, `g++-16`, and
+`gfortran-16` in the same three places.
 
 ### Route 2 — Use Homebrew GCC only to bootstrap SCLS's own GCC
 
@@ -155,12 +160,12 @@ Edit `flavors/macos.yaml`. On **Intel Macs**:
 
 ```yaml
 bootstrap_compilers:
-  cc:  /usr/local/bin/gcc-15
-  cxx: /usr/local/bin/g++-15
+  cc:  /usr/local/bin/gcc-16
+  cxx: /usr/local/bin/g++-16
 ```
 
-On **Apple Silicon**, use `/opt/homebrew/bin/gcc-15` and
-`/opt/homebrew/bin/g++-15`.
+On **Apple Silicon**, use `/opt/homebrew/bin/gcc-16` and
+`/opt/homebrew/bin/g++-16`.
 
 Leave `compilers` and `bootstrap_packages` unchanged. SCLS will then build
 its own GCC inside `/opt/scls` using Homebrew's GCC as the stage-0
