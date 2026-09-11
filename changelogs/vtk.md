@@ -1,6 +1,16 @@
 # Vtk Changelog
 
 ## Version 9.7.0-1 - Tue Aug 18 2026
+- 2026-09-10: the macos flavor's `-isystem` paths for the SCLS libstdc++ are
+  now derived from the installed GCC via the new gcc_version and gcc_machine
+  recipe macros (probed from the prefix's bin/g++) instead of a
+  hardcoded `include/c++/16.1.0/x86_64-apple-darwin24.6.0`, which broke as
+  soon as the GCC version or the host (Apple Silicon: 16.2.0,
+  aarch64-apple-darwin25.2.0) moved. macos now also `requires: gcc`. The
+  registry `cflags` include path was corrected from `vtk-9.6` to `vtk-9.7`
+  (stale since the 9.7.0 bump; affects the registry entry on every flavor).
+  VTK on macOS is still compiled with Apple clang by design. No release bump;
+  the Linux cmake lines are unchanged.
 - Updated to version 9.7.0
 - Rebuild for the OpenMP runtime fix: `-fopenmp` is now injected from
   `features.openmp` directly rather than via the math flags, which only ran when

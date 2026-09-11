@@ -33,6 +33,7 @@ from build_common import (
     resolve_flavor_key,
     apply_flavor_overrides,
     resolve_gcc_runtime_lib,
+    gcc_identity,
 )
 from patch_common import (
     copy_patches_to_sources,
@@ -667,6 +668,14 @@ class RPMBuilder:
         cmd = [s.replace('%{mpifort}', 'mpifort') for s in cmd]
         # Library extension
         cmd = [s.replace('%{libext}', self.lib_ext) for s in cmd]
+        # Installed SCLS GCC identity (see build_common.gcc_identity). Mirrors
+        # unix_builder.check_args; probed lazily, so a Linux spec that never
+        # uses the macros never touches <prefix>/bin/g++. The cmake path does
+        # NOT come through here -- see get_cmake_args_with_paths.
+        if any('%{gcc_version}' in s or '%{gcc_machine}' in s for s in cmd):
+            gcc_version, gcc_machine = gcc_identity(self.prefix, self.flavor)
+            cmd = [s.replace('%{gcc_version}', gcc_version) for s in cmd]
+            cmd = [s.replace('%{gcc_machine}', gcc_machine) for s in cmd]
         # CUDA paths and architectures
         cmd = [s.replace('%{cuda}', str(self.cuda_path)) for s in cmd]
         cuda_archs = self.flavor.get('nvidia', {}).get('architectures', '')
@@ -1649,6 +1658,13 @@ fi
             cuda_archs = self.flavor.get('nvidia', {}).get('architectures', '')
             arg = arg.replace('%{cuda_architectures}', cuda_archs)
             arg = arg.replace('%{libext}', self.lib_ext)
+            # %{gcc_version}/%{gcc_machine}: cmake args never pass through
+            # check_args on the RPM side, so substitute them here as well
+            # (parity with unix_builder.check_args at the cmake call).
+            if '%{gcc_version}' in arg or '%{gcc_machine}' in arg:
+                gcc_version, gcc_machine = gcc_identity(self.prefix, self.flavor)
+                arg = arg.replace('%{gcc_version}', gcc_version)
+                arg = arg.replace('%{gcc_machine}', gcc_machine)
             processed_args.append(arg)
 
         return processed_args

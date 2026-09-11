@@ -13,6 +13,7 @@ file, it is lost.
 
 - [dl20260904_mumps_macos_install_names_handover.md](dl20260904_mumps_macos_install_names_handover.md) — triaged the BELFEM MUMPS dylib install-name handover: stale, fixed generically by the macOS post-install normalizer in `f171e7d` (2026-05-27); remaining check is whether the Mac's installed prefix post-dates it
 - [dl20260904_website_restyle_and_doc_sweep.md](dl20260904_website_restyle_and_doc_sweep.md) — ported the scls.html restyle into the Jinja template/generator; swept README, doc/, CLAUDE.md and the website for stale GCC 15 and Apple Silicon claims
+- [dl20260910_apple_silicon_report_fixes.md](dl20260910_apple_silicon_report_fixes.md) — patched the seven findings of the first Apple Silicon bootstrap report (zsh activation, gklib NO_X86, macOS manifest hazard, vtk libstdc++ macros, openmpi PRRTE guard, PETSc PETSC_ARCH); report's empty-PETSC_ARCH fix refuted against PETSc source; two blind Codex+Grok rounds
 - [dl20260904_gcc_apple_silicon_patch.md](dl20260904_gcc_apple_silicon_patch.md) — vendored Homebrew's aarch64-apple-darwin GCC 16.2.0 branch patch, gated on arm64 via a new `arch:` patch-entry key; two-round Codex+Grok review, no Apple Silicon build evidence
 - [dl20260904_auditor_depth_selection.md](dl20260904_auditor_depth_selection.md) — ported BELFEM's explicit model/effort depth selection into the Codex and Grok wrappers and `cross_review.sh`
 - [dl20260817_ai_collaboration_setup.md](dl20260817_ai_collaboration_setup.md) — ported the BELFEM AI collaboration tooling and protocol to SCLS

@@ -35,6 +35,7 @@ from build_common import (
     get_interface_args,
     resolve_flavor_key,
     resolve_gcc_runtime_lib,
+    gcc_identity,
 )
 
 from patch_common import (
@@ -508,6 +509,13 @@ class UnixBuilder:
         cmd = [s.replace('%{mpifort}', 'mpifort') for s in cmd]
         # Library extension
         cmd = [s.replace('%{libext}', self.lib_ext) for s in cmd]
+        # Installed SCLS GCC identity, for recipes that must name GCC's own
+        # header directory (<prefix>/include/c++/<version>/<machine>). Probed
+        # lazily so builds that never use the macros never spawn the compiler.
+        if any('%{gcc_version}' in s or '%{gcc_machine}' in s for s in cmd):
+            gcc_version, gcc_machine = gcc_identity(self.prefix, self.flavor)
+            cmd = [s.replace('%{gcc_version}', gcc_version) for s in cmd]
+            cmd = [s.replace('%{gcc_machine}', gcc_machine) for s in cmd]
         # CUDA paths and architectures. Use math_common.get_cuda_path so the
         # unix path matches rpm_builder's substitution; the legacy
         # nvidia.cuda_path key is not present in any flavor YAML.
@@ -873,13 +881,31 @@ class UnixBuilder:
         Converts absolute paths to %{prefix}-relative paths and applies
         wildcards for versioned libraries (e.g., libfoo.so.1.2.3 -> libfoo.so.*)
 
-        Output is saved to files/{package}.txt
+        Output is saved to files/{package}.txt on Linux; on macOS to
+        work/files/{package}.txt unless SCLS_WRITE_TRACKED_FILES=1 (see below).
         """
         if not hasattr(self, 'installed_files') or not self.installed_files:
             print("No installed files to generate RPM file list from")
             return
 
-        files_dir = Path("files")
+        # files/<package>.txt is the tracked manifest rpm_builder.get_file_list()
+        # turns into the RPM %files section, i.e. a Linux artifact. A macOS
+        # install produces a Darwin tree (aarch64-apple-darwin* triplets,
+        # different installed files), and the .dylib -> .so rewrite below
+        # does not Linux-ify the rest, so a Mac must not overwrite the tracked
+        # manifest: the first Apple Silicon bootstrap dirtied ten of them,
+        # files/gcc.txt by 1616/1743 lines. On macOS the list goes to
+        # work/files/<package>.txt for inspection instead (not under
+        # self.work_dir, which the next build wipes). Set
+        # SCLS_WRITE_TRACKED_FILES=1 to write files/ deliberately, e.g. to
+        # seed a brand-new recipe, and review the result before committing.
+        # See devlog/dl20260910_apple_silicon_report_fixes.md (F4).
+        if self.platform == 'macos' and os.environ.get('SCLS_WRITE_TRACKED_FILES') != '1':
+            files_dir = self.project_root / "work" / "files"
+        elif self.platform == 'macos':
+            files_dir = self.project_root / "files"
+        else:
+            files_dir = Path("files")
         files_dir.mkdir(parents=True, exist_ok=True)
 
         prefix_str = str(self.prefix)
@@ -951,6 +977,9 @@ class UnixBuilder:
                 f.write(f"{rpm_file}\n")
 
         print(f"RPM file list written: {output_file} ({len(rpm_file_list)} entries)")
+        if files_dir == self.project_root / "work" / "files":
+            print("  (macOS is not authoritative for the tracked files/ manifests; "
+                  "set SCLS_WRITE_TRACKED_FILES=1 to write files/ instead)")
 
     def create_pkg(self) -> None:
         """Create macOS PKG file(s) with proper file tracking and subpackage support"""

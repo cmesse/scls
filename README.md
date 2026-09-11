@@ -2,7 +2,7 @@
 
 SCLS, the Scientific Core Library Stack, is an opinionated build and packaging system for scientific computing libraries.
 
-The project exists to solve a specific problem: getting a consistent, usable stack of numerical libraries built and installed across real machines, not idealized ones. That includes modern Enterprise Linux systems with RPM packaging, Debian/Ubuntu systems with DEB packaging, older or awkward Linux environments where native packaging is not an option, and macOS on Intel — Apple Silicon has the required GCC patch vendored but no build evidence yet.
+The project exists to solve a specific problem: getting a consistent, usable stack of numerical libraries built and installed across real machines, not idealized ones. That includes modern Enterprise Linux systems with RPM packaging, Debian/Ubuntu systems with DEB packaging, older or awkward Linux environments where native packaging is not an option, and macOS on Intel and, since the first verified GCC bootstrap on 2026-09-10, Apple Silicon (the rest of the stack there is still in bring-up).
 
 ## Copyright Notice
 
@@ -99,7 +99,7 @@ SCLS also supports a direct Unix builder for environments where native packaging
 
 ### 4. Native macOS builds
 
-SCLS supports direct builds on macOS as well. The `macos` flavor is exercised regularly on Intel developer workstations. Apple Silicon has not been built yet: the `aarch64-apple-darwin` GCC branch that Homebrew carries is vendored in `patches/gcc/` and applied automatically on arm64 hosts, but nobody has run the bootstrap, so treat it as untested rather than as expected to work.
+SCLS supports direct builds on macOS as well. The `macos` flavor is exercised regularly on Intel developer workstations. On Apple Silicon the `aarch64-apple-darwin` GCC branch that Homebrew carries is vendored in `patches/gcc/` and applied automatically on arm64 hosts; the three-stage GCC bootstrap and the packages up to and including OpenMPI were first built and installed on an M2 Pro on 2026-09-10 (see `doc/MACOS_BUILD.md`). Everything after OpenMPI in the build order — ScaLAPACK, MUMPS, SCOTCH, the SLATE/STRUMPACK stack, PETSc, VTK — has not been built on arm64 yet and should be treated as untested there.
 
 ## How the Repository Works
 
@@ -150,7 +150,7 @@ A flavor defines the target platform, compilers, optimization flags, math backen
 | `debug`         | `/opt/scls/debug`          | GCC      | Reference | `-Og -g`, for valgrind / sanitizers         |
 | `intel`         | `/opt/scls/intel`          | Intel    | Intel MKL | Requires Intel oneAPI compilers             |
 | `lbl`           | custom site prefix         | GCC      | OpenBLAS  | LBL site-specific                           |
-| `macos`         | `/opt/scls`                | GCC      | OpenBLAS  | Intel Macs; Apple Silicon patched, unbuilt  |
+| `macos`         | `/opt/scls`                | GCC      | OpenBLAS  | Intel Macs; Apple Silicon in bring-up       |
 | `gcc-mkl-cuda`  | `/opt/scls/gcc-mkl-cuda`   | GCC      | Intel MKL | CUDA-enabled (NVIDIA HPC SDK); untested     |
 
 ### Deployment Targets

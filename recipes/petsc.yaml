@@ -158,8 +158,21 @@ configure:
   ilp64_args:
     - "--with-64-bit-blas-indices=1"
   # Flavor-specific arguments
+  # PETSC_ARCH is passed as a configure ARGUMENT, pinned to the same name the
+  # build: and install: steps use below. Without it configure honours whatever
+  # PETSC_ARCH the developer has exported (most PETSc users have one, and
+  # share/scls/activate exports PETSC_ARCH="" for the prefix install) and
+  # writes its output there, while make/install look in arch-<os>-c-opt and
+  # die with "No rule to make target arch-darwin-c-opt/lib/petsc/conf/
+  # petscvariables". An argument beats the environment inside PETSc
+  # (config/PETSc/options/arch.py:45-57, identical in 3.25.0 and 3.25.4) with a
+  # logged warning. Do NOT try `env: PETSC_ARCH: ""` instead: the builders pass
+  # the empty string through and arch.py:66-67 aborts on it. The value equals
+  # PETSc's own default for --with-debugging=0 (arch.py:29-40), so artifacts are
+  # unchanged; only the generated configure line gains the token.
   flavor_args:
     gcc:
+      - "PETSC_ARCH=arch-linux-c-opt"
       - "--with-cuda=0"
       - "--with-hwloc-dir=%{prefix}"
       - "--with-zlib-include=%{zlib_include}"
@@ -176,6 +189,7 @@ configure:
       - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
       - "--with-openmp=1"
     lbl:
+      - "PETSC_ARCH=arch-linux-c-opt"
       - "--with-cuda=0"
       - "--with-hwloc-dir=/usr"
       - "--with-zlib-include=%{zlib_include}"
@@ -192,6 +206,7 @@ configure:
       - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
       - "--with-openmp=1"
     macos:
+      - "PETSC_ARCH=arch-darwin-c-opt"
       - "--with-cuda=0"
       - "--with-hwloc-dir=%{prefix}"
       - "--with-gmp-dir=%{prefix}"
@@ -209,6 +224,7 @@ configure:
       - "--CXX_LINKER_FLAGS=%{ldflags} -lgfortran"
       - "--with-openmp=1"
     debug:
+      - "PETSC_ARCH=arch-linux-c-opt"
       - "--with-cuda=0"
       - "--with-gmp-dir=/usr"
       - "--with-mpfr-dir=/usr"
@@ -226,6 +242,7 @@ configure:
       - "--with-openmp-include=/usr/include"
       - "--with-openmp-lib=%{libgomp}"
     mkl:
+      - "PETSC_ARCH=arch-linux-c-opt"
       - "--with-cuda=0"
       - "--with-gmp-dir=/usr"
       - "--with-mpfr-dir=/usr"
@@ -244,6 +261,7 @@ configure:
       - "--with-openmp-include=/usr/include"
       - "--with-openmp-lib=%{libgomp}"
     intel:
+      - "PETSC_ARCH=arch-linux-c-opt"
       - "--with-cuda=0"
       - "--with-gmp-dir=/usr"
       - "--with-mpfr-dir=/usr"
@@ -262,6 +280,7 @@ configure:
       - "--with-openmp-include=/opt/intel/oneapi/compiler/latest/include"
       - "--with-openmp-lib=/opt/intel/oneapi/compiler/latest/lib/libiomp5.so"
     cuda:
+      - "PETSC_ARCH=arch-linux-c-opt"
       - "--with-cuda=1"
       - "--CUDAC=%{cuda}/bin/nvcc"
       - "--CUDAFLAGS=-I%{prefix}/include -I%{cuda}/include"
@@ -292,6 +311,8 @@ build:
     - "PETSC_DIR=%{srcdir}"
   # Platform-specific PETSC_ARCH
   flavor_args:
+    gcc:
+      - "PETSC_ARCH=arch-linux-c-opt"
     lbl:
       - "PETSC_ARCH=arch-linux-c-opt"
     macos:
@@ -310,6 +331,8 @@ install:
     - "PETSC_DIR=%{srcdir}"
   # Platform-specific PETSC_ARCH for install
   flavor_args:
+    gcc:
+      - "PETSC_ARCH=arch-linux-c-opt"
     lbl:
       - "PETSC_ARCH=arch-linux-c-opt"
     macos:

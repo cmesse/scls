@@ -1,6 +1,12 @@
 # Openmpi Changelog
 
 ## Version 5.0.10-3 - Mon Aug 24 2026
+- 2026-09-10: the 5.x PRRTE install guard now checks lib/libprrte with the
+  libext recipe macro instead of a literal `lib/libprrte.so`. On macOS the library is
+  `libprrte.dylib`, so the guard failed every macOS install of a *complete*
+  tree ("PRRTE component 'lib/libprrte.so' is missing"). Linux renders `.so`
+  as before (spec identical apart from this changelog) and lbl (4.1.6) stays a
+  no-op, so no artifact changes and no release bump. Build-verified on an M2 Pro on 2026-09-10.
 - Add flex to rpm_build_requires for all flavors, and flex -> flex to
   packaging/system_packages.yaml so deb_builder's check_system_build_deps
   fails loudly on any host that lacks it. This is defence in depth, not a

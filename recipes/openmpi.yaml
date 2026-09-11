@@ -194,11 +194,14 @@ install:
   # Scoped to 5.x because the lbl flavor pins 4.1.6, which uses ORTE
   # (orterun/orted) rather than PRRTE. %{version} is substituted at
   # spec-generation time from the flavor-resolved recipe, so lbl renders
-  # `case 4.1.6 in 5.*)` and the check is a no-op there.
+  # `case 4.1.6 in 5.*)` and the check is a no-op there. %{libext} renders
+  # .so on Linux and .dylib on macOS (all three builders substitute it in
+  # install.post), so a correct Darwin tree passes the guard too -- a literal
+  # libprrte.so could never exist there and blocked every macOS build.
   post:
     - >-
       case %{version} in 5.*)
-      for f in bin/prte bin/prterun bin/prted bin/pterm bin/prte_info lib/libprrte.so; do
+      for f in bin/prte bin/prterun bin/prted bin/pterm bin/prte_info lib/libprrte%{libext}; do
       test -e %{prefix}/$f ||
       { echo "ERROR: PRRTE component '$f' is missing from the openmpi install tree."
       ; echo "OpenMPI 5.x mpirun execs bin/prterun and cannot launch any rank without it."

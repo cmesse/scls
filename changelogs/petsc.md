@@ -1,6 +1,18 @@
 # Petsc Changelog
 
 ## Version 3.25.4-1 - Wed Aug 19 2026
+- 2026-09-10: `PETSC_ARCH=arch-<os>-c-opt` is now passed to configure as an
+  argument for every flavor, matching what build/install already pinned, and
+  the plain `gcc` flavor gets the same build/install entries the others had.
+  Configure used to inherit an exported PETSC_ARCH (common in PETSc users'
+  shells; `share/scls/activate` exports an empty one) and write its output
+  there, after which make failed with "No rule to make target
+  arch-darwin-c-opt/lib/petsc/conf/petscvariables". Note PETSc rejects an
+  empty PETSC_ARCH outright (config/PETSc/options/arch.py:66-67), so the
+  obvious `env: PETSC_ARCH: ""` is not a fix. The generated configure line
+  gains one token on all flavors; the package is expected to be unchanged
+  (the value is PETSc's own default for --with-debugging=0), so no release
+  bump -- not build-verified on Linux yet.
 - Updated to version 3.25.4
 - Dropped lib/petsc/bin/petsclogformat.py from the file manifest; upstream no
   longer installs it.

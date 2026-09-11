@@ -42,6 +42,20 @@ configure:
     - -DSHARED=OFF
     - -DCMAKE_POSITION_INDEPENDENT_CODE=ON
     - -DOPENMP=ON
+  flavor_args:
+    # apps/gkuniq.c implements mem_flush() with x86 inline asm (clflush,
+    # sfence) that the arm64 assembler rejects, which takes the whole build
+    # down at 89% on Apple Silicon. Upstream's own switch: CMakeLists.txt:29
+    # option(NO_X86), applied as a PUBLIC compile definition (:94); the only
+    # consumer is apps/gkuniq.c:69, nothing under src/, so libGKlib.a is
+    # unchanged (doc/GKLIB_STATIC_POLICY.md). Upstream's Makefile:62 sets it
+    # for every non-x86_64 host. Not arch-gated because flavor_args have no
+    # arch axis; on an Intel Mac it only disables a cache flush inside an
+    # uninstalled benchmark app. Do NOT use -DGKLIB_BUILD_APPS=OFF instead:
+    # that drops bin/csrcnv, which files/gklib.txt requires. A Linux aarch64
+    # flavor would need the same flag.
+    macos:
+      - -DNO_X86=ON
   optimization:
     O_level: 2
 

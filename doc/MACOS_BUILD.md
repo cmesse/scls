@@ -9,8 +9,19 @@ the build flow, and what to do when the GCC bootstrap fails.
 - **Intel Macs:** the currently developed and tested platform.
 - **Apple Silicon:** the `aarch64-apple-darwin` GCC branch (Iain Sandoe's,
   as vendored by Homebrew) ships in `patches/gcc/` and is applied only on
-  arm64 hosts. No Apple Silicon bootstrap has been run: the patch applies
-  cleanly to the upstream tarball, and that is the whole of the evidence.
+  arm64 hosts. First bootstrap verified on 2026-09-10 on an M2 Pro (macOS
+  25.2, Darwin 25.2.0, Homebrew `gcc-15` as `bootstrap_compilers`): the
+  three-stage GCC 16.2.0 build completed in about 1 h 50 m at `-j12`, the
+  install names of all runtime dylibs are absolute, `codesign -v` is silent
+  after `install_name_tool`, Fortran/C++/OpenMP hello-worlds run, and
+  `-march=native` is safe. The bootstrap group (21 packages, up to
+  `testsweeper`), `gklib` and `openmpi` installed with the fixes recorded in
+  `devlog/dl20260910_apple_silicon_report_fixes.md`. Everything from
+  `openmpi` onward in the build order — ScaLAPACK/MUMPS/SCOTCH, the
+  SLATE/ButterflyPACK/STRUMPACK stack, PETSc, VTK, and the MUMPS
+  install-name normaliser — is unbuilt on arm64 and must be treated as
+  untested. The `hw.cpufamily` detector's `apple-m1` fallback for M4/M5
+  hosts has not been exercised either.
   Rosetta is not a supported path — a Rosetta shell reports `x86_64`, so the
   patch is skipped and an Intel toolchain is configured.
 
@@ -99,7 +110,7 @@ The `gcc` step is the single most fragile part of the bootstrap sequence:
   expects.
 - On Apple Silicon, upstream GCC has no `aarch64-apple-darwin` target at all;
   SCLS applies the Darwin branch patch for that (see above), and the resulting
-  three-stage bootstrap has not been exercised by SCLS yet.
+  three-stage bootstrap was first exercised by SCLS on 2026-09-10 (see Status above).
 
 Apple Clang *can* build GCC 16, and on a matched Xcode + SDK combination the
 bootstrap works out of the box. If it does not, the next section describes

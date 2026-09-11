@@ -896,6 +896,59 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path,
     return args
 
 
+_GCC_IDENTITY_CACHE: Dict[str, Tuple[str, str]] = {}
+
+
+def gcc_identity(prefix: Path, flavor: Dict) -> Tuple[str, str]:
+    """Return (version, machine) of the SCLS-installed GCC C++ compiler.
+
+    Backs the %{gcc_version} and %{gcc_machine} macros, which exist so a
+    recipe can name GCC's own header directory,
+    <prefix>/include/c++/<version>/<machine>, without hardcoding it
+    (recipes/vtk.yaml points Apple clang at the SCLS libstdc++ that way).
+    That directory is named by the installed compiler's full version and
+    configured target, so both are read from the compiler itself:
+    `-dumpfullversion` (not `-dumpversion`, which may print the major only)
+    and `-dumpmachine`. Not from recipes/gcc.yaml (the installed GCC can lag
+    the recipe) and not from uname (a Darwin point upgrade changes uname -r
+    but not the directory GCC was configured with).
+
+    The probe is <prefix>/bin/<flavor cxx>, deliberately not a PATH lookup:
+    this runs in the builder process, whose PATH is the developer's shell
+    PATH (a Homebrew gcc, or /usr/bin/g++, which is Apple clang and reports
+    arm64-apple-darwin where GCC says aarch64-apple-darwin). An absolute
+    flavor cxx is used as is. A missing compiler is a hard error, not a
+    fallback: a wrong answer here is exactly the stale-path failure the
+    macros replace. Cached per probe path.
+
+    Scope: the macros describe GCC's include layout only when that GCC was
+    NOT configured with --with-gcc-major-version-only. The lbl flavor's GCC
+    is (recipes/gcc.yaml, flavor_args.gcc), so its directory is
+    include/c++/16 while -dumpfullversion says 16.2.0; the macos GCC is
+    not. Today the only consumer is recipes/vtk.yaml under
+    flavor_args.macos. Do not reuse the macros on lbl without revisiting
+    this, and do not point them at a non-GCC cxx (intel's icpx).
+    """
+    cxx = flavor.get('compilers', {}).get('cxx', 'g++')
+    probe = Path(cxx) if os.path.isabs(cxx) else Path(prefix) / 'bin' / cxx
+    key = str(probe)
+    if key in _GCC_IDENTITY_CACHE:
+        return _GCC_IDENTITY_CACHE[key]
+    if not probe.is_file():
+        raise BuildError(
+            f"%{{gcc_version}}/%{{gcc_machine}} need the SCLS GCC at {probe}, "
+            f"which does not exist. Build and install gcc for this flavor first.")
+    values = []
+    for flag in ('-dumpfullversion', '-dumpmachine'):
+        result = subprocess.run([str(probe), flag], capture_output=True, text=True)
+        value = result.stdout.strip()
+        if result.returncode != 0 or not value:
+            raise BuildError(f"{probe} {flag} failed: {result.stderr.strip()}")
+        values.append(value)
+    _GCC_IDENTITY_CACHE[key] = (values[0], values[1])
+    return _GCC_IDENTITY_CACHE[key]
+
+
 def get_parallel_jobs() -> int:
     """Get number of parallel build jobs"""
     try:

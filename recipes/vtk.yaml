@@ -19,6 +19,10 @@ update:
 requires:
   all:
     - cmake
+  # The macOS flags below are probed from the SCLS GCC (%{gcc_version},
+  # %{gcc_machine}), so gcc must be installed first on that flavor.
+  macos:
+    - gcc
 
 features:
   fortran: false
@@ -53,13 +57,21 @@ configure:
       - "-DVTK_USE_X=OFF"
       - "-DVTK_SMP_IMPLEMENTATION_TYPE=Sequential"
       - "-DVTK_SMP_ENABLE_STDTHREAD=OFF"
+      # VTK is deliberately compiled with Apple clang (/usr/bin/gcc IS clang)
+      # but against the SCLS GCC libstdc++: -nostdinc++ hides clang's own C++
+      # headers and the -isystem paths point at GCC's. Those directories are
+      # named by the installed GCC's full version and configured target
+      # (include/c++/16.2.0/aarch64-apple-darwin25.2.0 on Apple Silicon), so
+      # they are probed from %{prefix}/bin/g++ (-dumpfullversion, -dumpmachine)
+      # at configure time via %{gcc_version}/%{gcc_machine} -- see
+      # gcc_identity() in python/build_common.py -- rather than hardcoded.
       - "-DCMAKE_C_COMPILER=/usr/bin/gcc"
       - "-DCMAKE_CXX_COMPILER=/usr/bin/g++"
-      - "-DCMAKE_CXX_FLAGS=-stdlib=libstdc++ -femulated-tls -nostdinc++ -isystem %{prefix}/include/c++/16.1.0 -isystem %{prefix}/include/c++/16.1.0/x86_64-apple-darwin24.6.0 -isystem %{prefix}/include/c++/16.1.0/backward"
+      - "-DCMAKE_CXX_FLAGS=-stdlib=libstdc++ -femulated-tls -nostdinc++ -isystem %{prefix}/include/c++/%{gcc_version} -isystem %{prefix}/include/c++/%{gcc_version}/%{gcc_machine} -isystem %{prefix}/include/c++/%{gcc_version}/backward"
       - "-DCMAKE_EXE_LINKER_FLAGS=-stdlib=libstdc++ -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib -Wl,-headerpad_max_install_names"
       - "-DCMAKE_SHARED_LINKER_FLAGS=-stdlib=libstdc++ -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib -Wl,-headerpad_max_install_names"
       - "-DCMAKE_MODULE_LINKER_FLAGS=-stdlib=libstdc++ -L%{prefix}/lib -Wl,-rpath,%{prefix}/lib -Wl,-headerpad_max_install_names"
-      - "-DVTK_REQUIRED_OBJCXX_FLAGS=-stdlib=libstdc++ -femulated-tls -nostdinc++ -isystem %{prefix}/include/c++/16.1.0 -isystem %{prefix}/include/c++/16.1.0/x86_64-apple-darwin24.6.0 -isystem %{prefix}/include/c++/16.1.0/backward"
+      - "-DVTK_REQUIRED_OBJCXX_FLAGS=-stdlib=libstdc++ -femulated-tls -nostdinc++ -isystem %{prefix}/include/c++/%{gcc_version} -isystem %{prefix}/include/c++/%{gcc_version}/%{gcc_machine} -isystem %{prefix}/include/c++/%{gcc_version}/backward"
     debug:
       - "-DVTK_USE_CUDA=OFF"
       - "-DVTK_SMP_IMPLEMENTATION_TYPE=OpenMP"
@@ -80,5 +92,6 @@ rpm_build_requires:
 rpm_files_auto: true
 
 registry:
-  cflags: "-I%{prefix}/include/vtk-9.6"
+  # Release series (X.Y), not the full version: bump together with version:.
+  cflags: "-I%{prefix}/include/vtk-9.7"
   ldflags: "-L%{prefix}/lib -lvtkCommonCore -lvtkCommonDataModel -lvtkIOCore"

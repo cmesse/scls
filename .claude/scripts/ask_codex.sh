@@ -9,7 +9,7 @@
 #   CODEX_BIN=/path/to/codex ask_codex.sh "..."             # override the CLI location
 #
 # Depth selection (doc/AI_COLLABORATION_PROTOCOL.md, "Depth Selection"):
-#   CODEX_MODEL   gpt-5.6-sol|gpt-5.6-terra|gpt-5.6-luna|gpt-5.5|gpt-5.4|gpt-5.4-mini
+#   CODEX_MODEL   gpt-6-astra|gpt-5.6-sol|gpt-5.6-terra|gpt-5.6-luna|gpt-5.5|gpt-5.4|gpt-5.4-mini
 #                 (default gpt-5.6-terra). Only terra and luna are named by the depth table.
 #                 gpt-5.6-sol and everything below luna are escape hatches, not tiers — sol in
 #                 particular is allowlisted but deliberately unnamed, pending a measured
@@ -62,10 +62,10 @@ if [ -z "${CODEX_MODEL:-}" ]; then CODEX_MODEL="gpt-5.6-terra"; CODEX_MODEL_CHOS
 if [ -z "${CODEX_EFFORT:-}" ]; then CODEX_EFFORT="medium";      CODEX_EFFORT_CHOSEN=0; fi
 
 case "$CODEX_MODEL" in
-    gpt-5.6-sol|gpt-5.6-terra|gpt-5.6-luna|gpt-5.5|gpt-5.4|gpt-5.4-mini) ;;
+    gpt-6-astra|gpt-5.6-sol|gpt-5.6-terra|gpt-5.6-luna|gpt-5.5|gpt-5.4|gpt-5.4-mini) ;;
     *)
         echo "ask_codex.sh: unknown CODEX_MODEL '$CODEX_MODEL'" >&2
-        echo "Allowed: gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna gpt-5.5 gpt-5.4 gpt-5.4-mini" >&2
+        echo "Allowed: gpt-6-astra gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna gpt-5.5 gpt-5.4 gpt-5.4-mini" >&2
         exit 1
         ;;
 esac
