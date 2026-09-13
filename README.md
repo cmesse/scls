@@ -175,6 +175,8 @@ Slurm and RDMA fabric are correlated on traditional HPC clusters but not coupled
 
 SCLS distinguishes the machine that *produces* packages from the machine that *consumes* them. RPMs and DEBs are typically produced once on a centralized build host (mock/pbuilder container, CI runner, maintainer workstation) and then distributed via a package repository or shared storage to many install hosts. Recipe `rpm_build_requires` / `rpm_requires` declarations describe the build host's and install host's needs respectively; the SCLS `requires:` field describes inter-package dependencies inside the stack.
 
+The install host does need a compiler: SCLS is a development stack and users build against it, so `scls-<flavor>-environment` requires the toolchain the flavor was built with (`gcc`, `gcc-c++`, `gcc-gfortran`, `glibc-devel`, `make` on RHEL-family hosts; `gcc`, `g++`, `gfortran`, `libc6-dev`, `make` on Debian/Ubuntu) and recommends `doxygen`. The `lbl` flavor ships its own GCC and needs only `make`. The `intel` flavor cannot express its compiler as a distro package: install Intel oneAPI (`icx`/`ifx`) from Intel's repository before installing the stack.
+
 The practical consequence: installing `libibverbs-dev` on your build host to compile `scls-gcc-ucx` does not mean the resulting package will require `libibverbs-dev` at install time. It requires only `libibverbs1` (the runtime soname package), which is tiny and harmless on machines without IB hardware.
 
 ## Quick Start

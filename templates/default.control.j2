@@ -10,6 +10,9 @@ Pre-Depends: {{ pre_depends | join(', ') }}
 {% if depends %}
 Depends: {{ depends | join(', ') }}
 {% endif %}
+{% if recommends %}
+Recommends: {{ recommends | join(', ') }}
+{% endif %}
 Homepage: {{ homepage }}
 Description: {{ summary }}
 {% for line in description_lines %}

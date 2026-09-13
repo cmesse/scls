@@ -50,6 +50,11 @@ Requires(pre):  {{ req }}
 Requires:       {{ req }}
 {% endfor %}
 
+# Weak runtime requirements (installed by default, skipped if unavailable)
+{% for req in recommends %}
+Recommends:     {{ req }}
+{% endfor %}
+
 # Disable automatic dependency detection - we use custom prefix
 AutoReqProv:    no
 

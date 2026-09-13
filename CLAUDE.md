@@ -101,6 +101,7 @@ Recipes in `recipes/*.yaml` define:
 - Build configuration (configure type: autotools/cmake/custom/none)
 - Features (fortran, mpi, openmp, math requirements)
 - Flavor restrictions (`include_flavors:` allowlist, `exclude_flavors:` blocklist). If `include_flavors:` is omitted, the package builds for all flavors; an explicit empty list (`include_flavors: []`) means the recipe is never built by default and must be opted in via `extra_packages:` in `flavor.conf`.
+- System package dependencies: `rpm_build_requires:` (build host), `rpm_requires:` (install host, hard), `rpm_recommends:` (install host, weak: RPM/DEB `Recommends:`, installed by default but never fatal when unavailable). All three accept a flat list or a per-flavor dict with `all:`. Names are RHEL package names; `packaging/system_packages.yaml` translates them for .debs and a missing entry is a hard error. The host compiler requirement for a whole flavor lives on the `environment` recipe, since every other package Requires(pre)/Pre-Depends on it.
 - Pre/post build commands
 - Test commands
 
