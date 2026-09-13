@@ -26,6 +26,11 @@ gcc-gfortran:             gfortran
 
 # Build tools
 autoconf:                 autoconf
+# glibc-devel is implied by gcc on RHEL; on Debian gcc only Recommends
+# libc6-dev, so the environment recipe lists it explicitly to get the
+# build-essential equivalent (gcc, g++, make, libc6-dev) as hard Depends.
+glibc-devel:              libc6-dev
+doxygen:                  doxygen
 automake:                 automake
 libtool:                  libtool
 make:                     make

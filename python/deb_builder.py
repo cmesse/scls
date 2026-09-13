@@ -436,6 +436,25 @@ class DebBuilder(UnixBuilder):
             add(recipe_requires)
         return build_requires, requires
 
+    def get_deb_recommends(self) -> List[str]:
+        """Weak runtime deps from the recipe's `rpm_recommends:`, translated.
+
+        Rendered as `Recommends:` on the main binary package (parallels
+        rpm_builder.get_rpm_recommends). apt installs Recommends by
+        default and skips them without error when unavailable.
+        """
+        recommends: List[str] = []
+        val = self.recipe.get('rpm_recommends')
+        if isinstance(val, dict):
+            flavor_specific = resolve_flavor_key(self.flavor, val)
+            if flavor_specific:
+                recommends.extend(flavor_specific)
+            if 'all' in val:
+                recommends.extend(val['all'])
+        elif isinstance(val, list):
+            recommends.extend(val)
+        return list(dict.fromkeys(self._translate_system_deps(recommends)))
+
     def get_deb_depends(self) -> Tuple[List[str], List[str]]:
         """Return (Build-Depends, Depends) with all system names translated."""
         br, r = self._collect_recipe_system_deps()
@@ -674,6 +693,7 @@ class DebBuilder(UnixBuilder):
             'subpkg_name': None,
             'depends': main_depends,
             'pre_depends': main_pre_depends,
+            'recommends': self.get_deb_recommends(),
             'summary': main_summary,
             'description': main_description,
         }]
@@ -859,7 +879,8 @@ class DebBuilder(UnixBuilder):
     def write_control(self, destdir: Path, scls_name: str,
                       depends: List[str], summary: str,
                       description: str,
-                      pre_depends: List[str] | None = None) -> None:
+                      pre_depends: List[str] | None = None,
+                      recommends: List[str] | None = None) -> None:
         """Render DEBIAN/control + DEBIAN/postinst into the given destdir.
 
         Used for both the main package and each subpackage. We discard
@@ -886,6 +907,7 @@ class DebBuilder(UnixBuilder):
             maintainer=self.maintainer,
             depends=depends,
             pre_depends=pre_depends or [],
+            recommends=recommends or [],
             homepage=self.recipe.get('homepage', ''),
             summary=summary,
             description_lines=body,
@@ -977,6 +999,7 @@ exit 0
                 scls_name=entry['scls_name'],
                 depends=entry['depends'],
                 pre_depends=entry.get('pre_depends', []),
+                recommends=entry.get('recommends', []),
                 summary=entry['summary'],
                 description=entry['description'],
             )
@@ -1054,6 +1077,7 @@ exit 0
             'scls_name': self.scls_name,
             'depends': depends,
             'pre_depends': main_pre_depends,
+            'recommends': self.get_deb_recommends(),
             'summary': (self.recipe.get('summary')
                         or (load_description(self.package)
                             or self.package).split('\n', 1)[0]),
@@ -1093,6 +1117,8 @@ exit 0
                 lines.append(f"Pre-Depends: {', '.join(binary['pre_depends'])}")
             if binary['depends']:
                 lines.append(f"Depends: {', '.join(binary['depends'])}")
+            if binary.get('recommends'):
+                lines.append(f"Recommends: {', '.join(binary['recommends'])}")
             lines.append(f"Description: {binary['summary']}")
             for line in desc_body:
                 lines.append(f" {line if line else '.'}")

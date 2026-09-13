@@ -1205,6 +1205,15 @@ class RPMBuilder:
         # Add registry file
         files_list.append(f"%{{prefix}}/share/scls/registry/{self.package}.yaml")
 
+        # Runtime deps come from the recipe's rpm_requires / rpm_recommends
+        # (environment carries the host-toolchain requirement for the whole
+        # flavor -- see recipes/environment.yaml). Build deps are the fixed
+        # bootstrap tool set below, not get_rpm_requires()'s BuildRequires.
+        _, requires, _ = self.get_rpm_requires()
+        recommends = self.get_rpm_recommends()
+        requires_block = "".join(f"Requires:       {r}\n" for r in requires)
+        recommends_block = "".join(f"Recommends:     {r}\n" for r in recommends)
+
         # Generate the SPEC file content
         spec_content = f"""# Generated SPEC file for scls-{self.flavor_name}-{self.package}
 # This is a generated package - no external source
@@ -1216,7 +1225,7 @@ class RPMBuilder:
 
 Name:           scls-%{{scls_flavor}}-%{{package_name}}
 Version:        %{{package_version}}
-Release:        1%{{?dist}}
+Release:        {self.get_release_string()}%{{?dist}}
 Summary:        {self.recipe.get('summary', 'SCLS environment package')}
 License:        {self.recipe.get('license', 'BSD-3-Clause')}
 BuildArch:      noarch
@@ -1227,6 +1236,12 @@ BuildRequires:  automake
 BuildRequires:  m4
 BuildRequires:  make
 BuildRequires:  libtool
+
+# Runtime requirements (recipe rpm_requires:)
+{requires_block}
+# Weak runtime requirements (recipe rpm_recommends:)
+{recommends_block}
+AutoReqProv:    no
 
 %description
 {self.recipe.get('summary', 'SCLS environment setup and activation scripts.')}
@@ -1416,6 +1431,7 @@ fi
 
         # Get requirements
         build_requires, requires, pre_requires = self.get_rpm_requires()
+        recommends = self.get_rpm_recommends()
 
         # Get file list
         files = self.get_file_list()
@@ -1534,6 +1550,7 @@ fi
             'build_requires': build_requires,
             'requires': requires,
             'pre_requires': pre_requires,
+            'recommends': recommends,
             'prefix': str(self.prefix),
             'sources': str(self.sources_dir),  # For extra sources (e.g., gmp/mpfr/mpc for GCC)
             'cflags': self.cflags,
@@ -1706,6 +1723,27 @@ fi
         args.extend(get_interface_args(self.recipe, self.flavor, 'install'))
 
         return args
+
+    def get_rpm_recommends(self) -> list:
+        """Weak runtime dependencies from the recipe's `rpm_recommends:`.
+
+        Rendered as `Recommends:` (main package only). dnf installs weak
+        deps by default but does not fail the transaction when one is not
+        available -- the right shape for tools like doxygen that live in
+        an opt-in repo (CRB on RHEL 9/10). Same flat-list or per-flavor
+        dict form as `rpm_requires:`.
+        """
+        recommends = []
+        val = self.recipe.get('rpm_recommends')
+        if isinstance(val, dict):
+            flavor_specific = resolve_flavor_key(self.flavor, val)
+            if flavor_specific:
+                recommends.extend(flavor_specific)
+            if 'all' in val:
+                recommends.extend(val['all'])
+        elif isinstance(val, list):
+            recommends.extend(val)
+        return list(dict.fromkeys(recommends))
 
     def get_rpm_requires(self) -> tuple[list, list, list]:
         """Get RPM BuildRequires, Requires, and Requires(pre) from recipe and

@@ -11,6 +11,7 @@ file, it is lost.
 
 ## Entries
 
+- [dl20260913_environment_toolchain_requires.md](dl20260913_environment_toolchain_requires.md) — environment now Requires the host toolchain and Recommends doxygen; new `rpm_recommends:` field; generated spec honours `release:`
 - [dl20260904_mumps_macos_install_names_handover.md](dl20260904_mumps_macos_install_names_handover.md) — triaged the BELFEM MUMPS dylib install-name handover: stale, fixed generically by the macOS post-install normalizer in `f171e7d` (2026-05-27); remaining check is whether the Mac's installed prefix post-dates it
 - [dl20260904_website_restyle_and_doc_sweep.md](dl20260904_website_restyle_and_doc_sweep.md) — ported the scls.html restyle into the Jinja template/generator; swept README, doc/, CLAUDE.md and the website for stale GCC 15 and Apple Silicon claims
 - [dl20260910_apple_silicon_report_fixes.md](dl20260910_apple_silicon_report_fixes.md) — patched the seven findings of the first Apple Silicon bootstrap report (zsh activation, gklib NO_X86, macOS manifest hazard, vtk libstdc++ macros, openmpi PRRTE guard, PETSc PETSC_ARCH); report's empty-PETSC_ARCH fix refuted against PETSc source; two blind Codex+Grok rounds

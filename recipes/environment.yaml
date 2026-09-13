@@ -1,8 +1,56 @@
 name: environment
 version: "2026"
+release: 2
 summary: SCLS environment setup, activation scripts, and configuration
 license: BSD-3-Clause
 bootstrap: true
+
+# Host toolchain the installed stack needs at runtime. SCLS is a development
+# stack (headers, .so, cmake/pkg-config files); users compile and link against
+# it, so the compilers the stack was built with must be present on the
+# consumer host. `AutoReqProv: no` (see CLAUDE.md) means nothing else pulls
+# them in, and every other package Pre-Depends/Requires(pre) on environment,
+# so this is the one place to state it. Names are RHEL package names; the
+# deb builder translates them via packaging/system_packages.yaml.
+#
+#   lbl    builds its own gcc/binutils (scls-lbl-gcc via requires:), so the
+#          host toolchain is not needed once the stack is installed.
+#   intel  uses icx/ifx from Intel's oneAPI repo; there is no distro package
+#          to name here. The install is documented as a host prerequisite.
+rpm_requires:
+  all:
+    - make
+  gcc:
+    - gcc
+    - gcc-c++
+    - gcc-gfortran
+    - glibc-devel
+  mkl:
+    - gcc
+    - gcc-c++
+    - gcc-gfortran
+    - glibc-devel
+  debug:
+    - gcc
+    - gcc-c++
+    - gcc-gfortran
+    - glibc-devel
+  gcc-mkl-cuda:
+    - gcc
+    - gcc-c++
+    - gcc-gfortran
+    - glibc-devel
+  lbl: []
+  intel: []
+
+# Weak dependencies (RPM Recommends: / Debian Recommends:). dnf and apt
+# install these by default but do not fail when they are unavailable --
+# doxygen lives in CRB on RHEL 9/10, which is disabled on a fresh host.
+# Nothing in the stack invokes doxygen; it is a convenience for developers
+# building documentation for their own projects against SCLS.
+rpm_recommends:
+  all:
+    - doxygen
 
 # This package has no external source - files are generated from templates
 source:
