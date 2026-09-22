@@ -101,6 +101,18 @@ SCLS also supports a direct Unix builder for environments where native packaging
 
 SCLS supports direct builds on macOS as well. The `macos` flavor is exercised regularly on Intel developer workstations. On Apple Silicon the `aarch64-apple-darwin` GCC branch that Homebrew carries is vendored in `patches/gcc/` and applied automatically on arm64 hosts; the three-stage GCC bootstrap and the packages up to and including OpenMPI were first built and installed on an M2 Pro on 2026-09-10 (see `doc/MACOS_BUILD.md`). Everything after OpenMPI in the build order — ScaLAPACK, MUMPS, SCOTCH, the SLATE/STRUMPACK stack, PETSc, VTK — has not been built on arm64 yet and should be treated as untested there.
 
+## Validation Model
+
+SCLS does not rely on a separate CI workflow as its primary test gate. Package builds
+automatically run the tests declared by each recipe, on the build host and for the selected
+platform and flavor. The complete build/install path is the meaningful validation: configure,
+compile, package, install, verify dependencies and installed versions, and run the upstream
+tests. This catches integration and ABI problems that a lightweight CI check would not.
+
+Validation is therefore recorded per package, flavor, platform, and build host. A successful
+build on one flavor or architecture does not establish support for another; unbuilt or
+untested combinations remain explicitly marked as such.
+
 ## How the Repository Works
 
 The project is built around three core concepts.
