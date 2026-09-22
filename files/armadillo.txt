@@ -130,6 +130,7 @@
 %{prefix}/include/armadillo_bits/fn_cor.hpp
 %{prefix}/include/armadillo_bits/fn_cov.hpp
 %{prefix}/include/armadillo_bits/fn_cross.hpp
+%{prefix}/include/armadillo_bits/fn_cubemul.hpp
 %{prefix}/include/armadillo_bits/fn_cumprod.hpp
 %{prefix}/include/armadillo_bits/fn_cumsum.hpp
 %{prefix}/include/armadillo_bits/fn_det.hpp
@@ -156,8 +157,7 @@
 %{prefix}/include/armadillo_bits/fn_histc.hpp
 %{prefix}/include/armadillo_bits/fn_index_max.hpp
 %{prefix}/include/armadillo_bits/fn_index_min.hpp
-%{prefix}/include/armadillo_bits/fn_inplace_strans.hpp
-%{prefix}/include/armadillo_bits/fn_inplace_trans.hpp
+%{prefix}/include/armadillo_bits/fn_inplace_xtrans.hpp
 %{prefix}/include/armadillo_bits/fn_interp1.hpp
 %{prefix}/include/armadillo_bits/fn_interp2.hpp
 %{prefix}/include/armadillo_bits/fn_intersect.hpp
@@ -186,6 +186,7 @@
 %{prefix}/include/armadillo_bits/fn_omit.hpp
 %{prefix}/include/armadillo_bits/fn_ones.hpp
 %{prefix}/include/armadillo_bits/fn_orth_null.hpp
+%{prefix}/include/armadillo_bits/fn_permute.hpp
 %{prefix}/include/armadillo_bits/fn_pinv.hpp
 %{prefix}/include/armadillo_bits/fn_polyfit.hpp
 %{prefix}/include/armadillo_bits/fn_polyval.hpp
@@ -224,7 +225,6 @@
 %{prefix}/include/armadillo_bits/fn_spsolve.hpp
 %{prefix}/include/armadillo_bits/fn_sqrtmat.hpp
 %{prefix}/include/armadillo_bits/fn_stddev.hpp
-%{prefix}/include/armadillo_bits/fn_strans.hpp
 %{prefix}/include/armadillo_bits/fn_sum.hpp
 %{prefix}/include/armadillo_bits/fn_svd.hpp
 %{prefix}/include/armadillo_bits/fn_svds.hpp
@@ -232,7 +232,6 @@
 %{prefix}/include/armadillo_bits/fn_symmat.hpp
 %{prefix}/include/armadillo_bits/fn_toeplitz.hpp
 %{prefix}/include/armadillo_bits/fn_trace.hpp
-%{prefix}/include/armadillo_bits/fn_trans.hpp
 %{prefix}/include/armadillo_bits/fn_trapz.hpp
 %{prefix}/include/armadillo_bits/fn_trig.hpp
 %{prefix}/include/armadillo_bits/fn_trimat.hpp
@@ -244,6 +243,7 @@
 %{prefix}/include/armadillo_bits/fn_vecnorm.hpp
 %{prefix}/include/armadillo_bits/fn_vectorise.hpp
 %{prefix}/include/armadillo_bits/fn_wishrnd.hpp
+%{prefix}/include/armadillo_bits/fn_xtrans.hpp
 %{prefix}/include/armadillo_bits/fn_zeros.hpp
 %{prefix}/include/armadillo_bits/glue_affmul_bones.hpp
 %{prefix}/include/armadillo_bits/glue_affmul_meat.hpp
@@ -257,6 +257,8 @@
 %{prefix}/include/armadillo_bits/glue_cov_meat.hpp
 %{prefix}/include/armadillo_bits/glue_cross_bones.hpp
 %{prefix}/include/armadillo_bits/glue_cross_meat.hpp
+%{prefix}/include/armadillo_bits/glue_cubemul_bones.hpp
+%{prefix}/include/armadillo_bits/glue_cubemul_meat.hpp
 %{prefix}/include/armadillo_bits/glue_hist_bones.hpp
 %{prefix}/include/armadillo_bits/glue_hist_meat.hpp
 %{prefix}/include/armadillo_bits/glue_histc_bones.hpp
@@ -443,6 +445,8 @@
 %{prefix}/include/armadillo_bits/op_omit_meat.hpp
 %{prefix}/include/armadillo_bits/op_orth_null_bones.hpp
 %{prefix}/include/armadillo_bits/op_orth_null_meat.hpp
+%{prefix}/include/armadillo_bits/op_permute_bones.hpp
+%{prefix}/include/armadillo_bits/op_permute_meat.hpp
 %{prefix}/include/armadillo_bits/op_pinv_bones.hpp
 %{prefix}/include/armadillo_bits/op_pinv_meat.hpp
 %{prefix}/include/armadillo_bits/op_powmat_bones.hpp

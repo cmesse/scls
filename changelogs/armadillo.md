@@ -2,6 +2,12 @@
 
 ## Version 15.6.0-1 - Tue Sep 22 2026
 - Updated to version 15.6.0
+- Manifest drift, found on the first Linux build (R9/debug): upstream consolidated
+  `fn_strans.hpp` + `fn_trans.hpp` into `fn_xtrans.hpp` and `fn_inplace_strans.hpp` +
+  `fn_inplace_trans.hpp` into `fn_inplace_xtrans.hpp`, and added the new `cubemul` and
+  `permute` features. `files/armadillo.txt`: 4 headers removed, 8 added. Transpose
+  functionality is unchanged — `op_strans_*`, `op_htrans_*` and `xtrans_mat_*` are all
+  still present, and every added header is referenced by the master `armadillo` header.
 
 ## Version 15.4.2-1 - Tue Aug 18 2026
 - Updated to version 15.4.2
