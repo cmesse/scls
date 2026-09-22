@@ -1,6 +1,7 @@
 name: petsc
 version: 3.25.4
 
+release: 2
 summary: Portable Extensible Toolkit for Scientific Computation
 homepage: https://petsc.org/
 license: BSD-2-Clause

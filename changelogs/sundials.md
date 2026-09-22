@@ -1,5 +1,12 @@
 # Sundials Changelog
 
+## Version 7.8.0-2 - Tue Sep 22 2026
+- Release bump only, no recipe content change: rebuild of the scotch reverse-dependency
+  closure (scotch, mumps, strumpack, petsc, slepc, sundials) after an unexplained
+  `-DBUILD_LIBSCOTCHMETIS` flip was found in `recipes/scotch.yaml` (95da949, 2026-04-01).
+  With `AutoReqProv: no` a rebuild at an unchanged NEVRA is invisible to dnf/apt, so each
+  package in the closure gets a new release.
+
 ## Version 7.8.0-1 - Wed Aug 19 2026
 - Updated to version 7.8.0
 - Prepend the in-tree build library directories to LD_LIBRARY_PATH when running

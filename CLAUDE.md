@@ -2,6 +2,37 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Build Configuration Changes Require Explicit Approval
+
+**No build-configuration change may be made without the maintainer's explicit approval in the
+current conversation.** This is the strictest rule in this file and it overrides any inference
+that a change is obviously correct, minimal, or needed to make something else work.
+
+A build-configuration change is any edit that alters what gets compiled, how, or what ships:
+
+- `configure.args`, `flavor_args`, `lp64_args`, `ilp64_args`, `cmake_args` and any other
+  compiler/configure/CMake option in `recipes/*.yaml`
+- compilers, flags, math-library or MPI selection, or prefixes in `flavors/*.yaml`
+- `files/*.txt` manifests, `patches/`, and the builders in `python/`
+- dependency lists, `include_flavors:` / `exclude_flavors:`, and system-package requirements
+
+Turning an upstream option ON or OFF is exactly the case this rule exists for. An option that is
+explicitly set in a recipe is a decision someone made; treat it as load-bearing until the
+maintainer says otherwise, even when the reason is not written down next to it.
+
+When such a change is genuinely needed to unblock work:
+
+1. Stop and ask. Describe the option, what breaks without it, and the rebuild blast radius
+   (`python/build_order.py` gives the reverse-dependency closure).
+2. If approved, record *why* in a comment next to the option, in `changelogs/<package>.md`, and in
+   the devlog entry — so the next reader does not have to reconstruct the reason from `git log -S`.
+3. Follow the review gate in [`doc/AI_COLLABORATION_PROTOCOL.md`](doc/AI_COLLABORATION_PROTOCOL.md):
+   plan, two blind audits, decide, implement, two blind audits, adjust.
+
+Commit messages for these changes must say what option changed and why, never a bare
+"package updates". An unexplained option flip is indistinguishable from an accident five months
+later.
+
 ## Repository Overview
 
 SCLS (Scientific Core Library Stack) is a Python-based build system for creating optimized scientific computing packages. It manages compilation and packaging of scientific software with different optimization flavors (e.g., gcc, mkl, debug, intel, lbl, macos) for both Linux (RPM) and macOS systems.
@@ -223,7 +254,7 @@ Multi-AI work in this repository follows [`doc/AI_COLLABORATION_PROTOCOL.md`](do
 - **Three-AI round:** `/cross-review` — Claude pre-registers its own findings, `scripts/cross_review.sh` dispatches both auditors blind, then Claude verifies every citation and writes the reconciliation table.
 - **Auto-review:** opt-in post-commit auditor, installed by `scripts/install_autoreview_hook.sh` and gated on `SCLS_AUTOREVIEW=1`. `scripts/review_status.sh` shows the backlog and any open P0 flags.
 - **Evidence discipline:** "reviewed" is not "verified". Name the gate that actually ran. The macOS dev host cannot run `rpmbuild`, so RPM claims top out at `--spec-only` generation and are written as pending a Linux build host.
-- **Edit safety:** investigation is read-only by default; `recipes/`, `flavors/`, `files/`, `patches/`, and `python/` are edited only after explicit approval.
+- **Edit safety:** investigation is read-only by default; `recipes/`, `flavors/`, `files/`, `patches/`, and `python/` are edited only after explicit approval. See [Build Configuration Changes Require Explicit Approval](#build-configuration-changes-require-explicit-approval) — that rule is absolute and covers upstream build options in particular.
 
 ## Testing
 
