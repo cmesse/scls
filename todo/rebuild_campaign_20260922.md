@@ -53,14 +53,14 @@ those dependencies changed.
 | 15 | 7 | mumps 5.9.1-1 → -2 | casc (openmpi, scotch, scalapack, parmetis) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 16 | 7 | netcdf 4.10.1-1 → -2 | casc (hdf5, openmpi) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 17 | 7 | slate 2025.05.28-2 → -3 | casc (openmpi, blaspp, lapackpp) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 18 | 7 | superlu_dist 9.2.1-2 → -3 | casc (openmpi, parmetis) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 19 | 8 | armadillo 15.4.2 → 15.6.0 | up | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 20 | 8 | butterflypack 4.1.0-2 → -3 | casc (openmpi, arpack-ng, scalapack) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 21 | 8 | exodus 2026.08.11-1 → -2 | casc (hdf5, netcdf, openmpi) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 22 | 9 | strumpack 8.0.0-3 → -4 | casc (openmpi, scotch, butterflypack, scalapack) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 18 | 7 | superlu_dist 9.2.1-2 → -3 | casc (openmpi, parmetis) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 19 | 8 | armadillo 15.4.2 → 15.6.0 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 20 | 8 | butterflypack 4.1.0-2 → -3 | casc (openmpi, arpack-ng, scalapack) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 21 | 8 | exodus 2026.08.11-1 → -2 | casc (hdf5, netcdf, openmpi) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 22 | 9 | strumpack 8.0.0-3 → -4 | casc (openmpi, scotch, butterflypack, scalapack) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 
 `openblas` builds only for `gcc` among the binary flavors (`mkl` uses MKL, `debug` uses the
 Netlib reference), so its four dependents (`blaze`, `blaspp`, `lapackpp`, `superlu`) cascade on
@@ -138,6 +138,27 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   strumpack, petsc, slepc, sundials). sundials is still the untested drift candidate from
   section B. Resume with `/update-build --from superlu_dist`.
   Host HEAD at run start: 88a324c (rebased onto fe904d0).
+- 2026-09-22 — **R9: debug 24/24 built and installed — column complete.** All 24 installed
+  NEVRAs re-verified against their recipes in one sweep after the last package. Final run added
+  superlu_dist 9.2.1-3, armadillo 15.6.0-1, butterflypack 4.1.0-3, exodus 2026.08.11-2,
+  strumpack 8.0.0-4, petsc 3.25.5-1, slepc 3.25.2-1, sundials 7.9.0-1.
+  Two Class M auto-fixes were required, both committed and **both needed on the other three
+  columns**:
+  - `67c3d4f` armadillo — 15.6.0 consolidated `fn_{,inplace_}{s,}trans.hpp` into
+    `fn_{,inplace_}xtrans.hpp` and added the `cubemul` and `permute` feature groups.
+    4 removed, 8 added. rpmbuild reported only the 4 missing; the 4 new headers were found by
+    diffing the whole buildroot and would otherwise have failed the next build as unpackaged.
+  - `3810fe9` petsc — dropped the stale `include/petscmat.h.orig` entry. `patch` runs with
+    `--no-backup-if-mismatch`, so an earlier version's fuzzy apply created the backup and a
+    manifest regenerated from that buildroot captured it; every petsc package shipped since
+    then carried an unpatched copy of a public header. 3.25.5 applies at fuzz 0, so the entry
+    is now stale. Verified the patch still applies (not a silently-unpatched build).
+  `petsc-baijmkl-decls.patch` was checked against pristine 3.25.5 and is **still required**:
+  `baijmkl/makefile` still requires `PETSC_HAVE_MKL_SPARSE_OPTIMIZE` while `petscmat.h:427`
+  still gates the declarations on `PETSC_HAVE_MKL_SPARSE`, and this host's oneAPI MKL 2026.0
+  has no `mkl_dcsrmv`. Inert on `debug`/`gcc`; load-bearing on `mkl`/`intel`.
+  sundials 7.8 → 7.9 produced **no** manifest drift, closing the last section B prediction.
+  Host HEAD at run start: 55f3f0b.
 
 ## Blockers
 
