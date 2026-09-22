@@ -1,5 +1,6 @@
 name: lapackpp
 version: 2025.05.28
+release: 2
 summary: C++ API for the Linear Algebra Package (LAPACK)
 homepage: https://icl.utk.edu/slate/
 license: BSD-3-Clause

@@ -1,5 +1,8 @@
 # Armadillo Changelog
 
+## Version 15.6.0-1 - Tue Sep 22 2026
+- Updated to version 15.6.0
+
 ## Version 15.4.2-1 - Tue Aug 18 2026
 - Updated to version 15.4.2
 - Collapsed the 644 individually listed armadillo_bits headers in

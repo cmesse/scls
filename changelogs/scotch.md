@@ -1,11 +1,8 @@
 # Scotch Changelog
 
-## Version 7.0.13-2 - Tue Sep 22 2026
-- Release bump only, no recipe content change: rebuild of the scotch reverse-dependency
-  closure (scotch, mumps, strumpack, petsc, slepc, sundials) after an unexplained
-  `-DBUILD_LIBSCOTCHMETIS` flip was found in `recipes/scotch.yaml` (95da949, 2026-04-01).
-  With `AutoReqProv: no` a rebuild at an unchanged NEVRA is invisible to dnf/apt, so each
-  package in the closure gets a new release.
+## Version 7.0.15-1 - Tue Sep 22 2026
+- Updated to version 7.0.15
+- All three patches apply at fuzz 0 against 7.0.15 (`patch --dry-run -F0` on the dev host).
 
 ## Version 7.0.13-1 - Tue Aug 18 2026
 - Updated to version 7.0.13

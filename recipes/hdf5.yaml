@@ -1,6 +1,6 @@
 name: hdf5
 version: 1.14.6
-release: 2
+release: 3
 summary: A general purpose library and file format for storing scientific data
 homepage: https://www.hdfgroup.org/solutions/hdf5
 

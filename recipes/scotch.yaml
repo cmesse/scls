@@ -1,6 +1,6 @@
 name: scotch
-version: 7.0.13
-release: 2
+version: 7.0.15
+release: 1
 summary: Graph, mesh and hypergraph partitioning library
 homepage: https://www.labri.fr/perso/pelegrin/scotch/
 license: CeCILL-C

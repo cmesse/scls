@@ -1,11 +1,7 @@
 # Mumps Changelog
 
 ## Version 5.9.1-2 - Tue Sep 22 2026
-- Release bump only, no recipe content change: rebuild of the scotch reverse-dependency
-  closure (scotch, mumps, strumpack, petsc, slepc, sundials) after an unexplained
-  `-DBUILD_LIBSCOTCHMETIS` flip was found in `recipes/scotch.yaml` (95da949, 2026-04-01).
-  With `AutoReqProv: no` a rebuild at an unchanged NEVRA is invisible to dnf/apt, so each
-  package in the closure gets a new release.
+- Release bump only, no recipe content change: rebuilt because openmpi, scotch, scalapack, parmetis changed in the 2026-09-22 campaign (`todo/rebuild_campaign_20260922.md`). With `AutoReqProv: no` a rebuild at an unchanged NEVRA is invisible to dnf/apt, so the release is bumped.
 
 ## Version 5.9.1-1 - Tue Aug 18 2026
 - Updated to version 5.9.1

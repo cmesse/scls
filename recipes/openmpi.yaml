@@ -1,6 +1,6 @@
 name: openmpi
-version: 5.0.10
-release: 3
+version: 5.0.11
+release: 1
 summary: A powerful implementation of MPI/SHMEM
 homepage: https://www.open-mpi.org
 license: BSD
@@ -25,16 +25,6 @@ source:
 # MPI-4 persist part component the patch touches; the empty list short-circuits
 # the `gcc:` key that lbl would otherwise inherit.
 patches:
-  gcc:
-    - openmpi-5.0.10-part-persist-drop-forced-inline.patch
-  mkl:
-    - openmpi-5.0.10-part-persist-drop-forced-inline.patch
-  debug:
-    - openmpi-5.0.10-part-persist-drop-forced-inline.patch
-  intel:
-    - openmpi-5.0.10-part-persist-drop-forced-inline.patch
-  macos:
-    - openmpi-5.0.10-part-persist-drop-forced-inline.patch
   lbl:
     - openmpi-4.1.6-memheap-zero-init.patch
 

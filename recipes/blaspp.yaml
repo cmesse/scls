@@ -1,5 +1,6 @@
 name: blaspp
 version: 2025.05.28
+release: 2
 summary: C++ API for the Basic Linear Algebra Subprograms (BLAS)
 homepage: https://icl.utk.edu/slate/
 license: BSD-3-Clause

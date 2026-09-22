@@ -1,5 +1,9 @@
 # Openblas Changelog
 
+## Version 0.3.34-1 - Tue Sep 22 2026
+- Updated to version 0.3.34
+- `files/openblas.txt`: `lib/libopenblas-r0.3.33.so` → `r0.3.34`. Both patches apply at fuzz 0 against 0.3.34.
+
 ## Version 0.3.33-1 - Sat Apr 25 2026
 - Updated to version 0.3.33
 

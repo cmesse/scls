@@ -392,7 +392,7 @@
 %{prefix}/lib/petsc/bin/xml2flamegraph.py
 %{prefix}/lib/petsc/conf/classes.data
 %{prefix}/lib/petsc/conf/configure-hash
-%{prefix}/lib/petsc/conf/modules/petsc/3.25.4
+%{prefix}/lib/petsc/conf/modules/petsc/3.25.5
 %{prefix}/lib/petsc/conf/petscrules
 %{prefix}/lib/petsc/conf/petscvariables
 %{prefix}/lib/petsc/conf/reconfigure-arch-linux-c-opt.py

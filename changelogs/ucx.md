@@ -1,5 +1,9 @@
 # Ucx Changelog
 
+## Version 1.22.0-1 - Tue Sep 22 2026
+- Updated to version 1.22.0
+- Minor-series jump (1.20 → 1.22). `files/ucx.txt` was not regenerated on the dev host; expect a manifest refresh at the first Linux build.
+
 ## Version 1.20.1-1 - Tue Jun 09 2026
 - Updated to version 1.20.1
 - Use -Wno-deprecated-openmp instead of -Wno-error=deprecated-openmp. GCC

@@ -1,5 +1,9 @@
 # Pmix Changelog
 
+## Version 5.0.11-1 - Tue Sep 22 2026
+- Updated to version 5.0.11
+- Paired with openmpi 5.0.11.
+
 ## Version 5.0.10-2 - Tue Aug 18 2026
 - Rebuild against hwloc 2.14.0 and libevent 2.1.13. No recipe or source change; the release is
   bumped because the rebuilt binaries differ and `AutoReqProv: no` means

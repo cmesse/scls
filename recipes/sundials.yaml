@@ -1,6 +1,6 @@
 name: sundials
-version: 7.8.0
-release: 2
+version: 7.9.0
+release: 1
 summary: Nonlinear and Differential/Algebraic Equation Solvers
 homepage: https://computing.llnl.gov/projects/sundials
 license: BSD-3-Clause

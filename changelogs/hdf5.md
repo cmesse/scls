@@ -1,5 +1,8 @@
 # Hdf5 Changelog
 
+## Version 1.14.6-3 - Tue Sep 22 2026
+- Release bump only, no recipe content change: rebuilt because openmpi changed in the 2026-09-22 campaign (`todo/rebuild_campaign_20260922.md`). With `AutoReqProv: no` a rebuild at an unchanged NEVRA is invisible to dnf/apt, so the release is bumped.
+
 ## Version 1.14.6-2 - Tue Aug 18 2026
 - Enabled the Fortran interface (`--enable-fortran`). `features.fortran: true`
   was already declared, and the registry entry advertised it, but nothing

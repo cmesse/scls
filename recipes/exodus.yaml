@@ -1,5 +1,6 @@
 name: exodus
 version: 2026.08.11
+release: 2
 summary: EXODUS - Advanced finite element data file format
 homepage: https://github.com/sandialabs/seacas
 license: BSD-3-Clause

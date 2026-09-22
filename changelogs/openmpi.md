@@ -1,5 +1,9 @@
 # Openmpi Changelog
 
+## Version 5.0.11-1 - Tue Sep 22 2026
+- Updated to version 5.0.11
+- Dropped `openmpi-5.0.10-part-persist-drop-forced-inline.patch` for the 5.x flavors: 5.0.11 removes `__opal_attribute_always_inline__` from `mca_part_persist_start` (`ompi/mca/part/persist/part_persist.h`), which was the patch's only hunk. The `lbl` flavor stays on 4.1.6 with its own patch.
+
 ## Version 5.0.10-3 - Mon Aug 24 2026
 - 2026-09-10: the 5.x PRRTE install guard now checks lib/libprrte with the
   libext recipe macro instead of a literal `lib/libprrte.so`. On macOS the library is
