@@ -3,6 +3,12 @@
 ## Version 3.25.5-1 - Tue Sep 22 2026
 - Updated to version 3.25.5
 - `files/petsc.txt`: `lib/petsc/conf/modules/petsc/3.25.4` → `3.25.5`. `petsc-baijmkl-decls.patch` applies at fuzz 0.
+- `files/petsc.txt`: dropped the stale `include/petscmat.h.orig` entry, found on the first
+  Linux build (R9/debug). `patch` runs with `--no-backup-if-mismatch`, so it writes a `.orig`
+  backup only when a hunk applies with fuzz or offset. An earlier version's patch did mismatch,
+  the backup was created, and a manifest regenerated from that buildroot captured it — so
+  releases since then shipped an unpatched copy of a public header into `include/`. At 3.25.5
+  the patch applies cleanly, no backup is written, and the entry is gone for good.
 
 ## Version 3.25.4-1 - Wed Aug 19 2026
 - 2026-09-10: `PETSC_ARCH=arch-<os>-c-opt` is now passed to configure as an

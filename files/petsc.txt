@@ -302,7 +302,6 @@
 %{prefix}/include/petscmachineinfo.h
 %{prefix}/include/petscmacros.h
 %{prefix}/include/petscmat.h
-%{prefix}/include/petscmat.h.orig
 %{prefix}/include/petscmat.mod
 %{prefix}/include/petscmat_kokkos.hpp
 %{prefix}/include/petscmatcoarsen.h
