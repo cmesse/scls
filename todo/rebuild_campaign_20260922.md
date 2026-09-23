@@ -45,22 +45,22 @@ those dependencies changed.
 | 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 11 | 6 | parmetis 4.0.3-2 → -3 | casc (openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 12 | 6 | scalapack 2.2.3-2 → -3 | casc (openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 13 | 6 | scotch 7.0.13 → 7.0.15 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 14 | 7 | arpack-ng 3.9.1-2 → -3 | casc (openmpi, scalapack) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 15 | 7 | mumps 5.9.1-1 → -2 | casc (openmpi, scotch, scalapack, parmetis) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 16 | 7 | netcdf 4.10.1-1 → -2 | casc (hdf5, openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 17 | 7 | slate 2025.05.28-2 → -3 | casc (openmpi, blaspp, lapackpp) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 18 | 7 | superlu_dist 9.2.1-2 → -3 | casc (openmpi, parmetis) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 19 | 8 | armadillo 15.4.2 → 15.6.0 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 20 | 8 | butterflypack 4.1.0-2 → -3 | casc (openmpi, arpack-ng, scalapack) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 21 | 8 | exodus 2026.08.11-1 → -2 | casc (hdf5, netcdf, openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 22 | 9 | strumpack 8.0.0-3 → -4 | casc (openmpi, scotch, butterflypack, scalapack) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 11 | 6 | parmetis 4.0.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 12 | 6 | scalapack 2.2.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 13 | 6 | scotch 7.0.13 → 7.0.15 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 14 | 7 | arpack-ng 3.9.1-2 → -3 | casc (openmpi, scalapack) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 15 | 7 | mumps 5.9.1-1 → -2 | casc (openmpi, scotch, scalapack, parmetis) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 16 | 7 | netcdf 4.10.1-1 → -2 | casc (hdf5, openmpi) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 17 | 7 | slate 2025.05.28-2 → -3 | casc (openmpi, blaspp, lapackpp) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 18 | 7 | superlu_dist 9.2.1-2 → -3 | casc (openmpi, parmetis) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 19 | 8 | armadillo 15.4.2 → 15.6.0 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 20 | 8 | butterflypack 4.1.0-2 → -3 | casc (openmpi, arpack-ng, scalapack) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 21 | 8 | exodus 2026.08.11-1 → -2 | casc (hdf5, netcdf, openmpi) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 22 | 9 | strumpack 8.0.0-3 → -4 | casc (openmpi, scotch, butterflypack, scalapack) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 26 | 0 | environment 2026-1 → 2026-2 | stale | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 28 | 2 | nlopt 2.10.1 → 2.11.0 | stale | [x] | [x] | [x] |
@@ -240,6 +240,33 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   here, since oneAPI 2026 has no `mkl_dcsrmv` — and scalapack, which must come from the stack
   and never from `libmkl_scalapack`/`libmkl_blacs`.
   Resume with `/update-build --from hdf5`. Host HEAD at run start: fc3edbe.
+- 2026-09-23 — **R9 COMPLETE: debug 24/24, gcc 25/25, mkl 24/24, plus rows 26–29.**
+  Final gate was a sweep over the *full* `build_order.py` list for each flavor, not just the
+  campaign rows: every installed package on all three flavors matches its recipe. Two Class M
+  auto-fixes (`67c3d4f` armadillo, `3810fe9` petsc), no blockers, no halts.
+  Three mkl-only checks, each verified by inspection rather than inferred from a successful build:
+  - **scalapack provenance.** `readelf -d /opt/scls/mkl/lib/libscalapack.so` shows
+    `libmkl_gf_lp64.so.3`, `libmkl_sequential.so.3`, `libmkl_core.so.3` and **no**
+    `libmkl_scalapack*` or `libmkl_blacs*`. The stack's own ScaLAPACK over MKL's BLAS/LAPACK,
+    exactly as policy requires.
+  - **MKL major SONAME.** Those `DT_NEEDED` entries are `.so.3`, so this column re-aligns the
+    mkl flavor after the host's `.so.2` → `.so.3` bump. Per `doc/MKL_ABI_POLICY.md` that SONAME
+    is invisible to RPM metadata under `AutoReqProv: no`, so a rebuild on the affected host is
+    the only fix and direct inspection the only confirmation.
+  - **hwloc.** `HWLOC_VERSION "2.14.0"` in `/opt/scls/mkl/include/hwloc/autogen/config.h`, so
+    pmix and openmpi compiled against the same hwloc as debug and gcc. The SONAME is
+    `libhwloc.so.15` for both 2.13 and 2.14, so `DT_NEEDED` would not have exposed a mismatch.
+  **Correction to the 2026-09-22 entry above:** `petsc-baijmkl-decls.patch` is recorded there as
+  "load-bearing on `mkl`/`intel`". That is wrong for this host. The installed
+  `/opt/scls/mkl/include/petscconf.h` defines `PETSC_HAVE_MKL_INCLUDES`, `..._LIBS` and
+  `..._SET_NUM_THREADS` but **neither** `PETSC_HAVE_MKL_SPARSE` nor `..._SPARSE_OPTIMIZE`, so
+  both of the patch's guards are false and it is inert on all three R9 flavors. The error was
+  inferring the macro from `mkl_sparse_optimize` being present in `mkl_spblas.h`; PETSc does not
+  enable MKL sparse merely because the symbol exists, and the recipe passes only
+  `--with-blaslapack-{include,lib}`. The upstream gating mismatch is nonetheless real and unfixed
+  in 3.25.5 (verified against the pristine tarball), and the recipe comment names **RHEL 10** as
+  the trigger — so **keep the patch**, and expect the `R10` column to be what actually tests it.
+  Host HEAD at run start: fc94ae6.
 
 ## Blockers
 
