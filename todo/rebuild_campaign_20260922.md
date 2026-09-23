@@ -36,31 +36,92 @@ those dependencies changed.
 
 | # | G | Package | why | R9 DBG | R9 GCC | R9 MKL | R10 DBG | R10 GCC | R10 MKL | AMZN GCC | AMZN MKL | U24 DBG | U24 GCC | U24 MKL |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 2 | cmake 4.4.2 → 4.4.3 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 2 | 2 | openblas 0.3.33 → 0.3.34 | up | n/a | [ ] | n/a | n/a | [ ] | n/a | [ ] | n/a | n/a | [ ] | n/a |
-| 3 | 2 | ucx 1.20.1 → 1.22.0 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 4 | 3 | blaze 3.8.2-1 → -2 | casc (openblas) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 11 | 6 | parmetis 4.0.3-2 → -3 | casc (openmpi) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 12 | 6 | scalapack 2.2.3-2 → -3 | casc (openmpi) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 13 | 6 | scotch 7.0.13 → 7.0.15 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 14 | 7 | arpack-ng 3.9.1-2 → -3 | casc (openmpi, scalapack) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 15 | 7 | mumps 5.9.1-1 → -2 | casc (openmpi, scotch, scalapack, parmetis) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 16 | 7 | netcdf 4.10.1-1 → -2 | casc (hdf5, openmpi) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 17 | 7 | slate 2025.05.28-2 → -3 | casc (openmpi, blaspp, lapackpp) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 18 | 7 | superlu_dist 9.2.1-2 → -3 | casc (openmpi, parmetis) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 19 | 8 | armadillo 15.4.2 → 15.6.0 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 20 | 8 | butterflypack 4.1.0-2 → -3 | casc (openmpi, arpack-ng, scalapack) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 21 | 8 | exodus 2026.08.11-1 → -2 | casc (hdf5, netcdf, openmpi) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 22 | 9 | strumpack 8.0.0-3 → -4 | casc (openmpi, scotch, butterflypack, scalapack) | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 1 | 2 | cmake 4.4.2 → 4.4.3 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 2 | 2 | openblas 0.3.33 → 0.3.34 | up | n/a | [x] | n/a | n/a | [ ] | n/a | [ ] | n/a | n/a | [ ] | n/a |
+| 3 | 2 | ucx 1.20.1 → 1.22.0 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 4 | 3 | blaze 3.8.2-1 → -2 | casc (openblas) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 11 | 6 | parmetis 4.0.3-2 → -3 | casc (openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 12 | 6 | scalapack 2.2.3-2 → -3 | casc (openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 13 | 6 | scotch 7.0.13 → 7.0.15 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 14 | 7 | arpack-ng 3.9.1-2 → -3 | casc (openmpi, scalapack) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 15 | 7 | mumps 5.9.1-1 → -2 | casc (openmpi, scotch, scalapack, parmetis) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 16 | 7 | netcdf 4.10.1-1 → -2 | casc (hdf5, openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 17 | 7 | slate 2025.05.28-2 → -3 | casc (openmpi, blaspp, lapackpp) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 18 | 7 | superlu_dist 9.2.1-2 → -3 | casc (openmpi, parmetis) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 19 | 8 | armadillo 15.4.2 → 15.6.0 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 20 | 8 | butterflypack 4.1.0-2 → -3 | casc (openmpi, arpack-ng, scalapack) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 21 | 8 | exodus 2026.08.11-1 → -2 | casc (hdf5, netcdf, openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 22 | 9 | strumpack 8.0.0-3 → -4 | casc (openmpi, scotch, butterflypack, scalapack) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 26 | 0 | environment 2026-1 → 2026-2 | stale | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 28 | 2 | nlopt 2.10.1 → 2.11.0 | stale | [x] | [x] | [x] |
+| 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+
+**Rows 26–28 were added on 2026-09-22, mid-run, and are not part of the original ten-bump
+scope.** `why: stale` means the installed package on the R9 build host was behind its own recipe
+and the gap predates this campaign — none of the three is a cascade of anything in rows 1–25.
+They are appended rather than inserted in build order so rows 1–25 keep their numbers; their
+real positions are `environment` Group 0 (always first) and `libunwind`/`nlopt` Group 2.
+
+Found when belfem's publishing session questioned an `scls-gcc-nlopt-2.10.1-1` in a planned drop
+against the `nlopt-2.11.0-1` already live in the repo. A full installed-vs-recipe sweep then
+showed all three stale on `debug` and `gcc`. Staging any drop before fixing this would have
+regressed `nlopt` in the published repository.
+
+**No package in rows 1–25 needs rebuilding because of this.** Verified rather than assumed:
+`environment` 2026-2 changes only RPM metadata (`rpm_requires:` for the host toolchain,
+`rpm_recommends: doxygen`, honouring `release:`/`AutoReqProv`) and alters no prefix, flag or
+path; `libunwind` 1.8.3-2 fixes `%dir` ownership and its changelog records that it was
+"re-wrapped from the existing payload rather than recompiled, so every file digest is
+unchanged", and its only reverse dependencies are `gperftools` and `gcc`, neither in this
+campaign; `nlopt` is a leaf with no reverse dependencies at all.
+
+**Rows 26–28 are installed, not rebuilt.** All nine correct-version RPMs already exist in the
+local tree (`scls-{debug,gcc,mkl}-environment-2026-2.el9.noarch.rpm`,
+`…-libunwind-1.8.3-2.el9.x86_64.rpm`, `…-nlopt-2.11.0-1.el9.x86_64.rpm`) — built here, uploaded,
+and then never installed on this host. This matches the uninstall-on-rebuild defect from
+2026-05-12 rather than an interrupted run, and went unnoticed for months because nothing
+compares installed state against recipes; the tracker only knows the packages it lists.
+
+Installing the existing artifacts rather than regenerating them keeps this host *byte*-identical
+to the published repo, not merely version-identical. Rebuilding would have produced the same
+NEVRA with different bytes — which belfem's contract v1.2 refuses to promote, since `mv -f`
+would replace a signed file with an unsigned one and break clients whose metadata is cached
+(`scls.repo` sets no `metadata_expire`, so up to 48 h).
+
+Drift is on all three flavors; `mkl` needs only two of the three:
+
+| flavor | environment | libunwind | nlopt |
+|---|---|---|---|
+| debug | 2026-1 → 2026-2 | 1.8.3-1 → -2 | 2.10.1-1 → 2.11.0-1 |
+| gcc   | 2026-1 → 2026-2 | 1.8.3-1 → -2 | 2.10.1-1 → 2.11.0-1 |
+| mkl   | 2026-1 → 2026-2 | 1.8.3-1 → -2 | already current |
+
+Eight installs in total. Rows 26–28 are **not staged** to belfem: their NEVRAs are already
+published, so they go in `MANIFEST.txt` under `already_published:` rather than as payload.
+
+**Row 29 (`hwloc`, mkl only) was found after rows 26–28 were installed**, by re-running the
+drift check across all three flavors. `debug` and `gcc` already had 2.14.0; only `mkl` was
+behind at 2.13.0, and `scls-mkl-hwloc-2.14.0-1.el9.x86_64.rpm` was sitting in
+`rpmbuild/RPMS/x86_64/` unused — the same built-but-never-installed defect, fourth instance.
+
+It was installed **before** the mkl column was built, which matters: `hwloc` is a dependency of
+`pmix` and `openmpi`, so building mkl first would have linked its whole MPI stack against 2.13.0
+while `debug` and `gcc` got 2.14.0 — a cross-flavor inconsistency that no manifest check would
+have caught and that nothing in the campaign would have flagged. `n/a` in the debug and gcc
+columns means those flavors were already current, not that the package is unbuilt there.
+
+After rows 26–29 the drift check reports `(all current)` for `debug` and `gcc`; `mkl` shows only
+the 24 campaign packages still to build.
 
 `openblas` builds only for `gcc` among the binary flavors (`mkl` uses MKL, `debug` uses the
 Netlib reference), so its four dependents (`blaze`, `blaspp`, `lapackpp`, `superlu`) cascade on
