@@ -47,17 +47,26 @@ SSH_OPTS=(-i "$PUBLISH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes
           -o StrictHostKeyChecking=yes)
 REMOTE="$PUBLISH_REMOTE"
 
-FLAVOR=""; COLUMN=""; STAGE=""; DO_BUILD=0; DO_UPLOAD=0
+FLAVOR=""; COLUMN=""; STAGE=""; DO_BUILD=0; DO_UPLOAD=0; USE_DROP=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --flavor) FLAVOR="$2"; shift 2 ;;
         --column) COLUMN="$2"; shift 2 ;;
         --stage)  STAGE="$2";  shift 2 ;;
+        --drop)   USE_DROP="$2"; shift 2 ;;
         --build)  DO_BUILD=1;  shift ;;
-        --upload) DO_UPLOAD=1; DO_BUILD=1; shift ;;
+        --upload) DO_UPLOAD=1; shift ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
+# --upload without --drop would restage under a NEW timestamp, so the thing
+# uploaded would not be the drop whose total_bytes the publishing host approved.
+# Approval is granted against a specific DROP name; honour it.
+if [ "$DO_UPLOAD" -eq 1 ] && [ -z "$USE_DROP" ]; then
+    echo "error: --upload requires --drop <DROP>, naming the already-staged drop." >&2
+    echo "Stage with --build first, get the size approved, then upload THAT drop." >&2
+    exit 2
+fi
 [ -n "$FLAVOR" ] && [ -n "$COLUMN" ] || { echo "usage: $0 --flavor <f> --column <c>" >&2; exit 2; }
 
 case "$COLUMN" in
@@ -69,7 +78,7 @@ case "$COLUMN" in
 esac
 [ "$DISTRO" = ubuntu ] && { echo "DEB staging not implemented; this host is RPM" >&2; exit 2; }
 
-DROP="${COLUMN}-${FLAVOR}-$(date -u +%Y%m%dT%H%MZ)"
+DROP="${USE_DROP:-${COLUMN}-${FLAVOR}-$(date -u +%Y%m%dT%H%MZ)}"
 STAGE="${STAGE:-$REPO/work/staging}"
 DROPDIR="$STAGE/$DROP"
 DIST=$(rpm --eval '%{dist}')
@@ -92,10 +101,34 @@ recipe_nevr() {
     python3 -c "import yaml,sys;r=yaml.safe_load(open('$REPO/recipes/$1.yaml'));print(f\"{r['version']}-{r.get('release',1)}\")" 2>/dev/null
 }
 
-# already_published: NEVRAs belfem already serves that this host verified byte-identical.
-# Maintained by hand from relay-confirmed digests; contract v1.5 §3 keeps them out of
-# the payload because a same-NEVRA different-bytes file can never be promoted.
-ALREADY_PKGS="environment libunwind nlopt hwloc"
+# The published NEVRA list comes FROM the publishing host, read out of its RPM
+# headers. Membership in it decides payload vs already_published, so the decision
+# rests on what the repo actually holds rather than on what this host's tracker
+# believes changed. Without it every current NEVRA would be treated as new, which
+# is safe but wastes upload and scarce remote free space on files that cannot be
+# promoted (contract v1.2: a NEVRA already published is never promoted, because
+# replacing a signed file with an unsigned one breaks clients holding cached
+# metadata).
+PUBLISHED_LIST="${PUBLISH_PUBLISHED_LIST:-$REPO/work/publish/published-$DISTRO.txt}"
+if [ -f "$PUBLISHED_LIST" ]; then
+    echo "published list: $PUBLISHED_LIST ($(grep -c . "$PUBLISHED_LIST") NEVRAs)"
+else
+    echo "WARNING: no published list at $PUBLISHED_LIST — every current NEVRA will" >&2
+    echo "         be treated as new. Ask the publishing host for its NEVRA list." >&2
+    PUBLISHED_LIST=/dev/null
+fi
+
+is_published() { grep -qxF "$1" "$PUBLISHED_LIST" 2>/dev/null; }
+# NOTE: do NOT write the arch as ${2:-%{ARCH}}. The `}` inside %{ARCH} closes the
+# parameter expansion early, so with $2 set the format ends up as "...src}", which
+# rpm rejects and returns EMPTY. With $2 unset it happens to work, which is how the
+# bug hides: binaries resolve correctly while every source package yields an empty
+# NEVRA, matches nothing in the published list, and is shipped as if it were new.
+nevra() {
+    local arch_fmt='%{ARCH}'
+    [ -n "${2:-}" ] && arch_fmt="$2"
+    rpm -qp --qf "%{NAME}-%|EPOCH?{%{EPOCH}}:{0}|:%{VERSION}-%{RELEASE}.${arch_fmt}" "$1" 2>/dev/null
+}
 
 # NEVER_SHIP: packages that must not leave this host as binaries, whatever else is
 # true of them. This is a licence decision, not a packaging accident — suitesparse
@@ -125,23 +158,37 @@ while read -r n v r a; do
         continue
     fi
 
-    # already-published packages are reported, never shipped
-    case " $ALREADY_PKGS " in
-        *" $short "*)
-            d=$(rpm -qp --qf '%{SHA256HEADER} %{PAYLOADDIGEST}' "$f" 2>/dev/null)
-            ALREADY+=("$n-$v-$r.$a  SHA256HEADER=${d% *} PAYLOADDIGEST=${d#* }")
-            continue ;;
-    esac
-
+    bin_nevra=$(nevra "$f")
     src=$(rpm -qp --qf '%{SOURCERPM}' "$f" 2>/dev/null)
-    if [ -n "$src" ] && [ -f "$REPO/rpmbuild/SRPMS/$src" ]; then
+    srcpath="$REPO/rpmbuild/SRPMS/$src"
+
+    if is_published "$bin_nevra"; then
+        # Already in the repo. Report it with digests so the publishing host can
+        # confirm this builder is byte-identical, but never ship the bytes.
+        d=$(rpm -qp --qf '%{SHA256HEADER} %{PAYLOADDIGEST}' "$f" 2>/dev/null)
+        ALREADY+=("$bin_nevra  SHA256HEADER=${d% *} PAYLOADDIGEST=${d#* }")
+    elif [ -n "$src" ] && [ -f "$srcpath" ]; then
         PAYLOAD_BIN+=("$f")
-        case " ${PAYLOAD_SRC[*]:-} " in *" $REPO/rpmbuild/SRPMS/$src "*) ;;
-            *) PAYLOAD_SRC+=("$REPO/rpmbuild/SRPMS/$src") ;; esac
     else
         # A binary with no shippable source cannot go out: doc/LICENSE_POLICY.md makes
         # the SRPM how SCLS meets its source-availability obligation.
-        EXCLUDED+=("$n-$v-$r.$a  reason: no SRPM in tree for SOURCERPM ${src:-unknown}")
+        EXCLUDED+=("$bin_nevra  reason: no SRPM in tree for SOURCERPM ${src:-unknown}")
+        continue
+    fi
+
+    # The source package is decided on its own merits: a binary can be new while
+    # its SRPM is already published (a rebuild at a new release from unchanged
+    # sources), and shipping a duplicate SRPM would be refused and waste space.
+    if [ -n "$src" ] && [ -f "$srcpath" ]; then
+        src_nevra=$(nevra "$srcpath" "src")
+        if is_published "$src_nevra"; then
+            d=$(rpm -qp --qf '%{SHA256HEADER} %{PAYLOADDIGEST}' "$srcpath" 2>/dev/null)
+            case " ${ALREADY[*]:-} " in *"$src_nevra "*) ;;
+                *) ALREADY+=("$src_nevra  SHA256HEADER=${d% *} PAYLOADDIGEST=${d#* }") ;; esac
+        else
+            case " ${PAYLOAD_SRC[*]:-} " in *" $srcpath "*) ;;
+                *) PAYLOAD_SRC+=("$srcpath") ;; esac
+        fi
     fi
 done < <(rpm -qa --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}\n' "scls-$FLAVOR-*" "scls-$FLAVOR" 2>/dev/null | sort -u)
 
@@ -169,9 +216,29 @@ echo "total_bytes:       $TOTAL"
 echo "excluded:          ${#EXCLUDED[@]}"
 echo "already_published: ${#ALREADY[@]}"
 echo
-[ "$DO_BUILD" -eq 1 ] || { echo "(selection only — pass --build to stage)"; exit 0; }
+if [ "$DO_BUILD" -eq 0 ] && [ "$DO_UPLOAD" -eq 0 ]; then
+    echo "(selection only — pass --build to stage)"; exit 0
+fi
+
+# Uploading a previously staged drop: do NOT restage. Re-running the selection
+# could produce different bytes than the ones whose size was approved, and a
+# drop is immutable once READY is sent.
+if [ "$DO_BUILD" -eq 0 ]; then
+    [ -d "$DROPDIR" ] || { echo "error: $DROPDIR does not exist — stage it first." >&2; exit 2; }
+    [ -f "$STAGE/READY" ] || { echo "error: $STAGE/READY missing — stage it first." >&2; exit 2; }
+    echo "re-using staged drop (no restage)"
+    ( cd "$DROPDIR" && sha256sum -c --quiet SHA256SUMS ) \
+        || { echo "STAGED DROP FAILED ITS OWN SHA256SUMS — refusing to upload" >&2; exit 1; }
+    READY_SHA=$(sha256sum "$DROPDIR/SHA256SUMS" | cut -d' ' -f1)
+    [ "$READY_SHA" = "$(cat "$STAGE/READY")" ] \
+        || { echo "READY does not match SHA256SUMS — refusing to upload" >&2; exit 1; }
+    COUNT=$(grep -c . "$DROPDIR/SHA256SUMS")
+    TOTAL=$(awk '/^total_bytes:/{print $2}' "$DROPDIR/MANIFEST.txt")
+    echo "verified: file_count=$COUNT total_bytes=$TOTAL sha256(SHA256SUMS)=$READY_SHA"
+fi
 
 # ------------------------------------------------------------------ staging ---
+if [ "$DO_BUILD" -eq 1 ]; then
 rm -rf "$DROPDIR"
 mkdir -p "$DROPDIR/$DISTRO/x86_64" "$DROPDIR/$DISTRO/source"
 # noarch goes in x86_64/ — contract §2. There is no noarch/ directory and none will
@@ -182,7 +249,9 @@ for f in "${PAYLOAD_SRC[@]}"; do ln "$f" "$DROPDIR/$DISTRO/source/" 2>/dev/null 
 
 {
     echo "drop: $DROP"
-    echo "host: $(hostname -f 2>/dev/null || hostname)"
+    # hostname -f is "localhost" on these VMs, which tells the publishing host
+    # nothing about which builder produced the drop. publish.conf may override.
+    echo "host: ${PUBLISH_HOST_LABEL:-$(hostname -f 2>/dev/null || hostname)}"
     echo "column: $COLUMN"
     echo "flavor: $FLAVOR"
     echo "distro: $DISTRO"
@@ -191,9 +260,19 @@ for f in "${PAYLOAD_SRC[@]}"; do ln "$f" "$DROPDIR/$DISTRO/source/" 2>/dev/null 
     echo "file_count: $COUNT"
     echo "total_bytes: $TOTAL"
     echo
-    for f in "${PAYLOAD_BIN[@]}" "${PAYLOAD_SRC[@]}"; do
-        rpm -qp --qf '%{NAME}-%|EPOCH?{%{EPOCH}}:{0}|:%{VERSION}-%{RELEASE}.%{ARCH}\n' "$f" 2>/dev/null
-    done | sort
+    # Binaries carry their real %{ARCH}; source packages are emitted as .src
+    # EXPLICITLY. rpm reports the BUILD arch for a .src.rpm (x86_64, not src), so
+    # querying %{ARCH} makes a binary and its source render as byte-identical
+    # lines and the manifest silently loses the distinction — 76 lines, 43 of
+    # them duplicates, with nothing to say which entry is the source.
+    {
+        for f in "${PAYLOAD_BIN[@]}"; do
+            rpm -qp --qf '%{NAME}-%|EPOCH?{%{EPOCH}}:{0}|:%{VERSION}-%{RELEASE}.%{ARCH}\n' "$f" 2>/dev/null
+        done
+        for f in "${PAYLOAD_SRC[@]}"; do
+            rpm -qp --qf '%{NAME}-%|EPOCH?{%{EPOCH}}:{0}|:%{VERSION}-%{RELEASE}.src\n' "$f" 2>/dev/null
+        done
+    } | sort
     if [ "${#EXCLUDED[@]}" -gt 0 ]; then
         echo; echo "excluded:"; printf '%s\n' "${EXCLUDED[@]}"
     fi
@@ -212,6 +291,8 @@ READY_SHA=$(sha256sum "$DROPDIR/SHA256SUMS" | cut -d' ' -f1)
 echo "$READY_SHA" > "$STAGE/READY"
 echo "sha256(SHA256SUMS): $READY_SHA"
 echo
+fi   # end staging
+
 [ "$DO_UPLOAD" -eq 1 ] || { echo "(staged only — send total_bytes=$TOTAL to belfem and await OK)"; exit 0; }
 
 # ------------------------------------------------------------------ upload ----
