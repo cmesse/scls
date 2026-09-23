@@ -131,11 +131,18 @@ nevra() {
 }
 
 # NEVER_SHIP: packages that must not leave this host as binaries, whatever else is
-# true of them. This is a licence decision, not a packaging accident — suitesparse
-# is excluded on those grounds (Christian, 2026-09-23), and the exclusion must not
-# depend on the incidental absence of an SRPM. If one ever lands in the tree the
-# selection below would otherwise happily ship it.
-NEVER_SHIP="suitesparse"
+# true of them. Each carries its OWN governing reason, because the next entry will
+# not be excluded for suitesparse's reason and a shared string would quietly
+# misattribute it.
+#
+# The reason states the rule first and the mechanism second. "no SRPM in the tree"
+# and "include_flavors: []" are consequences, not the rule: opt a package in via
+# extra_packages: for one local build and an SRPM appears, but it must still never
+# ship. The manifest travels with packages the publishing host signs, so it is the
+# durable record of why something was withheld and must name the governing reason.
+declare -A NEVER_SHIP_REASON=(
+    [suitesparse]="licence — GPL-2 linkable, not shipped as a binary (doc/LICENSE_POLICY.md); recipe carries include_flavors: [] so it is never built by default"
+)
 
 while read -r n v r a; do
     [ -z "${n:-}" ] && continue
@@ -143,11 +150,10 @@ while read -r n v r a; do
     [ "$short" = "$n" ] && short="${n#scls-}"        # the bare meta-package
     # Licence exclusion first: it must hold regardless of whether an artifact or an
     # SRPM exists, so it is checked before anything that could `continue` past it.
-    case " $NEVER_SHIP " in
-        *" $short "*)
-            EXCLUDED+=("$n-$v-$r.$a  reason: licence — not shipped as a binary (doc/LICENSE_POLICY.md)")
-            continue ;;
-    esac
+    if [ -n "${NEVER_SHIP_REASON[$short]:-}" ]; then
+        EXCLUDED+=("$n-$v-$r.$a  reason: ${NEVER_SHIP_REASON[$short]}")
+        continue
+    fi
 
     f="$REPO/rpmbuild/RPMS/$a/$n-$v-$r.$a.rpm"
     if [ ! -f "$f" ]; then
