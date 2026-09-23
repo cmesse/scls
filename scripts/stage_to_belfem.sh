@@ -76,10 +76,25 @@ recipe_nevr() {
 # the payload because a same-NEVRA different-bytes file can never be promoted.
 ALREADY_PKGS="environment libunwind nlopt hwloc"
 
+# NEVER_SHIP: packages that must not leave this host as binaries, whatever else is
+# true of them. This is a licence decision, not a packaging accident — suitesparse
+# is excluded on those grounds (Christian, 2026-09-23), and the exclusion must not
+# depend on the incidental absence of an SRPM. If one ever lands in the tree the
+# selection below would otherwise happily ship it.
+NEVER_SHIP="suitesparse"
+
 while read -r n v r a; do
     [ -z "${n:-}" ] && continue
     short="${n#scls-${FLAVOR}-}"
     [ "$short" = "$n" ] && short="${n#scls-}"        # the bare meta-package
+    # Licence exclusion first: it must hold regardless of whether an artifact or an
+    # SRPM exists, so it is checked before anything that could `continue` past it.
+    case " $NEVER_SHIP " in
+        *" $short "*)
+            EXCLUDED+=("$n-$v-$r.$a  reason: licence — not shipped as a binary (doc/LICENSE_POLICY.md)")
+            continue ;;
+    esac
+
     f="$REPO/rpmbuild/RPMS/$a/$n-$v-$r.$a.rpm"
     if [ ! -f "$f" ]; then
         # Installed on this host but no local artifact — pruned, or built on another

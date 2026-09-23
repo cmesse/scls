@@ -107,6 +107,44 @@ rather than dying inside PETSc.
 **1.5 Log directory.** `mkdir -p work/logs`. `work/` is git-ignored, so logs never reach a commit.
 Every build and install writes `work/logs/<flavor>/<pkg>.{build,install}.log`.
 
+**1.6 Drift sweep — always, for every flavor about to be built.** Compare what is *installed*
+against what the *recipes* say, across the **full** `build_order.py` list, not the package list
+the entry point is about to build:
+
+```bash
+DIST=$(rpm --eval '%{dist}')
+for p in $(python python/build_order.py recipes --flavor $F --names-only 2>/dev/null); do
+    [ -f "recipes/$p.yaml" ] || continue
+    want=$(python3 -c "import yaml;r=yaml.safe_load(open('recipes/$p.yaml'));print(f\"{r['version']}-{r.get('release',1)}\")" 2>/dev/null) || continue
+    have=$(rpm -q --qf '%{VERSION}-%{RELEASE}' scls-$F-$p 2>/dev/null | sed "s/${DIST}\$//")
+    [ -z "$have" ] && continue            # not installed yet — that is the build's job
+    [ "$want" = "$have" ] || echo "  $p  $have -> $want"
+done
+```
+
+(`dpkg-query -W -f='${Version}'` on `U24`.)
+
+Report the result. Then **subtract the packages the entry point is going to build anyway**.
+Anything left is a package that is stale on this host and that **nothing in this run will fix**.
+Stop and ask before building: it is not covered by the campaign, so building around it means
+compiling the rest of the stack against a version the recipes abandoned.
+
+This check is cheap — it is `rpm -q` and a YAML parse per package — and it is **not** the same as
+the §2 fallback that computes a target set when no tracker exists. That fallback is about *what
+to build*; this is about *what the build is standing on*. Run it even when a tracker exists,
+especially then: a tracker is a statement about the packages it lists and says nothing about the
+ones it omits.
+
+> Added 2026-09-23. On the R9 run of the 2026-09-22 campaign, four packages
+> (`environment` 2026-1→2, `libunwind` 1.8.3-1→2, `nlopt` 2.10.1→2.11.0, `hwloc` 2.13.0→2.14.0)
+> had been built, uploaded and published months earlier but never installed on the build host.
+> None was in the campaign, so `/update-build` never looked at them. They surfaced only because
+> the *publishing* host questioned an `nlopt` version in a drop that did not yet exist — after
+> two of three columns were already complete. `hwloc` is a dependency of `pmix` and `openmpi`,
+> so had the third column been built first, mkl's entire MPI stack would have linked a different
+> hwloc than `debug` and `gcc`, with nothing downstream to reveal it: both versions carry
+> SONAME `libhwloc.so.15`, so `DT_NEEDED` looks identical either way.
+
 ---
 
 ## 2. The per-package cycle

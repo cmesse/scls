@@ -25,7 +25,14 @@ Arguments: `--flavors` overrides the default sequence. `--from <pkg>` resumes at
 
 `doc/BUILD_EXECUTION.md` §1 in full — host classification, `devel` + `git pull --ff-only`,
 `sudo -n true` (with the bootstrap block if it fails: **this is the first-run setup for a new VM**
-and the run stops there until it is done), disk space, log directory.
+and the run stops there until it is done), disk space, log directory, and **§1.6 the drift
+sweep**.
+
+§1.6 matters most here, because a tracker is exactly the condition under which it is easiest to
+skip. The tracker tells you which packages to build; it says nothing about the packages it
+omits. Run the sweep over the full `build_order.py` list for each flavor in the sequence,
+subtract the tracker's rows, and **stop and ask if anything is left** — those are packages this
+run will not fix and will nevertheless build on top of.
 
 Then report the host column (`R9` / `R10` / `AMZN` / `U24`) and the flavor sequence you are about
 to run, and only then start building.
