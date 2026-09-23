@@ -1,9 +1,9 @@
 #!/bin/bash
 # Stage one flavor's artifacts for belfem.lbl.gov signing and publication.
 #
-# Written against belfem transfer contract v1.5. The contract is authoritative and
-# lives at /srv/scls/transfer/CONTRACT.md on belfem; it cannot be read back over the
-# upload key (forced `rrsync -wo`), so revisions arrive over the AI relay.
+# Written against transfer contract v1.5. The contract is authoritative and lives in
+# the publishing host's staging root; it cannot be read back over the upload key
+# (forced write-only rsync), so revisions arrive over the AI relay.
 #
 # THIS SCRIPT ENDS AT "READY UPLOADED, REPORTED". It never signs, never promotes,
 # never runs createrepo/reprepro, and never touches repository state. See
@@ -22,9 +22,30 @@
 set -u -o pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SSH_OPTS=(-i "$HOME/.ssh/scls_upload" -o IdentitiesOnly=yes -o BatchMode=yes
+
+# Connection details live in an UNTRACKED local file, never in the repo. SCLS is
+# published under BSD-3-Clause-LBNL: a hardcoded internal hostname and service
+# account tell a reader exactly which host to aim at and as whom, which is
+# reconnaissance we have no reason to ship. The repo documents the mechanism; the
+# endpoint is site configuration. See publish.conf.example.
+#
+# Nothing secret belongs in publish.conf either — it names a key, it does not
+# contain one. The private key stays in ~/.ssh and never goes near this tree.
+CONF="$REPO/publish.conf"
+if [ ! -f "$CONF" ]; then
+    echo "error: $CONF not found." >&2
+    echo "Copy publish.conf.example to publish.conf and fill in this site's values." >&2
+    echo "It is git-ignored and must stay that way." >&2
+    exit 2
+fi
+# shellcheck disable=SC1090
+. "$CONF"
+: "${PUBLISH_REMOTE:?publish.conf must set PUBLISH_REMOTE (user@host)}"
+: "${PUBLISH_KEY:?publish.conf must set PUBLISH_KEY (path to the upload private key)}"
+
+SSH_OPTS=(-i "$PUBLISH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes
           -o StrictHostKeyChecking=yes)
-REMOTE="mockbuild@belfem-local.lbl.gov"
+REMOTE="$PUBLISH_REMOTE"
 
 FLAVOR=""; COLUMN=""; STAGE=""; DO_BUILD=0; DO_UPLOAD=0
 while [ $# -gt 0 ]; do

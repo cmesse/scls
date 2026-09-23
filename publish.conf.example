@@ -1,0 +1,30 @@
+# SCLS publish endpoint — copy to publish.conf and edit. publish.conf is
+# git-ignored and must stay that way.
+#
+# This file names a key; it must never CONTAIN one. The upload private key lives
+# in ~/.ssh and never enters this tree. Nothing here is secret, but the hostname
+# and account are site infrastructure and SCLS is published under
+# BSD-3-Clause-LBNL — so they are configuration, not source.
+
+# Where drops are uploaded, as user@host. The account should be a dedicated
+# upload service account, not a person's login.
+PUBLISH_REMOTE="upload-user@publish-host.example.org"
+
+# Private key for that account. Give each build host its own key so one can be
+# revoked without touching the others; the ssh-keygen comment is a good place to
+# record which host it belongs to.
+PUBLISH_KEY="$HOME/.ssh/scls_upload"
+
+# ---------------------------------------------------------------------------
+# Server-side expectations, for reference — configured on the publishing host,
+# not here:
+#
+#   - The key is force-commanded to a write-only rsync confined to the staging
+#     directory, so it cannot read, list, delete, obtain a shell, or escape the
+#     sandbox with '..'. Verify all five before trusting a new endpoint; a
+#     write-only key that can still write outside its sandbox is not contained.
+#   - The host key is pinned in ~/.ssh/known_hosts. Check the fingerprint you
+#     accept on first connect against one the publishing host states out of band
+#     — trust-on-first-use is exactly where an impostor would sit.
+#   - Uploads land in a staging area only. Promotion, signing and publication
+#     are manual on the publishing host and are never triggered from here.

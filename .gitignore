@@ -45,3 +45,6 @@ scls.html
 *.exe
 *.out
 *.app
+
+# Publish endpoint: site infrastructure (hostname, upload account), never committed.
+publish.conf

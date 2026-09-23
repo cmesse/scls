@@ -15,11 +15,22 @@ promotes, runs `createrepo_c`/`reprepro`, or touches repository state.** `doc/BU
 
 ---
 
+## 0. Endpoint configuration is not in this repo
+
+The publishing host, upload account and key path live in `publish.conf`, which is **git-ignored**
+(`publish.conf.example` is the tracked template). SCLS is published under `BSD-3-Clause-LBNL`, and
+a hardcoded internal hostname and service account would tell any reader which host to aim at and
+as whom. The repo carries the mechanism; the endpoint is site configuration.
+
+`publish.conf` **names** a key and never contains one. The upload private key stays in `~/.ssh`
+and never enters this tree. If a drop, a manifest or a log ever looks like it might carry key
+material, stop and check before it leaves the host.
+
 ## 1. The contract is authoritative, and you cannot read it
 
-belfem's transfer contract lives at `/srv/scls/transfer/CONTRACT.md`, currently **v1.5**. The
-upload key is force-commanded to `rrsync -wo`, so it is write-only — **you cannot read the
-contract back over it, ever.** Revisions arrive over the AI relay from the belfem session.
+The publishing host's transfer contract lives in its staging root, currently **v1.5**. The
+upload key is force-commanded to a write-only rsync, so **you cannot read the contract back over
+it, ever.** Revisions arrive over the AI relay from the publishing session.
 
 Before staging, ask the belfem session to confirm the current contract version. If its answer
 does not match what `scripts/stage_to_belfem.sh` was written against, **stop and reconcile
