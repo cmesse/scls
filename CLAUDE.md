@@ -203,7 +203,7 @@ A GKlib change means rebuilding metis and parmetis.
 
 ### Licensing
 
-See [`doc/LICENSE_POLICY.md`](doc/LICENSE_POLICY.md) for the full package policy and rationale. Short version: distributed binary flavors avoid GPL-3 linkable libraries (FFTW is the canonical reason); GPL-3 build tools are fine when only executed during the build; GPL-2, LGPL, and CeCILL-C scientific libraries are allowed with source and notice compliance; GMP/MPFR/MPC use system `*-devel` packages on mainline Linux binary flavors and are built in-stack only on `lbl` and `macos`. Source RPMs and (on macOS) source-plus-binary DMGs are how SCLS satisfies the source-availability obligations.
+See [`doc/LICENSE_POLICY.md`](doc/LICENSE_POLICY.md) for the full package policy and rationale. Short version: distributed binary flavors ship **no GPL linkable library**, GPL-2 or GPL-3 alike (FFTW is the canonical GPL-3 reason; SuiteSparse is the GPL-2 one, and carries `include_flavors: []`). The **only** GPL exception is a build tool — executed during the build, never linked into what ships — which in practice means the `macos` and `lbl` toolchains; GCC is the single case whose output is linked, covered by the GCC Runtime Library Exception. LGPL and CeCILL-C are *not* GPL for this purpose and remain allowed with source and notice compliance (`mumps` and `scotch` ship everywhere); GMP/MPFR/MPC use system `*-devel` packages on mainline Linux binary flavors and are built in-stack only on `lbl` and `macos`. Source RPMs and (on macOS) source-plus-binary DMGs are how SCLS satisfies the source-availability obligations.
 
 ### No Python / language bindings in the stack
 

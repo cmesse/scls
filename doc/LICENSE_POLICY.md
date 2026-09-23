@@ -59,16 +59,36 @@ designed to permit linking with non-GPL programs.
 
 ### GPL-2 Libraries
 
-GPL-2-or-later libraries are not automatically excluded.
+GPL-2 linkable libraries are **not** included in distributed binary flavors, on the
+same reasoning as GPL-3 above. The version of the GPL is not the deciding factor:
+what matters is whether SCLS ships the code as something downstream applications
+link against.
 
-They may be included when the project decides their scientific value justifies
-the compliance obligations and when SCLS can provide corresponding source,
-patches, build recipes, and license notices through the normal source RPM or
-source-tarball distribution path.
+**The only exception for GPL code is a build tool** — something executed during the
+build that does not become part of a delivered library (see *GPL-3 Build Tools*
+above). In practice those live on the `macos` and `lbl` flavors, where SCLS builds
+its own toolchain rather than using the distribution's. GCC is the single case where
+the output of GPL code is linked into what we ship, and that is covered by the GCC
+Runtime Library Exception, which exists precisely to permit it.
 
-SuiteSparse components such as UMFPACK are in this category. They are useful
-scientific libraries and are acceptable in SCLS when packaged with complete
-source availability and clear license metadata.
+SuiteSparse is the concrete case. It carries GPL-2.0-or-later components alongside
+LGPL-2.1, BSD-3-Clause and Apache-2.0 ones, and it is therefore **not shipped as a
+binary**: `recipes/suitesparse.yaml` sets `include_flavors: []`, so it is never built
+by default and must be opted into explicitly via `extra_packages:` for local use.
+Source availability would not rescue it — the objection is to distributing the binary
+at all, not to the compliance paperwork.
+
+This supersedes an earlier version of this section, which said GPL-2-or-later
+libraries were "not automatically excluded" and named SuiteSparse as acceptable when
+packaged with complete source. That was never the practice: every GPL package in the
+recipe set is a build tool or GCC, and SuiteSparse has carried `include_flavors: []`
+throughout. Corrected 2026-09-23.
+
+### LGPL and CeCILL-C are separate
+
+Neither is affected by the rule above. LGPL libraries follow the section below;
+CeCILL-C libraries (`mumps`, `scotch`) are LGPL-like and ship on all flavors. The
+GPL exclusion is specific to the GPL proper.
 
 ### LGPL Libraries
 
