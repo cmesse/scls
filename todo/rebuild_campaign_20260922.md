@@ -36,15 +36,15 @@ those dependencies changed.
 
 | # | G | Package | why | R9 DBG | R9 GCC | R9 MKL | R10 DBG | R10 GCC | R10 MKL | AMZN GCC | AMZN MKL | U24 DBG | U24 GCC | U24 MKL |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 2 | cmake 4.4.2 → 4.4.3 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 1 | 2 | cmake 4.4.2 → 4.4.3 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 2 | 2 | openblas 0.3.33 → 0.3.34 | up | n/a | [x] | n/a | n/a | [ ] | n/a | [ ] | n/a | n/a | [ ] | n/a |
-| 3 | 2 | ucx 1.20.1 → 1.22.0 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 4 | 3 | blaze 3.8.2-1 → -2 | casc (openblas) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 3 | 2 | ucx 1.20.1 → 1.22.0 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 4 | 3 | blaze 3.8.2-1 → -2 | casc (openblas) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 11 | 6 | parmetis 4.0.3-2 → -3 | casc (openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 12 | 6 | scalapack 2.2.3-2 → -3 | casc (openmpi) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
@@ -220,6 +220,26 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   has no `mkl_dcsrmv`. Inert on `debug`/`gcc`; load-bearing on `mkl`/`intel`.
   sundials 7.8 → 7.9 produced **no** manifest drift, closing the last section B prediction.
   Host HEAD at run start: 55f3f0b.
+- 2026-09-22 — **R9: gcc 25/25 — column complete.** All 25 NEVRAs re-verified against recipes in
+  one sweep. openblas 0.3.34-1 confirmed the hand-edited version-stamped
+  `libopenblas-r0.3.34.so` manifest entry. Both Class M fixes from the debug column
+  (`67c3d4f` armadillo, `3810fe9` petsc) applied unchanged on gcc — two flavors each is the
+  evidence they are upstream drift rather than debug-specific, and they still must reach R10,
+  AMZN and U24. Rows 26–29 installed on every affected flavor (see above).
+- 2026-09-22 — R9: mkl 8/24 built and installed (rows 1–9, groups 2–5 complete; row 2 openblas
+  `n/a` — mkl uses MKL for BLAS). Stopped deliberately before hdf5 at Christian's request,
+  **not** on a failure; hdf5 (row 10) had just been reached and was killed at the start of its
+  build. Three mkl-specific risks cleared so far: blaze's blazetest passed against MKL's
+  `mkl_cblas.h` under oneAPI 2026; openmpi 5.0.11 built clean without the dropped
+  `part-persist` patch on the third and final flavor, retiring that risk for the campaign; and
+  pmix compiled against hwloc 2.14.0 — verified via `HWLOC_VERSION` in
+  `/opt/scls/mkl/include/hwloc/autogen/config.h`, not assumed, because the SONAME is
+  `libhwloc.so.15` for both 2.13 and 2.14 and `DT_NEEDED` would not have revealed a mismatch.
+  Still untested on this column: the MKL major SONAME in consumers' `DT_NEEDED`
+  (`doc/MKL_ABI_POLICY.md`), petsc's `baijmkl` patch — inert on debug and gcc but load-bearing
+  here, since oneAPI 2026 has no `mkl_dcsrmv` — and scalapack, which must come from the stack
+  and never from `libmkl_scalapack`/`libmkl_blacs`.
+  Resume with `/update-build --from hdf5`. Host HEAD at run start: fc3edbe.
 
 ## Blockers
 
