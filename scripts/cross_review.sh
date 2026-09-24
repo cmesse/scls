@@ -52,6 +52,8 @@ SLUG="${AI_EXCHANGE_SLUG:-scratch}"
 if [ "$MODE" = "quick" ]; then
     # Unattended, per-commit, and paid for on every commit — the cheap rung, pinned here
     # rather than left to the wrapper defaults, which are tuned for interactive audits.
+    # Grok stays on 4.6 here for that reason, exactly as Codex stays on luna: the seat moved
+    # to grok-4.7 for interactive rounds, the cheap rung did not.
     CODEX_MODEL="gpt-5.6-luna"; CODEX_EFFORT="medium"
     GROK_MODEL="grok-4.6";      GROK_EFFORT="medium"
 else
@@ -72,12 +74,17 @@ else
     # at a time: a typo would fail the Codex leg, let the Grok leg run and bill, and leave
     # the round exiting 0 with a synthetic "Audit FAILED" entry that reads like a vendor
     # outage. Refuse the whole round here instead, before anything is dispatched.
+    # gpt-6-astra is allowlisted here because .claude/scripts/ask_codex.sh accepts it: a
+    # model that works for a single audit and dies in a jury round is the worse failure.
+    # Like gpt-5.6-sol it is named by no row of the depth table — an escape hatch, not a tier.
     case "$CODEX_MODEL" in
-        gpt-5.6-sol|gpt-5.6-terra|gpt-5.6-luna|gpt-5.5|gpt-5.4|gpt-5.4-mini) ;;
+        gpt-6-astra|gpt-5.6-sol|gpt-5.6-terra|gpt-5.6-luna|gpt-5.5|gpt-5.4|gpt-5.4-mini) ;;
         *) echo "cross_review.sh: bad CODEX_MODEL '$CODEX_MODEL' (see the depth table)" >&2; exit 1 ;;
     esac
+    # grok-4.7 is the current seat (depth table §9.1, and the ask_grok.sh default). 4.6 and
+    # 4.5 stay allowlisted so an earlier round can be reproduced exactly.
     case "$GROK_MODEL" in
-        grok-4.6|grok-4.5) ;;
+        grok-4.7|grok-4.6|grok-4.5) ;;
         *) echo "cross_review.sh: bad GROK_MODEL '$GROK_MODEL' (see the depth table)" >&2; exit 1 ;;
     esac
     for V in CODEX_EFFORT GROK_EFFORT; do
@@ -86,6 +93,13 @@ else
             *) echo "cross_review.sh: bad $V '${!V}' — allowed: low medium high xhigh" >&2; exit 1 ;;
         esac
     done
+    # Refuse the invalid pair here too. The wrapper rejects it, but one leg at a time: the
+    # Grok leg would die locally while the Codex leg still ran and billed — the partial round
+    # this block exists to prevent.
+    if [ "$GROK_MODEL" = "grok-4.5" ] && [ "$GROK_EFFORT" = "xhigh" ]; then
+        echo "cross_review.sh: grok-4.5 does not offer effort xhigh (menu: low medium high)" >&2
+        exit 1
+    fi
 fi
 
 timestamp() { date '+%Y-%m-%d %H:%M:%S %Z'; }

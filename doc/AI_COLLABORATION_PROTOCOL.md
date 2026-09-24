@@ -334,11 +334,14 @@ this repository can check; if the vendor config drifts, the wrapper defaults sta
 | Round ≥ 2, a round-1 split verdict, or a policy-boundary subject (license redistribution, MKL SONAME, cross-builder divergence, anything that reaches a published repository) | `gpt-5.6-terra`, `xhigh` | `xhigh` |
 | Unattended post-commit `--quick` | `gpt-5.6-luna`, `medium` | `grok-4.6`, `medium` |
 
-Grok's model column is `grok-4.6` throughout; only the effort varies.
+Grok's model column is `grok-4.7` for every interactive row — the current seat, moved there on
+2026-09-23 — and only the effort varies along it. The unattended `--quick` row keeps `grok-4.6` on
+purpose: it is the cheap rung, for the same reason its Codex column is `luna` and not `terra`.
+`grok-4.6` and `grok-4.5` stay allowlisted so an earlier round can be reproduced exactly.
 
 ```bash
 CODEX_MODEL=gpt-5.6-terra CODEX_EFFORT=high AI_EXCHANGE_SLUG=<slug> .claude/scripts/ask_codex.sh - < prompt.md
-GROK_MODEL=grok-4.6 GROK_EFFORT=high        AI_EXCHANGE_SLUG=<slug> .claude/scripts/ask_grok.sh  - < prompt.md
+GROK_MODEL=grok-4.7 GROK_EFFORT=high        AI_EXCHANGE_SLUG=<slug> .claude/scripts/ask_grok.sh  - < prompt.md
 ```
 
 Four things the table encodes:
