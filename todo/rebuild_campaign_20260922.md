@@ -36,16 +36,16 @@ those dependencies changed.
 
 | # | G | Package | why | R9 DBG | R9 GCC | R9 MKL | R10 DBG | R10 GCC | R10 MKL | AMZN GCC | AMZN MKL | U24 DBG | U24 GCC | U24 MKL |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 2 | cmake 4.4.2 → 4.4.3 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 1 | 2 | cmake 4.4.2 → 4.4.3 | up | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 2 | 2 | openblas 0.3.33 → 0.3.34 | up | n/a | [x] | n/a | n/a | [ ] | n/a | [ ] | n/a | n/a | [ ] | n/a |
-| 3 | 2 | ucx 1.20.1 → 1.22.0 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 4 | 3 | blaze 3.8.2-1 → -2 | casc (openblas) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 3 | 2 | ucx 1.20.1 → 1.22.0 | up | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 4 | 3 | blaze 3.8.2-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 11 | 6 | parmetis 4.0.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 12 | 6 | scalapack 2.2.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 13 | 6 | scotch 7.0.13 → 7.0.15 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
@@ -61,10 +61,10 @@ those dependencies changed.
 | 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 26 | 0 | environment 2026-1 → 2026-2 | stale | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 26 | 0 | environment 2026-1 → 2026-2 | stale | [x] | [x] | [x] | n/a | n/a | n/a | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | n/a | n/a | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 28 | 2 | nlopt 2.10.1 → 2.11.0 | stale | [x] | [x] | [x] |
-| 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | n/a | n/a | n/a | [ ] | [ ] | [ ] | [ ] | [ ] |
 
 **Rows 26–28 were added on 2026-09-22, mid-run, and are not part of the original ten-bump
 scope.** `why: stale` means the installed package on the R9 build host was behind its own recipe
@@ -279,6 +279,22 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   in 3.25.5 (verified against the pristine tarball), and the recipe comment names **RHEL 10** as
   the trigger — so **keep the patch**, and expect the `R10` column to be what actually tests it.
   Host HEAD at run start: fc94ae6.
+
+- 2026-09-23 — R10: debug 9/24 built and installed (rows 1, 3–10; groups 2–6 through hdf5).
+  Stopped deliberately after hdf5 at Christian's request (checkpoint), **not** on a failure;
+  parmetis (row 11) was killed within a second of starting and stays unticked. No auto-fixes:
+  ucx 1.22 and openmpi 5.0.11 built clean on el10, as on R9. hdf5 `make check` took 67 min.
+  Preflight drift sweep on this host: `debug` and `gcc` stale only on campaign rows —
+  `environment`, `libunwind`, `nlopt`, `hwloc` were already current, hence `n/a` in rows 26, 27,
+  29 (row 28 has no R10 cells; nlopt is current on all three R10 flavors). `mkl` additionally had
+  `libunwind`, `blaze`, `gperftools`, `nlopt`, `vtk` built but **never installed** — fifth
+  instance of the built-not-installed defect. With Christian's approval the existing
+  `.el10` RPMs of libunwind 1.8.3-2, gperftools 2.18.1-1, nlopt 2.11.0-1 and vtk 9.7.0-1 were
+  installed before any mkl build (not rebuilt); blaze is campaign row 4 and builds in the mkl
+  column. Sudo on this VM is Option A (dnf/apt-get/dpkg/rpm only), so `sudo -n true` fails by
+  design; the builders only call those binaries.
+  Resume with `/update-build --from parmetis`. Host HEAD at run start: a580f09.
+  Logs: `work/logs/debug/` (git-ignored, local to this host).
 
 ## Blockers
 
