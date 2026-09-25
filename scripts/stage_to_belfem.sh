@@ -80,6 +80,9 @@ esac
 
 DROP="${USE_DROP:-${COLUMN}-${FLAVOR}-$(date -u +%Y%m%dT%H%MZ)}"
 STAGE="${STAGE:-$REPO/work/staging}"
+# Always absolute. The linkage gate extracts each RPM after cd'ing into a scratch
+# dir, so a relative --stage silently yields "no ELF objects found" (R10, 2026-09-25).
+STAGE=$(realpath -m -- "$STAGE") || { echo "error: cannot resolve --stage $STAGE" >&2; exit 2; }
 DROPDIR="$STAGE/$DROP"
 DIST=$(rpm --eval '%{dist}')
 

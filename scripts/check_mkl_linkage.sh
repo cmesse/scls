@@ -35,6 +35,10 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$FLAVOR" ] || { echo "usage: $0 --flavor <f> [--prefix DIR | --dir RPMDIR]" >&2; exit 2; }
 [ -n "$PREFIX" ] || [ -n "$DIR" ] || { echo "error: need --prefix or --dir" >&2; exit 2; }
+# Resolve to absolute paths: RPMs are extracted after cd'ing into a scratch dir,
+# where a relative --dir no longer points anywhere.
+[ -n "$DIR" ] && DIR=$(realpath -e -- "$DIR" 2>/dev/null || echo "$DIR")
+[ -n "$PREFIX" ] && PREFIX=$(realpath -e -- "$PREFIX" 2>/dev/null || echo "$PREFIX")
 command -v readelf >/dev/null || { echo "error: readelf not found (binutils)" >&2; exit 2; }
 
 # The expected model comes from the flavor file, never from a hardcoded list, so
