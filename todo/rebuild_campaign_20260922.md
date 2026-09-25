@@ -340,6 +340,19 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   environment/libunwind 2026-1 / 1.8.3-1 artifacts. Upload to belfem pending the R10 key setup and
   belfem's go-ahead (R9 drops ahead in the queue).
 
+- 2026-09-25 — R10 publishing. scalapack 2.2.3-4 / armadillo 15.6.0-2 are recipe-wide release
+  bumps, so with Christian's approval they were also rebuilt and installed for debug and gcc
+  (release-only there). After that all three flavors match their recipes over the full build order,
+  and `check_mkl_linkage.sh --prefix` passes for debug, gcc and mkl. (R9 did not rebuild debug/gcc;
+  belfem schedules an el9 follow-up after R10.)
+  Drops (belfem incoming/, one in flight):
+  1. `R10-debug-20260925T0959Z` — **uploaded** (51 files, 765014526 B, READY sent). Carries
+     scalapack 2.2.3-3 / armadillo 15.6.0-1, because it was staged before the bump.
+  2. `R10-gcc-20260925T1111Z` — staged, 53 files, 794720168 B, gate PASS.
+  3. `R10-debug-20260925T1112Z` — staged follow-up, the 2 new debug NEVRAs + SRPMs, 14266718 B.
+  4. `R10-mkl-20260925T1111Z` — staged, 51 files, 765256774 B, gate PASS (only `gnu_thread`).
+  Upload order and slots are belfem's call; Christian approved the R10 uploads in the R10 session.
+
 ## Blockers
 
 - **mkl, R9 and R10 — mixed MKL threading layers; mkl drops held (belfem, 2026-09-25).** On both
