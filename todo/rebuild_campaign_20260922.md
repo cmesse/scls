@@ -323,6 +323,9 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   mkl-only checks, by inspection:
   - **scalapack provenance.** `libscalapack.so` `DT_NEEDED`: `libmkl_gf_lp64.so.3`,
     `libmkl_sequential.so.3`, `libmkl_core.so.3`, no `libmkl_scalapack*`/`libmkl_blacs*`.
+    **CORRECTION 2026-09-25:** same error as the R9 entry — `libmkl_sequential.so.3` was printed
+    here and not flagged, although every other mkl library links `libmkl_gnu_thread`. Provenance
+    was right; flavor self-consistency was never checked. See Blockers.
   - **MKL major SONAME** `.so.3` in scalapack and petsc, same as R9.
   - **hwloc** `HWLOC_VERSION "2.14.0"` in `/opt/scls/mkl/include/hwloc/autogen/config.h`.
   - **`petsc-baijmkl-decls.patch` is inert on R10 too.** It applied, but the installed
@@ -348,3 +351,9 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   consumers on R10 (`DT_NEEDED`): butterflypack (14 files), mumps (3), petsc, slepc, strumpack.
   Not introduced by this campaign (only release bumps on both recipes). Any fix is a
   build-configuration change — Christian's decision, not auto-fixable. debug/gcc unaffected.
+  **Resolved on R10 2026-09-25** by `6a4d268` (Christian approved the rebuild in the R10 session):
+  scls-mkl-scalapack 2.2.3-4 and scls-mkl-armadillo 15.6.0-2 rebuilt and installed;
+  `scripts/check_mkl_linkage.sh --flavor mkl --prefix /opt/scls/mkl` FAILED before (naming exactly
+  those two) and PASSES after — 492 ELF files, one layer, `libmkl_gnu_thread`. Pre-fix vs post-fix
+  `--spec-only` over every mkl package changed exactly three specs: scalapack, armadillo and
+  blaze (header-only; test-link flags only; not bumped, not rebuilt).
