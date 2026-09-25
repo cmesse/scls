@@ -379,6 +379,17 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   `python/` or recipe change and was not made. Remaining on AMZN: the mkl column.
   Host HEAD at run start: f445537.
 
+- 2026-09-25 — AMZN mkl: **held, not started.** A host-side `dnf remove 'intel-oneapi-*-2026.0*'`
+  at 11:34 (dnf transaction 238, before the gcc run) also removed MKL **2026.1** and, as dependents,
+  20 `scls-mkl-*` packages (scalapack, petsc, slepc, mumps, strumpack, sundials, armadillo,
+  butterflypack, arpack-ng, slate, superlu{,_dist}, blaze, blaspp, lapackpp, suitesparse and the
+  `-examples` subpackages). With Christian's approval `intel-oneapi-mkl-devel` 2026.1.0-236 was
+  reinstalled (`libmkl_*.so.3`, same major as R9/R10). Re-run drift sweep: exactly the 24 campaign
+  rows — 10 stale, 14 missing — and nothing outside them, so the column restores the removed set;
+  suitesparse stays removed (`include_flavors: []`). Held at belfem's request (claude-06): builds on
+  hosts that may share a physical machine with R9/R10 are sequential while R10 uploads. This is a
+  VirtualBox NAT VM, so sharing is unknown and Christian chose to treat it as shared.
+
 ## Blockers
 
 - **mkl, R9 and R10 — mixed MKL threading layers; mkl drops held (belfem, 2026-09-25).** On both
