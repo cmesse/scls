@@ -353,6 +353,12 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   4. `R10-mkl-20260925T1111Z` — staged, 51 files, 765256774 B, gate PASS (only `gnu_thread`).
   Upload order and slots are belfem's call; Christian approved the R10 uploads in the R10 session.
 
+- 2026-09-25 — **R10 PUBLISHED.** All four R10 drops verified and promoted by belfem:
+  `R10-debug-20260925T0959Z`, `R10-gcc-20260925T1111Z`, `R10-debug-20260925T1112Z` (fixup, 76/76
+  already_published digests matched), `R10-mkl-20260925T1111Z` (linkage uniform across 163
+  consumers). R10 column closed. Devlog: `devlog/dl20260925_r10_build_and_publish.md`.
+  Still open: el9 debug/gcc scalapack/armadillo follow-up; AMZN and U24 columns.
+
 ## Blockers
 
 - **mkl, R9 and R10 — mixed MKL threading layers; mkl drops held (belfem, 2026-09-25).** On both
@@ -364,7 +370,7 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   consumers on R10 (`DT_NEEDED`): butterflypack (14 files), mumps (3), petsc, slepc, strumpack.
   Not introduced by this campaign (only release bumps on both recipes). Any fix is a
   build-configuration change — Christian's decision, not auto-fixable. debug/gcc unaffected.
-  **Resolved on R10 2026-09-25** by `6a4d268` (Christian approved the rebuild in the R10 session):
+  **Resolved on R10 2026-09-25 (all flavors rebuilt and published)** by `6a4d268` (Christian approved the rebuild in the R10 session):
   scls-mkl-scalapack 2.2.3-4 and scls-mkl-armadillo 15.6.0-2 rebuilt and installed;
   `scripts/check_mkl_linkage.sh --flavor mkl --prefix /opt/scls/mkl` FAILED before (naming exactly
   those two) and PASSES after — 492 ELF files, one layer, `libmkl_gnu_thread`. Pre-fix vs post-fix

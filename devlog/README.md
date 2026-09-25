@@ -11,6 +11,7 @@ file, it is lost.
 
 ## Entries
 
+- [dl20260925_r10_build_and_publish.md](dl20260925_r10_build_and_publish.md) — R10 column of the 2026-09-22 campaign built and published (4 drops); MKL threading fix rebuilt on all flavors; relative `--stage` gate bug fixed
 - [dl20260913_environment_toolchain_requires.md](dl20260913_environment_toolchain_requires.md) — environment now Requires the host toolchain and Recommends doxygen; new `rpm_recommends:` field; generated spec honours `release:`
 - [dl20260904_mumps_macos_install_names_handover.md](dl20260904_mumps_macos_install_names_handover.md) — triaged the BELFEM MUMPS dylib install-name handover: stale, fixed generically by the macOS post-install normalizer in `f171e7d` (2026-05-27); remaining check is whether the Mac's installed prefix post-dates it
 - [dl20260904_website_restyle_and_doc_sweep.md](dl20260904_website_restyle_and_doc_sweep.md) — ported the scls.html restyle into the Jinja template/generator; swept README, doc/, CLAUDE.md and the website for stale GCC 15 and Apple Silicon claims
