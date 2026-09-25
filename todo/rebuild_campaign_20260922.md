@@ -249,6 +249,18 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
     `libmkl_gf_lp64.so.3`, `libmkl_sequential.so.3`, `libmkl_core.so.3` and **no**
     `libmkl_scalapack*` or `libmkl_blacs*`. The stack's own ScaLAPACK over MKL's BLAS/LAPACK,
     exactly as policy requires.
+    **CORRECTION 2026-09-25 — this entry certified a defect.** The provenance claim is true and
+    still holds: ScaLAPACK is ours and no `libmkl_scalapack`/`libmkl_blacs` is linked. But
+    "exactly as policy requires" was wrong about the rest of the line. `libmkl_sequential.so.3`
+    was printed here and passed over, and it made this the only library in the flavor not linking
+    `libmkl_gnu_thread` — so `ldd libpetsc.so` loaded two MKL threading layers into one process.
+    The check asked about provenance and answered it correctly; it never asked whether the flavor
+    was self-consistent, which no per-package check can. Fixed on 2026-09-25 outside this
+    campaign's scope (scalapack 2.2.3-4, armadillo 15.6.0-2, plus
+    `scripts/check_mkl_linkage.sh` as a per-flavor gate). See
+    `devlog/dl20260925_mkl_threading_uniformity.md` and the new threading-uniformity section of
+    `doc/MKL_ABI_POLICY.md`. Anyone reading this row as a precedent for a future campaign should
+    read the correction first.
   - **MKL major SONAME.** Those `DT_NEEDED` entries are `.so.3`, so this column re-aligns the
     mkl flavor after the host's `.so.2` → `.so.3` bump. Per `doc/MKL_ABI_POLICY.md` that SONAME
     is invisible to RPM metadata under `AutoReqProv: no`, so a rebuild on the affected host is

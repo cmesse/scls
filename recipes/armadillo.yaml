@@ -1,5 +1,8 @@
 name: armadillo
 version: 15.6.0
+# release 2: MKL link line corrected -- armadillo's own FindMKL no longer adds
+# libmkl_rt alongside the layered libs (2026-09-25).
+release: 2
 summary: Fast C++ matrix library with syntax similar to MATLAB and Octave
 homepage: https://arma.sourceforge.net/
 license: Apache-2.0
@@ -74,23 +77,76 @@ configure:
       - "-DBLAS_LIBRARY=%{prefix}/lib/libopenblas.so"
       - "-DLAPACK_LIBRARY=%{prefix}/lib/libopenblas.so"
 
+    # MKL-class flavors (mkl, intel, cuda): armadillo's own MKL detection stays
+    # OFF and the layered libraries are named explicitly, as absolute paths.
+    #
+    # ALLOW_MKL_LINUX=ON let armadillo's finder add -lmkl_rt on top of the
+    # layered -lmkl_gf_lp64 -lmkl_<threading> -lmkl_core trio that
+    # %{math_ldflags} already supplies, so libarmadillo.so carried BOTH MKL
+    # models: `ldd libarmadillo.so.15.6.0` showed libmkl_rt.so.3 next to
+    # libmkl_gnu_thread.so.3. mkl_rt is the single-dynamic-library interface
+    # and picks its threading layer at RUNTIME from MKL_THREADING_LAYER; the
+    # layered libs bind it at LINK time. Mixing them means the layer in force
+    # depends on load order and environment, which is precisely what
+    # doc/MKL_ABI_POLICY.md exists to prevent. Intel supports one model or the
+    # other, never both in one binary.
+    #
+    # armadillo-add-allow-mkl-option.patch gates `include(ARMA_FindMKL)`, and
+    # ARMA_FindMKL is the module that returns mkl_rt. Turning the option OFF is
+    # therefore the whole fix; the patch is retained because the gcc/debug/lbl
+    # branches already rely on the option existing.
+    #
+    # BLAS_LIBRARY names ONE absolute path -- the interface library only, not
+    # the whole trio. Two upstream constraints force that shape, both found by
+    # building rather than by reading:
+    #   * It is a CMake *library* variable, not a link line. Passing
+    #     %{math_ldflags} (with -Wl,-rpath and -l flags) makes CMake treat the
+    #     entire string as one filename: "No rule to make target '-Wl,-rpath,...'".
+    #   * It cannot be a ';'-list either. ARMA_FindBLAS.cmake:33 calls
+    #     GET_FILENAME_COMPONENT(NATIVE_BLAS_LIB_PATH ${BLAS_LIBRARY} PATH)
+    #     unquoted, so a list expands to extra arguments: "GET_FILENAME_COMPONENT
+    #     unknown component".
+    # Setting it satisfies armadillo's detection (BLAS_FOUND, hence ARMA_USE_BLAS
+    # in the generated config header) and puts the correct *interface* library in
+    # ARMA_LIBS. The threading layer and core arrive on every link anyway through
+    # CMAKE_CXX_STANDARD_LIBRARIES, which build_common sets to the flavor's full
+    # MKL line -- so the shipped DT_NEEDED is gf_lp64 + gnu_thread + core with no
+    # mkl_rt. Verified with readelf after the build, not assumed.
+    #
+    # Why not let find_package(BLAS) do it: with ALLOW_MKL_LINUX=OFF, armadillo
+    # falls through to ARMA_FindBLAS, and CMake's FindBLAS under
+    # BLA_VENDOR=Intel10_64lp may select mkl_intel_lp64 — the Intel Fortran ABI
+    # — which is wrong under gfortran (see doc/MKL_ABI_POLICY.md on gf_lp64 vs
+    # intel_lp64). BLA_VENDOR was also reported unused by CMake here, since
+    # armadillo uses include(ARMA_Find*) rather than find_package(MKL), so it
+    # and CMAKE_DISABLE_FIND_PACKAGE_MKL were dropped as no-ops rather than
+    # kept as reassuring noise. Naming the trio explicitly keeps the interface
+    # library correct per toolchain and leaves nothing to search order.
+    #
+    # The duplication of math_common's layer choice is deliberate and is the
+    # cost of CMake wanting paths; scripts/check_mkl_linkage.sh is the guard
+    # that catches it drifting out of step with the flavor.
+    #
+    # Scoped in by Christian 2026-09-25; see
+    # devlog/dl20260925_mkl_threading_uniformity.md.
     mkl:
       - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
       - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
-      # Pin BLAS discovery to MKL so a host-installed OpenBLAS cannot
-      # sneak in via CMake's FindBLAS search order.
-      - "-DBLA_VENDOR=Intel10_64lp"
-      - "-DALLOW_MKL_LINUX=ON"
+      - "-DALLOW_MKL_LINUX=OFF"
+      - "-DBLAS_LIBRARY=%{mklroot}/lib/libmkl_gf_lp64.so"
+      - "-DLAPACK_LIBRARY=%{mklroot}/lib/libmkl_gf_lp64.so"
     intel:
       - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
       - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
-      - "-DBLA_VENDOR=Intel10_64lp"
-      - "-DALLOW_MKL_LINUX=ON"
+      - "-DALLOW_MKL_LINUX=OFF"
+      - "-DBLAS_LIBRARY=%{mklroot}/lib/libmkl_intel_lp64.so"
+      - "-DLAPACK_LIBRARY=%{mklroot}/lib/libmkl_intel_lp64.so"
     cuda:
       - "-DARPACK_LIBRARY=%{prefix}/lib/libarpack.so"
       - "-DSuperLU_LIBRARY=%{prefix}/lib/libsuperlu.so"
-      - "-DBLA_VENDOR=Intel10_64lp"
-      - "-DALLOW_MKL_LINUX=ON"
+      - "-DALLOW_MKL_LINUX=OFF"
+      - "-DBLAS_LIBRARY=%{mklroot}/lib/libmkl_gf_lp64.so"
+      - "-DLAPACK_LIBRARY=%{mklroot}/lib/libmkl_gf_lp64.so"
 
 build:
   parallel: true

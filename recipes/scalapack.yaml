@@ -1,6 +1,9 @@
 name: scalapack
 version: 2.2.3
-release: 3
+# release 4: MKL threading layer unified -- was the only library in the mkl
+# flavor linking libmkl_sequential while all others linked libmkl_gnu_thread,
+# putting two MKL threading layers in one process (2026-09-25).
+release: 4
 summary: A subset of LAPACK routines redesigned for heterogeneous computing
 homepage: https://www.netlib.org/scalapack/
 

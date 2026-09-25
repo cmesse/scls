@@ -285,7 +285,28 @@ def get_math_link_line(flavor: Dict, recipe: Dict) -> str:
         args.append(f'-l{get_mkl_interface_lib(flavor)}')
 
         # Threading layer and OpenMP runtime both follow the compiler family.
-        threaded = use_omp and mkl_threading_mode(flavor, recipe) == 'threaded'
+        #
+        # The MKL threading layer is a property of the FLAVOR, not of the
+        # package. This used to be gated on `use_omp` as well, so a recipe with
+        # features.openmp: false got -lmkl_sequential while every OpenMP
+        # package in the same flavor got -lmkl_gnu_thread. Both layers then
+        # loaded into one process: `ldd libpetsc.so` pulled libmkl_gnu_thread.so.3
+        # AND libmkl_sequential.so.3, the latter via libscalapack. Intel
+        # documents that as unsupported, and which layer's symbols win depends
+        # on load order. Only %{math_ldflags} carried the gate;
+        # %{mkl_linker_flags} (get_mkl_serial_link_line) never consulted the
+        # recipe, which is why blaspp and lapackpp are threaded despite
+        # openmp: false and libscalapack was the lone sequential library. The
+        # flavor's math.threading: is now the single source of truth on both
+        # paths. Scoped in by Christian 2026-09-25 -- it was NOT part of the
+        # 2026-09-22 campaign; see devlog/dl20260925_mkl_threading_uniformity.md.
+        #
+        # A package that uses no OpenMP itself is not harmed by a threaded MKL
+        # beneath it, but it does inherit MKL's thread pool: an MPI job with one
+        # rank per core can oversubscribe unless MKL_NUM_THREADS is set. Pinning
+        # that in the environment was considered and deliberately NOT taken here
+        # -- see the devlog's Open Questions.
+        threaded = mkl_threading_mode(flavor, recipe) == 'threaded'
 
         if threaded:
             args.append(f'-l{mkl_threading_lib(flavor)}')

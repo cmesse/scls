@@ -291,6 +291,26 @@ for f in "${PAYLOAD_SRC[@]}"; do ln "$f" "$DROPDIR/$DISTRO/source/" 2>/dev/null 
 ( cd "$DROPDIR" && sha256sum -c --quiet SHA256SUMS ) || { echo "LOCAL SHA256SUMS VERIFY FAILED" >&2; exit 1; }
 echo "local sha256sum -c: OK"
 
+# Math/threading uniformity gate. This runs BEFORE READY exists, so a violation
+# leaves a drop that physically cannot be uploaded (--upload refuses without a
+# matching READY) rather than a warning someone scrolls past.
+#
+# It exists because on 2026-09-25 belfem rejected R9-mkl-20260925T0946Z over a
+# defect that every check up to that point had passed: libscalapack linked
+# libmkl_sequential while the flavor's other 256 MKL references linked
+# libmkl_gnu_thread, putting two MKL threading layers in one process. Nothing
+# here could see it — AutoReqProv: no keeps DT_NEEDED out of RPM metadata, and
+# the per-package checks all passed because each object is well-formed alone and
+# only wrong in company. The rule is per-flavor, so the gate has to be too.
+echo "checking math/threading uniformity..."
+if ! "$REPO/scripts/check_mkl_linkage.sh" --flavor "$FLAVOR" --dir "$DROPDIR/$DISTRO/x86_64"; then
+    echo >&2
+    echo "LINKAGE GATE FAILED — READY not written, so this drop cannot be uploaded." >&2
+    echo "Fix the recipes, rebuild the offending packages, and stage a new drop." >&2
+    exit 1
+fi
+echo
+
 # READY is built OUTSIDE the drop directory so the payload rsync cannot carry it up
 # by accident. Sending READY early would mark an incomplete drop consumable.
 READY_SHA=$(sha256sum "$DROPDIR/SHA256SUMS" | cut -d' ' -f1)

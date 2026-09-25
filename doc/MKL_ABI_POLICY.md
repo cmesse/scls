@@ -187,6 +187,62 @@ DEB install is blocked with a clean SONAME-mismatch error):
    changed; their artifacts still resolve correctly. Rebuilding the entire
    build matrix on every Intel-side bump is unnecessary churn.
 
+## Threading-layer uniformity (policy, added 2026-09-25)
+
+**Every ELF object in an MKL-class flavor must name the same MKL threading layer, and no object
+may link `libmkl_rt`.** The layer is a property of the flavor — `math.threading:` in
+`flavors/<f>.yaml`, cross-checked against the compiler family — never of the individual package.
+
+### Why this is a policy and not a preference
+
+Mixing layers is not a tidiness issue. `libmkl_sequential` and `libmkl_gnu_thread` export the same
+symbols; when both are in a process image the winner is decided by load order, so the same binary
+can get different BLAS behaviour depending on which library the loader reached first. Intel
+supports exactly one threading layer per process. `libmkl_rt` is the same problem in a different
+form: it is the single-dynamic-library interface and resolves its layer at *runtime* from
+`MKL_THREADING_LAYER`, while the layered libraries bind at *link* time, so a binary carrying both
+is asking two mechanisms to answer one question.
+
+### How it was violated, and why nothing caught it
+
+Until 2026-09-25 `libscalapack.so` linked `libmkl_sequential` while the flavor's other 256 MKL
+references linked `libmkl_gnu_thread`. `ldd libpetsc.so.3.25.5` loaded both. The cause was in
+`python/math_common.py:get_math_link_line`, which gated the threading layer on the *recipe's*
+`features.openmp` in addition to the flavor's declaration, while the sibling path
+`get_mkl_serial_link_line` (`%{mkl_linker_flags}`) did not. Two macros, two answers.
+
+Three existing safeguards each looked straight at it and passed:
+
+- `AutoReqProv: no` keeps `DT_NEEDED` out of RPM metadata, so install-time resolution says nothing.
+- The campaign's "scalapack provenance" check ran `readelf -d` on the offending library, printed
+  `libmkl_sequential.so.3` in its own output, and passed it — because it asked whether ScaLAPACK
+  came from the stack rather than `libmkl_scalapack`, which it did.
+- Every per-package review passed, because each object is individually well-formed. The defect
+  exists only in the relationship between objects.
+
+The lesson worth keeping: **a per-package check cannot see a per-flavor invariant.** That is why
+the gate below inspects the whole flavor at once.
+
+### The gate
+
+`scripts/check_mkl_linkage.sh --flavor <f> [--prefix DIR | --dir RPMDIR]` reads the expected model
+from the flavor file (following `inherits:`) and asserts over real `DT_NEEDED`:
+
+- MKL-class: exactly one threading layer, matching the flavor's declaration; no `libmkl_rt`;
+  no `libmkl_scalapack`/`libmkl_blacs`.
+- Non-MKL: one OpenMP runtime, one BLAS provider, and no MKL at all.
+
+It names the carrying library, because the failure mode is one outlier among hundreds.
+`scripts/stage_to_belfem.sh` runs it during `--build`, **before `READY` is written**, so a
+violating drop cannot be uploaded rather than merely warned about.
+
+### Known trade-off
+
+A package declaring `features.openmp: false` now links the threaded layer anyway and inherits
+MKL's thread pool. An MPI job with one rank per core can oversubscribe unless `MKL_NUM_THREADS` is
+set, and nothing in `recipes/environment.yaml` pins it today. This was accepted knowingly when the
+change was scoped in; see `devlog/dl20260925_mkl_threading_uniformity.md`.
+
 ## A second, unrelated hazard: `-lgomp` in `CMAKE_<LANG>_STANDARD_LIBRARIES`
 
 This one is not a SONAME problem, but it lives in the same link line and is
