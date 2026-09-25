@@ -36,35 +36,35 @@ those dependencies changed.
 
 | # | G | Package | why | R9 DBG | R9 GCC | R9 MKL | R10 DBG | R10 GCC | R10 MKL | AMZN GCC | AMZN MKL | U24 DBG | U24 GCC | U24 MKL |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 2 | cmake 4.4.2 → 4.4.3 | up | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 2 | 2 | openblas 0.3.33 → 0.3.34 | up | n/a | [x] | n/a | n/a | [x] | n/a | [ ] | n/a | n/a | [ ] | n/a |
-| 3 | 2 | ucx 1.20.1 → 1.22.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 4 | 3 | blaze 3.8.2-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 11 | 6 | parmetis 4.0.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 12 | 6 | scalapack 2.2.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 13 | 6 | scotch 7.0.13 → 7.0.15 | up | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 14 | 7 | arpack-ng 3.9.1-2 → -3 | casc (openmpi, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 15 | 7 | mumps 5.9.1-1 → -2 | casc (openmpi, scotch, scalapack, parmetis) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 16 | 7 | netcdf 4.10.1-1 → -2 | casc (hdf5, openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 17 | 7 | slate 2025.05.28-2 → -3 | casc (openmpi, blaspp, lapackpp) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 18 | 7 | superlu_dist 9.2.1-2 → -3 | casc (openmpi, parmetis) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 19 | 8 | armadillo 15.4.2 → 15.6.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 20 | 8 | butterflypack 4.1.0-2 → -3 | casc (openmpi, arpack-ng, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 21 | 8 | exodus 2026.08.11-1 → -2 | casc (hdf5, netcdf, openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 22 | 9 | strumpack 8.0.0-3 → -4 | casc (openmpi, scotch, butterflypack, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 26 | 0 | environment 2026-1 → 2026-2 | stale | [x] | [x] | [x] | n/a | n/a | n/a | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | n/a | n/a | [x] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 1 | 2 | cmake 4.4.2 → 4.4.3 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 2 | 2 | openblas 0.3.33 → 0.3.34 | up | n/a | [x] | n/a | n/a | [x] | n/a | [x] | n/a | n/a | [ ] | n/a |
+| 3 | 2 | ucx 1.20.1 → 1.22.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 4 | 3 | blaze 3.8.2-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 11 | 6 | parmetis 4.0.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 12 | 6 | scalapack 2.2.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 13 | 6 | scotch 7.0.13 → 7.0.15 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 14 | 7 | arpack-ng 3.9.1-2 → -3 | casc (openmpi, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 15 | 7 | mumps 5.9.1-1 → -2 | casc (openmpi, scotch, scalapack, parmetis) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 16 | 7 | netcdf 4.10.1-1 → -2 | casc (hdf5, openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 17 | 7 | slate 2025.05.28-2 → -3 | casc (openmpi, blaspp, lapackpp) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 18 | 7 | superlu_dist 9.2.1-2 → -3 | casc (openmpi, parmetis) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 19 | 8 | armadillo 15.4.2 → 15.6.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 20 | 8 | butterflypack 4.1.0-2 → -3 | casc (openmpi, arpack-ng, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 21 | 8 | exodus 2026.08.11-1 → -2 | casc (hdf5, netcdf, openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 22 | 9 | strumpack 8.0.0-3 → -4 | casc (openmpi, scotch, butterflypack, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] |
+| 26 | 0 | environment 2026-1 → 2026-2 | stale | [x] | [x] | [x] | n/a | n/a | n/a | n/a | n/a | [ ] | [ ] | [ ] |
+| 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | n/a | n/a | [x] | n/a | n/a | [ ] | [ ] | [ ] |
 | 28 | 2 | nlopt 2.10.1 → 2.11.0 | stale | [x] | [x] | [x] |
-| 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | n/a | n/a | n/a | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a | [ ] | [ ] | [ ] |
 
 **Rows 26–28 were added on 2026-09-22, mid-run, and are not part of the original ten-bump
 scope.** `why: stale` means the installed package on the R9 build host was behind its own recipe
@@ -358,6 +358,26 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   already_published digests matched), `R10-mkl-20260925T1111Z` (linkage uniform across 163
   consumers). R10 column closed. Devlog: `devlog/dl20260925_r10_build_and_publish.md`.
   Still open: el9 debug/gcc scalapack/armadillo follow-up; AMZN and U24 columns.
+
+- 2026-09-25 — **AMZN: gcc 25/25 built and installed — column complete** (11:37–14:38). Full
+  `build_order.py` sweep afterwards: every gcc package matches its recipe. No auto-fixes: the R9
+  manifest fixes (`67c3d4f` armadillo, `3810fe9` petsc) held, scotch/sundials built with no drift.
+  Rows 26, 27, 29 are `n/a` in both AMZN columns — `environment` 2026-2, `libunwind` 1.8.3-2 and
+  `hwloc` 2.14.0 were already installed for gcc and mkl (preflight drift sweep); nlopt too.
+  Preflight needed two host fixes first: the sudo grant (`scripts/grant_pkg_sudo.sh`, run by
+  Christian) and disk (4.8 → 13 GB free).
+  **One failure, host environment, not recipe:** slepc configure died with `SLEPC_DIR environment
+  variable is not valid`. The shell that launched the run had sourced
+  `/opt/scls/gcc/share/scls/activate.sh`, which exports `SLEPC_DIR`, `PETSC_DIR`, `PETSC_ARCH`,
+  `CMAKE_PREFIX_PATH`, `PKG_CONFIG_PATH`, `MPI_HOME`, `SCLS*`; rpmbuild inherits all of it and the
+  slepc spec never overrides `SLEPC_DIR` for configure. Re-run with those unset and `/opt/scls/*`
+  stripped from `PATH` — built clean. The 22 packages before it inherited the same variables, but all
+  point at `/opt/scls/gcc`, the prefix those builds target anyway; petsc's spec sets
+  `PETSC_DIR=$PWD` (confirmed in its log). **For mkl the leak would not be benign** —
+  `CMAKE_PREFIX_PATH`/`MPI_HOME` would point mkl builds at the gcc prefix — so build mkl from a
+  shell that has not sourced `activate`. No builder hardens against this; doing so is a
+  `python/` or recipe change and was not made. Remaining on AMZN: the mkl column.
+  Host HEAD at run start: f445537.
 
 ## Blockers
 
