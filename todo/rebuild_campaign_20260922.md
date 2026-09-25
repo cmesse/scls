@@ -415,6 +415,18 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   `AMZN-gcc-20260925T1913Z` (53 files, 792433462 B, gate PASS) and `AMZN-mkl-20260925T1914Z`
   (51 files, 763212434 B, gate PASS, `gnu_thread` only). Open with belfem before upload: the
   script is written against contract v1.5, belfem's instructions cite v1.6.
+  **Resolved:** v1.6 adds only the licence-first `excluded:` reason rule, which the gcc manifest
+  already met — no restage.
+
+- 2026-09-25 — AMZN publishing (belfem coordinator claude-9d). `AMZN-gcc-20260925T1913Z` uploaded by
+  Christian from this host (Claude's session permission guard blocked the upload); belfem:
+  verify_drop PASS, 53 files / 792433462 B, promoted 12:53 and signed (835e8a44). `AMZN-mkl-20260925T1914Z`
+  slot granted; upload pending.
+  **Defect found — `scripts/stage_to_belfem.sh` keeps READY in one location shared across drops.**
+  Staging mkl one minute after gcc overwrote gcc's READY, so `--drop … --upload` refused ("READY does
+  not match SHA256SUMS") before any rsync — the self-check worked. Workaround: rewrite READY with the
+  approved hash before each upload. Fix (READY per drop, outside the rsynced payload) is a `scripts/`
+  change awaiting Christian's approval; belfem asked for it on devel.
 
 ## Blockers
 
