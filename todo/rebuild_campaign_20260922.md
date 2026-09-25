@@ -408,6 +408,14 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   - The mkl run cleared the sourced-`activate` variables from the gcc entry before every build.
   Host HEAD at mkl start: 4e3a09a. Remaining: U24 (all columns).
 
+- 2026-09-25 — AMZN cleanup and staging. `scls-gcc-suitesparse` 7.12.2-1 removed from this host with
+  Christian's approval (`include_flavors: []`, GPL-2 linkable — `doc/LICENSE_POLICY.md`); nothing
+  required it. `scls-mkl-suitesparse` was already gone (dnf transaction 238). Drops staged locally
+  with `--build` against belfem's `published-amzn2023.txt` (166 NEVRAs), **not uploaded**:
+  `AMZN-gcc-20260925T1913Z` (53 files, 792433462 B, gate PASS) and `AMZN-mkl-20260925T1914Z`
+  (51 files, 763212434 B, gate PASS, `gnu_thread` only). Open with belfem before upload: the
+  script is written against contract v1.5, belfem's instructions cite v1.6.
+
 ## Blockers
 
 - **mkl, R9 and R10 — mixed MKL threading layers; mkl drops held (belfem, 2026-09-25).** On both
