@@ -339,4 +339,12 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
 
 ## Blockers
 
-- none
+- **mkl, R9 and R10 — mixed MKL threading layers; mkl drops held (belfem, 2026-09-25).** On both
+  hosts 346 of 348 MKL-linked files in `/opt/scls/mkl` link `gf_lp64 + gnu_thread + core`, but
+  `libscalapack.so.2.2.3` links `libmkl_sequential` and `libarmadillo.so.15.6.0` links `libmkl_rt`
+  *in addition to* the layered set. scalapack: `features.openmp: false` →
+  `python/math_common.py` emits `-lmkl_sequential` for non-OpenMP packages. armadillo:
+  `-DALLOW_MKL_LINUX=ON` lets its own FindMKL pick `libmkl_rt.so` into `ARMA_LIBS`. Runtime
+  consumers on R10 (`DT_NEEDED`): butterflypack (14 files), mumps (3), petsc, slepc, strumpack.
+  Not introduced by this campaign (only release bumps on both recipes). Any fix is a
+  build-configuration change — Christian's decision, not auto-fixable. debug/gcc unaffected.
