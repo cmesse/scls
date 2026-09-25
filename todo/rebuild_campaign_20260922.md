@@ -331,6 +331,12 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
     exercise it did not hold; nothing in this campaign has tested the patch's effect.
   Host HEAD at mkl start: a0d0170.
 
+- 2026-09-25 — R10 cleanup: `scls-{debug,gcc,mkl}-suitesparse` 7.12.2-1 removed from this host with
+  Christian's approval (`include_flavors: []`, GPL-2 linkable — `doc/LICENSE_POLICY.md`). Checked
+  first: no RPM required it and no stack binary had it in `DT_NEEDED`. Also pruned 12 superseded
+  environment/libunwind 2026-1 / 1.8.3-1 artifacts. Upload to belfem pending the R10 key setup and
+  belfem's go-ahead (R9 drops ahead in the queue).
+
 ## Blockers
 
 - none
