@@ -34,7 +34,7 @@ omits. Run the sweep over the full `build_order.py` list for each flavor in the 
 subtract the tracker's rows, and **stop and ask if anything is left** — those are packages this
 run will not fix and will nevertheless build on top of.
 
-Then report the host column (`R9` / `R10` / `AMZN` / `U24`) and the flavor sequence you are about
+Then report the host column (`R9` / `R10` / `AMZN` / `U24` / `U26`) and the flavor sequence you are about
 to run, and only then start building.
 
 ## 2. Target set
@@ -57,7 +57,7 @@ for p in $(python python/build_order.py recipes --flavor $F --names-only); do
 done
 ```
 
-(`dpkg-query -W -f='${Version}'` on U24.) The output is already in build order. Show it and
+(`dpkg-query -W -f='${Version}'` on U24/U26, with `_` mapped to `-` in the package name.) The output is already in build order. Show it and
 confirm the list with Christian before building — a computed set has no §C to say what was
 deliberately left out.
 

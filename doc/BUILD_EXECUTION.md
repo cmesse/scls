@@ -50,6 +50,7 @@ tracker column:
 | `rocky`/`rhel`/`almalinux` 10.x | `R10` | RPM | yes |
 | `amzn` 2023 | `AMZN` | RPM | **no** |
 | `ubuntu` 24.04 | `U24` | DEB | yes |
+| `ubuntu` 26.04 | `U26` | DEB | yes |
 
 Anything else: stop and report. The `scls` wrapper's own RPM/DEB detection must agree — if
 `./scls list` reports a format you did not expect, trust the wrapper and stop.
@@ -122,7 +123,7 @@ for p in $(python python/build_order.py recipes --flavor $F --names-only 2>/dev/
 done
 ```
 
-(`dpkg-query -W -f='${Version}'` on `U24`.)
+(`dpkg-query -W -f='${Version}'` on `U24`/`U26`, querying `scls-$F-${p//_/-}` — deb names map `_` to `-`.)
 
 Report the result. Then **subtract the packages the entry point is going to build anyway**.
 Anything left is a package that is stale on this host and that **nothing in this run will fix**.
@@ -291,6 +292,12 @@ headers that were always expected to be present, not for adding capability.
 ## 4. Halt protocol
 
 When a failure is outside §3:
+
+> **Unattended runs with jury authority.** When Christian has authorized jury fixes for a run
+> (first: U26 full stack, 2026-09-26), go through `.claude/commands/build-fix-jury.md` before
+> halting. Its tier-J fixes land locally after a Codex + Grok jury; everything else is parked as a
+> blocker, and — instead of step 1 below — the run skips the blocked package and its reverse
+> dependencies and continues. Without that authorization, the steps below apply unchanged.
 
 1. **Stop this flavor.** Do not start the next package, and do not move to the next flavor — a
    `debug` failure is the canary for `gcc` and `mkl`, and proceeding past it wastes hours.

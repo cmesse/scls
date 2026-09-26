@@ -117,6 +117,15 @@ Every cell in the `all` column is **unverified** — see the gate below. The scr
 `/etc/sudoers` has an includedir for `/etc/sudoers.d`, but not that the include comes *after*
 `%wheel` or another later policy source, which is what "evaluated last" depends on.
 
+**Ubuntu 26.04 (`U26`), 2026-09-26 — first Linux run of the `all` column.** After `--scope all`
+and `sudo -k`: `sudo -n true` → yes, `sudo -n apt-get` → yes, `sudo -n -v` → **no**. 26.04's
+default `sudo` is **sudo-rs** (`/etc/alternatives/sudo -> /usr/lib/cargo/bin/sudo`), which does
+not honour `verifypw`. Classic sudo is still shipped as `/usr/bin/sudo.ws`, and `sudo.ws -n -v`
+passes with the same fragment. So on U26 the `scls build all` keepalive fails unless Christian
+switches the alternative (`update-alternatives --set sudo /usr/bin/sudo.ws`, a host change that is
+his to make). The per-package `./scls build P && ./scls install P` loop needs only `sudo -n
+apt-get` and is unaffected.
+
 So the choice is: `--scope all` and the repo plausibly needs no changes, or `--scope pkg` and those
 three call sites have to move to a scoped test. My recommendation for SCLS build VMs is
 `--scope all` — they are compilation-only hosts and pkg does not lower the ceiling anyway — but as
