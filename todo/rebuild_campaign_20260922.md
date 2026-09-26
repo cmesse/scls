@@ -36,13 +36,13 @@ those dependencies changed.
 
 | # | G | Package | why | R9 DBG | R9 GCC | R9 MKL | R10 DBG | R10 GCC | R10 MKL | AMZN GCC | AMZN MKL | U24 DBG | U24 GCC | U24 MKL |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 2 | cmake 4.4.2 → 4.4.3 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
+| 1 | 2 | cmake 4.4.2 → 4.4.3 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | 2 | 2 | openblas 0.3.33 → 0.3.34 | up | n/a | [x] | n/a | n/a | [x] | n/a | [x] | n/a | n/a | [ ] | n/a |
-| 3 | 2 | ucx 1.20.1 → 1.22.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 4 | 3 | blaze 3.8.2-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
+| 3 | 2 | ucx 1.20.1 → 1.22.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 4 | 3 | blaze 3.8.2-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
 | 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
 | 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
@@ -61,7 +61,7 @@ those dependencies changed.
 | 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
 | 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
 | 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 26 | 0 | environment 2026-1 → 2026-2 | stale | [x] | [x] | [x] | n/a | n/a | n/a | n/a | n/a | [ ] | [ ] | [ ] |
+| 26 | 0 | environment 2026-1 → 2026-2 | stale | [x] | [x] | [x] | n/a | n/a | n/a | n/a | n/a | [x] | [ ] | [ ] |
 | 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | n/a | n/a | [x] | n/a | n/a | [ ] | [ ] | [ ] |
 | 28 | 2 | nlopt 2.10.1 → 2.11.0 | stale | [x] | [x] | [x] |
 | 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a | [ ] | [ ] | [ ] |
@@ -428,6 +428,19 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   approved hash before each upload. Fix (READY per drop, outside the rsynced payload) is a `scripts/`
   change awaiting Christian's approval; belfem asked for it on devel.
 
+- 2026-09-26 — **U24: debug 7/25 built and installed, then HALTED at openmpi (row 8).** Installed:
+  environment 2026-2, cmake 4.4.3-1, ucx 1.22.0-1, blaspp/lapackpp 2025.05.28-2, blaze 3.8.2-2,
+  pmix 5.0.11-1 (00:40–01:55). No auto-fixes. gcc and mkl not started; openmpi's failure would
+  recur on both. See Blockers.
+  Host prep this session (with Christian): sudo grant `--scope pkg` (`sudo -n apt-get --version`
+  passes; `sudo -n true` fails by design); `scls-{debug,gcc,mkl}-suitesparse` removed (no
+  consumers); desktop/snaps/LibreOffice removed for disk; oneAPI MKL 2026.0 → **2026.1.0-236**
+  (same `.so.3` major as AMZN; `common-licensing-2026.0`/`common-oneapi-vars-2026.0` must stay).
+  Preflight found `vtk` 9.7.0 absent on all three flavors: the flavor meta-packages `scls-<F>`
+  were built in August but never installed here, and vtk is a leaf only the meta pulls in. Plan:
+  end each flavor with `./scls build _meta && ./scls install _meta`.
+  Host HEAD at run start: 8a4b68e.
+
 ## Blockers
 
 - **mkl, R9 and R10 — mixed MKL threading layers; mkl drops held (belfem, 2026-09-25).** On both
@@ -445,3 +458,28 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   those two) and PASSES after — 492 ELF files, one layer, `libmkl_gnu_thread`. Pre-fix vs post-fix
   `--spec-only` over every mkl package changed exactly three specs: scalapack, armadillo and
   blaze (header-only; test-link flags only; not bumped, not rebuilt).
+
+- **openmpi 5.0.11, U24 (all DEB flavors) — PRRTE silently external; guard fails. HALT, needs a
+  build-config decision.** `./scls build openmpi` on debug compiles and stages, then the recipe's
+  own `install.post` guard fails: `ERROR: PRRTE component 'bin/prte' is missing`. Log:
+  `work/logs/debug/openmpi.build.log` (U24 host, git-ignored). configure printed
+  `checking for prte.h... yes`, `external PRRTE version is 3.0.0 or greater... yes`, `PRRTE: external`.
+  **Cause (verified):** the *installed* openmpi 5.0.10-3 put `include/prte.h`, `prte_version.h` and
+  `lib/libprrte.so.3.0.13` in `/opt/scls/debug`; the DEB/unix build environment exports
+  `CPATH=<prefix>/include` (`python/build_common.py:1005`), so gcc finds `prte.h` with no `-I`, and
+  OpenMPI 5's default `--with-prrte` (auto) prefers an external PRRTE when one compiles. The
+  bundled PRRTE is then neither built nor installed. RPM builds don't go through that env, which is
+  why R9/R10/AMZN passed the same guard.
+  **This is very likely the unexplained "intermittent" drop in
+  `devlog/dl20260824_openmpi_prrte_and_sundials_ldpath.md`:** the broken/correct/broken/correct
+  sequence there alternates exactly as this predicts — a build on top of a good install (PRRTE
+  present) goes external and ships without PRRTE; the next build, on top of that broken install,
+  finds none and bundles it again.
+  **Proposed fix (Christian's call — build-config change):** add `--with-prrte=internal` to
+  `configure.flavor_args` for `gcc`, `mkl`, `debug` in `recipes/openmpi.yaml` (valid in 5.0.11
+  configure; `lbl` is 4.1.6/ORTE and unaffected). It makes explicit what R9/R10/AMZN already built,
+  so no RPM content changes. Alternatives: build with the old openmpi removed first
+  (`dpkg -r --force-depends`, destructive, leaves dependents broken until reinstall), or drop
+  `CPATH` from the DEB build env (`python/`, wider blast radius). Rebuild radius of the recipe
+  fix: none beyond this campaign — every openmpi consumer is already a campaign cascade row.
+  Resume with `/update-build --from openmpi` (debug) after the decision.
