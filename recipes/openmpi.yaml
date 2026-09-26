@@ -1,6 +1,6 @@
 name: openmpi
 version: 5.0.11
-release: 1
+release: 2
 summary: A powerful implementation of MPI/SHMEM
 homepage: https://www.open-mpi.org
 license: BSD
@@ -110,8 +110,22 @@ configure:
   args:
     - --enable-mpi-fortran
     - --enable-mpi1-compatibility
+  # --with-prrte=internal on every 5.x flavor (approved by Christian
+  # 2026-09-26). OpenMPI 5's default is to *prefer* an external PRRTE and
+  # build the bundled one only when none is usable (upstream 5.0.11
+  # config/ompi_setup_prrte.m4:31-33, :89, :98-100). A previously installed
+  # openmpi 5.x leaves include/prte.h and lib/libprrte.so in %{prefix}, and
+  # the DEB/unix build env exports CPATH=%{prefix}/include
+  # (python/build_common.py), so the probe succeeds with no -I: configure
+  # prints "PRRTE: external", the bundled PRRTE is never built, and the
+  # package ships without prte/prterun. That is the cause of the 2026-08
+  # "intermittent" Ubuntu PRRTE drop and the U24 5.0.11 halt
+  # (devlog/dl20260926_u24_openmpi_prrte_external.md). RPM builds already
+  # took the internal path; this makes it explicit everywhere. Not on lbl:
+  # 4.1.6 uses ORTE, not PRRTE.
   flavor_args:
     gcc:
+      - --with-prrte=internal
       - --with-pmix=%{prefix}
       - --with-hwloc=%{prefix}
       - --with-hwloc-libdir=%{prefix}/lib
@@ -121,6 +135,7 @@ configure:
     mkl:
       # mkl flavor uses our own pmix/hwloc/libevent (same as gcc); MKL only
       # affects math libs, not the MPI stack.
+      - --with-prrte=internal
       - --with-pmix=%{prefix}
       - --with-hwloc=%{prefix}
       - --with-hwloc-libdir=%{prefix}/lib
@@ -128,6 +143,7 @@ configure:
       - --with-libevent-libdir=%{prefix}/lib
       - --with-ucx=%{prefix}
     debug:
+      - --with-prrte=internal
       - --with-pmix=%{prefix}
       - --with-hwloc=%{prefix}
       - --with-hwloc-libdir=%{prefix}/lib
@@ -143,7 +159,12 @@ configure:
       - --with-libevent=external
       - --with-ucx=%{prefix}
       - --without-verbs
+    intel:
+      - --with-prrte=internal
+    macos:
+      - --with-prrte=internal
     gcc-mkl-cuda:
+      - --with-prrte=internal
       - --enable-mpi-ext=cuda
       - --with-cuda=%{cuda}
       - --with-cuda-libdir=%{cuda}/lib64
@@ -177,9 +198,11 @@ install:
   # Both take "whatever got installed" as the manifest, so a short install
   # yields a smaller-but-valid package and exits 0. That is how the
   # 2026-08 Ubuntu 24.04 rebuilds shipped a broken 5.0.10-2 intermittently
-  # (see devlog/dl20260824_openmpi_prrte_and_sundials_ldpath.md). The root
-  # cause is still unknown, so gate on the symptom instead: this turns a
-  # silent ~400-file drop into a loud build failure on every distro.
+  # (see devlog/dl20260824_openmpi_prrte_and_sundials_ldpath.md). Root cause
+  # found 2026-09-26: configure picked the previously installed PRRTE as
+  # "external" (see --with-prrte=internal under flavor_args). Keep the guard
+  # anyway: it turns any future silent ~400-file drop into a loud build
+  # failure on every distro.
   #
   # Scoped to 5.x because the lbl flavor pins 4.1.6, which uses ORTE
   # (orterun/orted) rather than PRRTE. %{version} is substituted at

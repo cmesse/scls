@@ -1,5 +1,17 @@
 # Openmpi Changelog
 
+## Version 5.0.11-2 - Sat Sep 26 2026
+- `--with-prrte=internal` on every 5.x flavor (gcc, mkl, debug, intel, macos,
+  gcc-mkl-cuda), approved by Christian. OpenMPI 5 prefers an external PRRTE
+  when one compiles; on DEB/unix builds `CPATH=<prefix>/include` exposes the
+  `prte.h` left by the previously installed openmpi, so configure chose
+  "PRRTE: external" and the bundled PRRTE was never built. That is the root
+  cause of the 2026-08 "intermittent" Ubuntu PRRTE drop noted under 5.0.10-3
+  below, and it halted the U24 5.0.11-1 build. RPM 5.0.11-1 builds already took
+  the internal path, so their payload should be unchanged; the release is bumped
+  anyway so that one NEVRA always means one recipe state (Christian's policy).
+  No cascade: SONAMEs are unchanged. lbl (4.1.6, ORTE) is unaffected.
+
 ## Version 5.0.11-1 - Tue Sep 22 2026
 - Updated to version 5.0.11
 - Dropped `openmpi-5.0.10-part-persist-drop-forced-inline.patch` for the 5.x flavors: 5.0.11 removes `__opal_attribute_always_inline__` from `mca_part_persist_start` (`ompi/mca/part/persist/part_persist.h`), which was the patch's only hunk. The `lbl` flavor stays on 4.1.6 with its own patch.

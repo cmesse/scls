@@ -65,6 +65,7 @@ those dependencies changed.
 | 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | n/a | n/a | [x] | n/a | n/a | [ ] | [ ] | [ ] |
 | 28 | 2 | nlopt 2.10.1 → 2.11.0 | stale | [x] | [x] | [x] |
 | 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a | [ ] | [ ] | [ ] |
+| 30 | 5 | openmpi 5.0.11-1 → -2 | fix (`--with-prrte=internal`) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | n/a | n/a | n/a |
 
 **Rows 26–28 were added on 2026-09-22, mid-run, and are not part of the original ten-bump
 scope.** `why: stale` means the installed package on the R9 build host was behind its own recipe
@@ -128,6 +129,14 @@ Netlib reference), so its four dependents (`blaze`, `blaspp`, `lapackpp`, `super
 `gcc` only. They are still rebuilt on `debug` and `mkl` because the release bump is in the
 recipe and therefore changes the NEVRA on every flavor; a repository that carries `-2` for `gcc`
 and `-1` for `mkl` of the same recipe is the state this table exists to avoid.
+
+**Row 30 (openmpi 5.0.11-2) was added on 2026-09-26** after the U24 PRRTE halt (see Blockers).
+The recipe now forces `--with-prrte=internal`; Christian's one-NEVRA-per-recipe-state policy
+bumps the release. RPM hosts: rebuild and install openmpi alone, then stage it. Nothing
+cascades, because libmpi/libprrte/libpmix SONAMEs are unchanged and the RPM -1 builds already
+used the internal PRRTE. U24 cells are `n/a` here because row 8 builds -2 directly on that
+column. `lbl` also becomes 4.1.6-2 with no content change (release is recipe-wide); `lbl` is
+source-only and not tracked here.
 
 ## B. What was verified on the dev host before this file was written
 
