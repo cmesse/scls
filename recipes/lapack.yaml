@@ -1,5 +1,6 @@
 name: lapack
 version: 3.12.1
+release: 2
 summary: LAPACK - Linear Algebra PACKage
 homepage: https://www.netlib.org/lapack/
 license: BSD-3-Clause
@@ -79,7 +80,24 @@ configure:
     # XBLAS for extended precision
     - "-DXBLAS=OFF"
     # -frecursive is needed for LAPACK's recursive routines
-    - "-DCMAKE_Fortran_FLAGS=%{fcflags} -frecursive"
+    #
+    # -ffp-contract=off works around a gfortran 15.2 wrong-code bug (approved
+    # by Christian 2026-09-26, jury-reviewed under /build-fix-jury). With
+    # -O2 and the debug flavor's -march=x86-64-v3 (FMA), the SLP vectorizer
+    # turns the complex update at zlaqr5.f:450 (DO 40, `H(K+1,J) - REFSUM*T1`)
+    # into vfmaddsub/vfmsubadd code that computes the wrong result: a
+    # multishift QR sweep stops being a similarity, and ZGEEV/CGEEV return
+    # wrong eigenvectors for 76 <= n < 150 (lapackpp `tester geev`, residual
+    # ~3e-3). LAPACK's own ctest does not catch it. The same lapack 3.12.1
+    # built with GCC 13 (U24) passes. Without FMA contraction the vectorizer
+    # cannot form that pattern (zlaqr5: 55 vfmadd* -> 0, measured with this
+    # flag placed before upstream's appended -O2, which does not re-enable
+    # contraction). claqr5.f is the CGEEV twin and gets the same flag.
+    # OpenBLAS sidesteps the same code in its bundled LAPACK with
+    # -fno-tree-vectorize for gfortran (OpenBLAS 0.3.34 Makefile:318-319).
+    # Reproducer, measurements and gate results are in the devlog below.
+    # Record: devlog/dl20260926_u26_lapack_gfortran15_zlaqr5.md.
+    - "-DCMAKE_Fortran_FLAGS=%{fcflags} -frecursive -ffp-contract=off"
   flavor_args:
     debug:
       # Build BLAS and CBLAS for debug flavor (blaspp/lapackpp are separate packages)
