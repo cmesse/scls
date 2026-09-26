@@ -43,28 +43,28 @@ those dependencies changed.
 | 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 11 | 6 | parmetis 4.0.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 12 | 6 | scalapack 2.2.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 13 | 6 | scotch 7.0.13 → 7.0.15 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 14 | 7 | arpack-ng 3.9.1-2 → -3 | casc (openmpi, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 15 | 7 | mumps 5.9.1-1 → -2 | casc (openmpi, scotch, scalapack, parmetis) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 16 | 7 | netcdf 4.10.1-1 → -2 | casc (hdf5, openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 17 | 7 | slate 2025.05.28-2 → -3 | casc (openmpi, blaspp, lapackpp) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 18 | 7 | superlu_dist 9.2.1-2 → -3 | casc (openmpi, parmetis) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 19 | 8 | armadillo 15.4.2 → 15.6.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 20 | 8 | butterflypack 4.1.0-2 → -3 | casc (openmpi, arpack-ng, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 21 | 8 | exodus 2026.08.11-1 → -2 | casc (hdf5, netcdf, openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 22 | 9 | strumpack 8.0.0-3 → -4 | casc (openmpi, scotch, butterflypack, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
+| 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 11 | 6 | parmetis 4.0.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 12 | 6 | scalapack 2.2.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 13 | 6 | scotch 7.0.13 → 7.0.15 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 14 | 7 | arpack-ng 3.9.1-2 → -3 | casc (openmpi, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 15 | 7 | mumps 5.9.1-1 → -2 | casc (openmpi, scotch, scalapack, parmetis) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 16 | 7 | netcdf 4.10.1-1 → -2 | casc (hdf5, openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 17 | 7 | slate 2025.05.28-2 → -3 | casc (openmpi, blaspp, lapackpp) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 18 | 7 | superlu_dist 9.2.1-2 → -3 | casc (openmpi, parmetis) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 19 | 8 | armadillo 15.4.2 → 15.6.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 20 | 8 | butterflypack 4.1.0-2 → -3 | casc (openmpi, arpack-ng, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 21 | 8 | exodus 2026.08.11-1 → -2 | casc (hdf5, netcdf, openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 22 | 9 | strumpack 8.0.0-3 → -4 | casc (openmpi, scotch, butterflypack, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | 26 | 0 | environment 2026-1 → 2026-2 | stale | [x] | [x] | [x] | n/a | n/a | n/a | n/a | n/a | [x] | [ ] | [ ] |
-| 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | n/a | n/a | [x] | n/a | n/a | [ ] | [ ] | [ ] |
+| 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a |
 | 28 | 2 | nlopt 2.10.1 → 2.11.0 | stale | [x] | [x] | [x] |
-| 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a | [ ] | [ ] | [ ] |
+| 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | 30 | 5 | openmpi 5.0.11-1 → -2 | fix (`--with-prrte=internal`) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | n/a | n/a | n/a |
 
 **Rows 26–28 were added on 2026-09-22, mid-run, and are not part of the original ten-bump
@@ -450,6 +450,16 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   end each flavor with `./scls build _meta && ./scls install _meta`.
   Host HEAD at run start: 8a4b68e.
 
+- 2026-09-26 — **U24: debug 25/25 built and installed — column complete** (resumed 10:02–13:29 after
+  the openmpi fix `950c074`: `--with-prrte=internal`, openmpi **5.0.11-2**, configure "PRRTE:
+  internal", guard passed, `mpirun -np 2 hostname` runs). Full `build_order.py` sweep: every debug
+  package matches its recipe (Debian names `_`→`-`). Then `./scls build _meta && ./scls install _meta`:
+  `scls-debug` 2026-1 installed and pulled `scls-debug-vtk` 9.7.0-1 from belfem — vtk gap closed.
+  The meta NEVRA stays **2026-1** (`deb_builder` uses environment's *version* with a hard-coded
+  release 1; earlier notes saying 2026-2 were wrong); its Depends match the published 2026-1
+  exactly, so the rebuilt meta .deb must **not** be staged. Rows 27/29 are `n/a` on U24: libunwind
+  and hwloc were already current on all three flavors at preflight. No Class M/P/D auto-fixes.
+
 ## Blockers
 
 - **mkl, R9 and R10 — mixed MKL threading layers; mkl drops held (belfem, 2026-09-25).** On both
@@ -492,3 +502,7 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   `CPATH` from the DEB build env (`python/`, wider blast radius). Rebuild radius of the recipe
   fix: none beyond this campaign — every openmpi consumer is already a campaign cascade row.
   Resume with `/update-build --from openmpi` (debug) after the decision.
+  **Resolved 2026-09-26** by `950c074` (Christian approved `--with-prrte=internal` on all 5.x
+  flavors plus a release bump to 5.0.11-2, per one NEVRA per recipe state). Verified on U24/debug.
+  The two-auditor review gate was not run (Codex 401, Grok sandbox failure on this VM); audit
+  from the dev host is pending. R9/R10/AMZN need the -2 rebuild (row 30).
