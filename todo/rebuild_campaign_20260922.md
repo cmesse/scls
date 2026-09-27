@@ -36,32 +36,32 @@ those dependencies changed.
 
 | # | G | Package | why | R9 DBG | R9 GCC | R9 MKL | R10 DBG | R10 GCC | R10 MKL | AMZN GCC | AMZN MKL | U24 DBG | U24 GCC | U24 MKL |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 2 | cmake 4.4.2 → 4.4.3 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 2 | 2 | openblas 0.3.33 → 0.3.34 | up | n/a | [x] | n/a | n/a | [x] | n/a | [x] | n/a | n/a | [ ] | n/a |
-| 3 | 2 | ucx 1.20.1 → 1.22.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 4 | 3 | blaze 3.8.2-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 11 | 6 | parmetis 4.0.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 12 | 6 | scalapack 2.2.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 13 | 6 | scotch 7.0.13 → 7.0.15 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 14 | 7 | arpack-ng 3.9.1-2 → -3 | casc (openmpi, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 15 | 7 | mumps 5.9.1-1 → -2 | casc (openmpi, scotch, scalapack, parmetis) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 16 | 7 | netcdf 4.10.1-1 → -2 | casc (hdf5, openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 17 | 7 | slate 2025.05.28-2 → -3 | casc (openmpi, blaspp, lapackpp) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 18 | 7 | superlu_dist 9.2.1-2 → -3 | casc (openmpi, parmetis) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 19 | 8 | armadillo 15.4.2 → 15.6.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 20 | 8 | butterflypack 4.1.0-2 → -3 | casc (openmpi, arpack-ng, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 21 | 8 | exodus 2026.08.11-1 → -2 | casc (hdf5, netcdf, openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 22 | 9 | strumpack 8.0.0-3 → -4 | casc (openmpi, scotch, butterflypack, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| 26 | 0 | environment 2026-1 → 2026-2 | stale | [x] | [x] | [x] | n/a | n/a | n/a | n/a | n/a | [x] | [ ] | [ ] |
+| 1 | 2 | cmake 4.4.2 → 4.4.3 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 2 | 2 | openblas 0.3.33 → 0.3.34 | up | n/a | [x] | n/a | n/a | [x] | n/a | [x] | n/a | n/a | [x] | n/a |
+| 3 | 2 | ucx 1.20.1 → 1.22.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 4 | 3 | blaze 3.8.2-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 5 | 4 | blaspp 2025.05.28-1 → -2 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 6 | 4 | pmix 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 7 | 5 | lapackpp 2025.05.28-1 → -2 | casc (openblas, blaspp) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 8 | 5 | openmpi 5.0.10 → 5.0.11 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 9 | 5 | superlu 7.0.1-2 → -3 | casc (openblas) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 10 | 6 | hdf5 1.14.6-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 11 | 6 | parmetis 4.0.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 12 | 6 | scalapack 2.2.3-2 → -3 | casc (openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 13 | 6 | scotch 7.0.13 → 7.0.15 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 14 | 7 | arpack-ng 3.9.1-2 → -3 | casc (openmpi, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 15 | 7 | mumps 5.9.1-1 → -2 | casc (openmpi, scotch, scalapack, parmetis) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 16 | 7 | netcdf 4.10.1-1 → -2 | casc (hdf5, openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 17 | 7 | slate 2025.05.28-2 → -3 | casc (openmpi, blaspp, lapackpp) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 18 | 7 | superlu_dist 9.2.1-2 → -3 | casc (openmpi, parmetis) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 19 | 8 | armadillo 15.4.2 → 15.6.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 20 | 8 | butterflypack 4.1.0-2 → -3 | casc (openmpi, arpack-ng, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 21 | 8 | exodus 2026.08.11-1 → -2 | casc (hdf5, netcdf, openmpi) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 22 | 9 | strumpack 8.0.0-3 → -4 | casc (openmpi, scotch, butterflypack, scalapack) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 23 | 10 | petsc 3.25.4 → 3.25.5 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 24 | 11 | slepc 3.25.1 → 3.25.2 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 25 | 11 | sundials 7.8.0 → 7.9.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] |
+| 26 | 0 | environment 2026-1 → 2026-2 | stale | [x] | [x] | [x] | n/a | n/a | n/a | n/a | n/a | [x] | [x] | [ ] |
 | 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a |
 | 28 | 2 | nlopt 2.10.1 → 2.11.0 | stale | [x] | [x] | [x] |
 | 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
@@ -459,6 +459,12 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   release 1; earlier notes saying 2026-2 were wrong); its Depends match the published 2026-1
   exactly, so the rebuilt meta .deb must **not** be staged. Rows 27/29 are `n/a` on U24: libunwind
   and hwloc were already current on all three flavors at preflight. No Class M/P/D auto-fixes.
+
+- 2026-09-26 — **U24: gcc 26/26 built and installed — column complete** (13:30–18:20). Full
+  `build_order.py` sweep clean; openmpi 5.0.11-2 "PRRTE: internal", `mpirun -np 2` runs;
+  `scls-gcc` meta 2026-1 installed and pulled `scls-gcc-vtk` 9.7.0-1;
+  `scripts/check_mkl_linkage.sh --flavor gcc --prefix /opt/scls/gcc` PASS (libopenblas). openblas
+  0.3.34 confirmed the hand-edited `libopenblas-r0.3.34.so` entry on Ubuntu. No auto-fixes.
 
 ## Blockers
 
