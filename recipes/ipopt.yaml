@@ -1,0 +1,87 @@
+name: ipopt
+version: 3.14.20
+release: 1
+summary: Interior Point OPTimizer for large-scale nonlinear optimization
+homepage: https://coin-or.github.io/Ipopt/
+# Eclipse Public License 2.0 — weak copyleft, not GPL; see doc/LICENSE_POLICY.md.
+license: EPL-2.0
+
+source:
+  # Upstream tags are "releases/<version>". The trailing path component only
+  # names the download (ipopt-<version>.tar.gz rather than <version>.tar.gz),
+  # so the shared source cache cannot collide with another package's bare
+  # version tag. GitHub resolves either form to the same codeload archive.
+  url: https://github.com/coin-or/Ipopt/archive/releases/%{version}/ipopt-%{version}.tar.gz
+  # GitHub archives a tag containing "/" as <repo>-<tag with / as ->; pin
+  # it so %setup -n is right even when the spec is generated before the
+  # tarball is in SOURCES (otherwise the builder falls back to ipopt-<v>).
+  directory: Ipopt-releases-%{version}
+
+update:
+  strategy: github_release
+  repo: coin-or/Ipopt
+  tag_prefix: "releases/"
+
+requires:
+  all:
+    # Ipopt itself is serial. openmpi is listed because the stack's MUMPS is
+    # the MPI build: libipopt links libmpi, and its MUMPS interface calls
+    # MPI_Init when the library is loaded (upstream 3.14.20,
+    # src/Algorithm/LinearSolvers/IpMumpsSolverInterface.cpp:56-78).
+    - openmpi
+    - mumps
+
+features:
+  fortran: true
+  mpi: true
+  openmp: false
+  math: serial
+
+configure:
+  type: autotools
+  args:
+    # Hand configure the flavor's BLAS/LAPACK line explicitly. Left alone,
+    # Ipopt's own probe prefers MKL and then Accelerate before falling back
+    # to -llapack -lblas (upstream configure:25356,25728,25933), so on macOS
+    # it would pick Accelerate over the stack's OpenBLAS. On MKL flavors this
+    # line also carries libmkl_core, where configure finds the pardiso
+    # symbol and enables the MKL Pardiso interface (configure.ac:221-227).
+    - "--with-lapack-lflags=%{math_ldflags}"
+    # No coinmumps.pc in the stack (that is COIN's ThirdParty-Mumps wrapper),
+    # so point at the MUMPS we ship. Same link line as the mumps registry.
+    - "--with-mumps-cflags=-I%{prefix}/include"
+    - "--with-mumps-lflags=-L%{prefix}/lib -ldmumps -lmumps_common -lpord"
+    # ASL (AMPL executable) and HSL are looked up via pkg-config
+    # (coinasl / coinhsl). Neither is in the stack; turn the lookups off so a
+    # stray .pc on a build host cannot change what ships. HSL and
+    # pardiso-project Pardiso can still be supplied by users at runtime
+    # through Ipopt's dlopen loader (libhsl / libpardiso), which stays on.
+    - --without-asl
+    - --without-hsl
+    # Java bindings are on by default whenever javac is found; the stack
+    # ships no language bindings (CLAUDE.md).
+    - --disable-java
+  # Index width must match the flavor's BLAS/LAPACK and MUMPS interface.
+  # Only lp64 flavors exist today; the ilp64 pairing is recorded, not built.
+  lp64_args:
+    - --with-intsize=32
+  ilp64_args:
+    - --with-intsize=64
+  optimization:
+    O_level: 3
+
+build:
+  parallel: true
+
+test:
+  commands:
+    # Upstream unit tests: hs071 in C, C++ and Fortran plus the sIpopt
+    # checks (test/Makefile.am), none of which need ASL. Loading libipopt
+    # initialises MPI as a singleton; the OMPI_ variables let that happen
+    # when rpmbuild runs as root, the same way the mumps test passes
+    # --allow-run-as-root to mpirun.
+    - "OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 make test"
+
+registry:
+  cflags: "-I%{prefix}/include/coin-or"
+  ldflags: "-L%{prefix}/lib -lipopt"
