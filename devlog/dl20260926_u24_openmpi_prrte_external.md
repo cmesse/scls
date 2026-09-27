@@ -75,3 +75,14 @@ without it this would have shipped a `mpirun` that cannot launch ranks.
   describes the dropped GCC 16 always-inline patch; `files/openmpi.txt` is an ORTE-era list
   (unused while `rpm_files_auto: true`).
 - Still unverified by execution: intel, macos, gcc-mkl-cuda, and every RPM host (tracker row 30).
+
+## Host note — Codex/Grok sandbox on Ubuntu 24.04
+
+Both auditors sandbox through `bwrap`. On U24 (Ubuntu 24.04, apparmor 4.0.1-0ubuntu0.24.04.8,
+bubblewrap 0.9.0) `/etc/apparmor.d` has no bwrap profile, so with the default
+`kernel.apparmor_restrict_unprivileged_userns=1` bwrap cannot write its uid_map and both wrappers
+return an "audit" that read nothing (`bwrap: setting up uid map: Permission denied`). Christian set
+the sysctl to 0 on U24 (non-persistent). U26 (Ubuntu 26.04, apparmor 5.0.2, bubblewrap 0.11.1, same
+codex-cli 0.157.1 / grok 1.0.41) works at restrict=1 because it ships a `bwrap-userns-restrict`
+profile. A narrower fix for 24.04 hosts is that profile rather than the global sysctl; whether it
+back-ports to apparmor 4.0.1 is untested. Either way: an audit that cites no file:line did not run.
