@@ -66,6 +66,7 @@ those dependencies changed.
 | 28 | 2 | nlopt 2.10.1 → 2.11.0 | stale | [x] | [x] | [x] |
 | 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | 30 | 5 | openmpi 5.0.11-1 → -2 | fix (`--with-prrte=internal`) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | n/a | n/a | n/a |
+| 31 | 3 | lapack 3.12.1-1 → -2 (debug only) | fix (`-ffp-contract=off`, `80a972a`) | [ ] | n/a | n/a | [ ] | n/a | n/a | n/a | n/a | [x] | n/a | n/a |
 
 **Rows 26–28 were added on 2026-09-22, mid-run, and are not part of the original ten-bump
 scope.** `why: stale` means the installed package on the R9 build host was behind its own recipe
@@ -137,6 +138,13 @@ cascades, because libmpi/libprrte/libpmix SONAMEs are unchanged and the RPM -1 b
 used the internal PRRTE. U24 cells are `n/a` here because row 8 builds -2 directly on that
 column. `lbl` also becomes 4.1.6-2 with no content change (release is recipe-wide); `lbl` is
 source-only and not tracked here.
+
+**Row 31 (lapack 3.12.1-2, debug only) was added on 2026-09-26** from U26's fix `80a972a`:
+gfortran 15.2 at `-O2 -march=x86-64-v3` miscompiles `zlaqr5.f` (ZGEEV/CGEEV eigenvectors wrong for
+76 <= n < 150); the recipe now builds with `-ffp-contract=off`. GCC 13/14 hosts (R9, R10, U24) are
+not affected, but the release bump changes the NEVRA (one NEVRA per recipe state), so each debug
+column rebuilds lapack alone; its four subpackages (blas, cblas, lapack, lapacke) move together.
+No cascade. `gcc`/`mkl`/AMZN are `n/a`: reference LAPACK is debug-only there.
 
 ## B. What was verified on the dev host before this file was written
 
@@ -474,6 +482,17 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   `gnu_thread` + `core` `.so.3` (no `sequential`, `mkl_rt`, `mkl_scalapack`/`blacs`); hwloc
   `HWLOC_VERSION "2.14.0"`; `petsc-baijmkl-decls.patch` inert again (`petscconf.h` has only
   `PETSC_HAVE_MKL_{INCLUDES,LIBS,SET_NUM_THREADS}`). No auto-fixes.
+
+- 2026-09-27 — **U24 COMPLETE: debug 25/25, gcc 26/26, mkl 24/24, plus lapack 3.12.1-2 (row 31).**
+  Row 31: debug lapack rebuilt from U26's `80a972a` (`-ffp-contract=off`); blas/cblas/lapack/lapacke
+  all 3.12.1-2, LAPACK ctest 125/125. Final gate: sweep over the *full* `build_order.py` list —
+  debug 37, gcc 37, mkl 36 packages, every one matches its recipe; all three `scls-<F>` metas
+  installed (vtk present everywhere). No superseded artifacts to prune; no stale stack packages
+  (the only "extras" are lapack's own subpackages). One recipe fix (`950c074`, openmpi
+  5.0.11-2, `--with-prrte=internal`), reviewed after the fact (no P0/P1). No Class M/P/D auto-fixes.
+  **Still open elsewhere:** row 30 (openmpi -2) on R9/R10/AMZN, row 31 (lapack -2) on R9/R10 debug;
+  U24 staging/upload not started (deferred by Christian). The rebuilt `scls-<F>` 2026-1 metas are
+  same-NEVRA as published and must not be staged.
 
 ## Blockers
 
