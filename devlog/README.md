@@ -11,6 +11,7 @@ file, it is lost.
 
 ## Entries
 
+- [dl20260927_u26_full_stack_build.md](dl20260927_u26_full_stack_build.md) — U26 (Ubuntu 26.04) first full-stack build: debug 37, gcc 37, mkl 36 installed; sudo-rs, curl, vtk OOM job cap; MKL linkage PASS
 - [dl20260926_u26_lapack_gfortran15_zlaqr5.md](dl20260926_u26_lapack_gfortran15_zlaqr5.md) — U26 (Ubuntu 26.04): gfortran 15.2 SLP+FMA wrong code in reference LAPACK `zlaqr5` gave wrong complex eigenvectors for 76≤n<150; lapack 3.12.1-2 builds with `-ffp-contract=off`
 - [dl20260925_r10_build_and_publish.md](dl20260925_r10_build_and_publish.md) — R10 column of the 2026-09-22 campaign built and published (4 drops); MKL threading fix rebuilt on all flavors; relative `--stage` gate bug fixed
 - [dl20260913_environment_toolchain_requires.md](dl20260913_environment_toolchain_requires.md) — environment now Requires the host toolchain and Recommends doxygen; new `rpm_recommends:` field; generated spec honours `release:`
