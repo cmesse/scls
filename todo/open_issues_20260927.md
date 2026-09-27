@@ -86,7 +86,40 @@ Each of these is a build-configuration or recipe edit and needs Christian's appr
       continue`). That is exactly how the missing vtk went unnoticed on U24. Consider reporting
       "not installed" for packages that the flavor meta-package depends on.
 
-## 6. Host notes (U24 VM)
+## 6. From U26 (Ubuntu 26.04 host)
+
+Reported by the U26 session. Details are in `devlog/dl20260927_u26_full_stack_build.md` and
+`devlog/dl20260926_u26_lapack_gfortran15_zlaqr5.md`. Items 6.1–6.3 were spot-checked on U24 and hold there too.
+
+- [ ] **6.1 lapack runtime Depends (P1, pre-existing).** `scls-<F>-lapack` has no Depends on
+      `scls-<F>-blas`, although `liblapack.so.3` has `libblas.so.3` in `DT_NEEDED`. Confirmed on U24:
+      `Depends: scls-debug-environment` only. `blas` is listed under the same-name `lapack`
+      subpackage, which `rpm_builder.py:2370` / `deb_builder.py:704` skip without merging its requires.
+      This is a dependency-list change and needs Christian.
+- [ ] **6.2 lapack license notice (P2, pre-existing).** The binary packages ship no LAPACK LICENSE
+      (BSD requires one); `files/lapack.txt` has none, and nothing is under `share/licenses/` on U24.
+- [ ] **6.3 U26 DEB publishing isn't wired up.** `stage_to_belfem.sh` knows only U24; the
+      `scls-release` .deb hard-codes `Suites: noble` (`python/deb_builder.py:2051`, confirmed); .deb
+      versions carry no distro tag, so U24 and U26 builds of the same recipe collide in one reprepro pool.
+      This needs a decision on a per-release suite plus a version suffix (e.g. `~u24`/`~u26`). The
+      decision would also affect the U24 staging in §2.
+- [ ] **6.4 sudo-rs on 26.04.** `sudo -n -v` fails even with `--scope all` (sudo-rs ignores
+      `verifypw`), so `scls build all`'s keepalive (`scls:151-168`) can't work there. Either
+      switch U26's sudo alternative to sudo.ws, or make the keepalive test `sudo -n apt-get --version`.
+      This is a wrapper change, and overlaps §5's `sudo -n true` item.
+- [ ] **6.5 Parallelism knob.** `get_parallel_jobs()` is `cpu_count` with no override. vtk debug
+      ran out of memory at `-j8` in 15 GB on U26, which capped heavy packages with `PYTHON_CPU_COUNT=4`
+      in a local driver. A supported knob (env `SCLS_JOBS`, or a per-recipe `max_jobs`) would make
+      that reproducible. It's a builder change.
+- [ ] **6.6 Fresh-Ubuntu-host prep checklist.** A 26.04 minimal install has no `curl`
+      (`check_host_tools` needs it). Also cover the Codex/Grok sandbox (§7) and the sudo grant.
+- [ ] **6.7 (optional) GCC bug report** for the `zlaqr5` SLP+FMA wrong code; there's a standalone
+      reproducer in U26 scratch. Note that OpenBLAS escapes it only because its `Makefile:318-319` adds
+      `-fno-tree-vectorize` for gfortran, so an OpenBLAS CMake build would lose that protection.
+- [ ] **6.8 R9/R10 debug lapack -2 (row 31).** After rebuilding, also run lapackpp `tester geev`
+      there. The host GCC version decides whether it's exposed, and LAPACK's own ctest doesn't catch the bug.
+
+## 7. Host notes (U24 VM)
 
 - [ ] **Codex/Grok sandbox.** Ubuntu 24.04 ships no bwrap AppArmor profile, so with
       `kernel.apparmor_restrict_unprivileged_userns=1` both auditors return audits that read nothing.
