@@ -54,3 +54,24 @@ without it this would have shipped a `mpirun` that cannot launch ranks.
    `todo/rebuild_campaign_20260922.md`.
 2. The 2026-08-24 devlog's "root cause still unknown" and the recipe comment should be updated once
    the fix lands.
+
+## Update — fix applied and reviewed (later on 2026-09-26)
+
+- Christian approved `--with-prrte=internal` on **every 5.x flavor** (gcc, mkl, debug, intel, macos,
+  gcc-mkl-cuda; not lbl) and a release bump to **5.0.11-2** (one NEVRA per recipe state): `950c074`.
+  Verified on U24/debug and U24/gcc: configure `PRRTE: internal`, guard passes, package ships
+  `prterun`/`libprrte`, `mpirun -np 2 hostname` runs. SONAMEs measured: `libmpi.so.40`, `libprrte.so.3`.
+- The mechanism needs both `CPATH=<prefix>/include` (header probe) and `LIBRARY_PATH=<prefix>/lib`
+  (link probe), both exported by `python/build_common.py:1002-1005`.
+- **Review gate, after the fact.** Skipped at commit time because neither auditor could run on U24:
+  Ubuntu 24.04's `kernel.apparmor_restrict_unprivileged_userns=1` blocks their `bwrap` sandboxes.
+  Christian relaxed it and both ran post-commit (Codex gpt-5.6-terra/high, Grok grok-4.7/high).
+  No P0/P1. Both confirmed the CPATH mechanism and per-flavor resolution. Codex said the m4
+  citation is absent from the tarball (refuted: `openmpi-5.0.11/config/ompi_setup_prrte.m4` is in it);
+  Grok found no extracted copy and declined to sign the line numbers.
+  Accepted P2s (doc wording) fixed in the follow-up commit. Pre-existing and out of scope, left to
+  Christian: `gcc-mkl-cuda` openmpi lacks the pmix/hwloc/libevent/ucx args that `mkl` has (its own
+  key wins); `intel` openmpi has no `requires` key; the recipe comment above `patches:` still
+  describes the dropped GCC 16 always-inline patch; `files/openmpi.txt` is an ORTE-era list
+  (unused while `rpm_files_auto: true`).
+- Still unverified by execution: intel, macos, gcc-mkl-cuda, and every RPM host (tracker row 30).
