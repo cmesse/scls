@@ -37,12 +37,30 @@ release bumps have to reach every host that already published the old NEVRA. Nei
     `already_published:`.
   - The same applies to any other package whose NEVRA is already published. Check against belfem's
     published list for noble before staging.
+  - **2026-09-28 status:** `stage_to_belfem.sh` now stages .debs (contract v1.6 layout `ubuntu/pkgs`,
+    `ubuntu/spkgs`; manifest body per belfem's proposed v1.7). The published state comes from noble's
+    signed `InRelease`/`Packages.gz`/`Sources.gz` (126 .debs, 107 sources), verified against
+    `RPM-GPG-KEY-SCLS`. All three drops are staged locally, gates PASS, **not uploaded**:
+    - `U24-debug-*`: 31 .debs + 25 sources (75 files), 1496853220 B
+    - `U24-gcc-*`: 28 .debs + 25 sources (75 files), 810025878 B
+    - `U24-mkl-*`: 27 .debs + 24 sources (72 files), 779669318 B. Linkage gate: `gnu_thread` only, on
+      both the drop and the full `/opt/scls/mkl` prefix (491 ELF).
+    - Each drop lists 24 entries under `already_published:`, including the metas and `environment 2026-2`.
+      For `scls-<F>` 2026-1 and `scls-<F>-environment` 2026-2 the local rebuild differs from the
+      published copy. They are never re-shipped (v1.2); the manifest notes the difference.
+  - Upload key: `~/.ssh/scls_upload` (SHA256:4BmdyYN0…HcGU), installed on belfem as `scls-upload-u24`.
+    The belfem host key is pinned (Christian confirmed SHA256:8iDhHWaQ…Ew). The 2026-09-28 20:47Z access
+    test was refused with `Permission denied (publickey)`: the key isn't in belfem's authorized_keys yet.
+    Next: Christian installs it, rerun the 4-part test, then debug → gcc → mkl, one drop in flight, each after
+    belfem's promote.
+  - Restage right before each upload so `git_head` names the commit that carries the DEB path.
 - [ ] **U26 drops.** This is a new distro (Ubuntu 26.04), so there's probably no published repo yet.
       Coordinate the suite name and repo setup with belfem first.
-- [ ] `scripts/stage_to_belfem.sh` keeps one shared READY file across drops, so staging a second drop
+- [x] `scripts/stage_to_belfem.sh` keeps one shared READY file across drops, so staging a second drop
       overwrites the first one's READY. This was found on AMZN and is still open. Fix it (READY per
       drop, outside the rsynced payload) before staging several flavors in a row, or rewrite READY
       before each upload. The fix is a `scripts/` change and needs approval.
+      **Fixed 2026-09-28:** READY is now `$STAGE/READY.<DROP>` (approved by Christian), on the RPM path too.
 
 ## 3. openmpi recipe items found in the post-commit review (not caused by `950c074`)
 
@@ -103,6 +121,13 @@ Reported by the U26 session. Details are in `devlog/dl20260927_u26_full_stack_bu
       versions carry no distro tag, so U24 and U26 builds of the same recipe collide in one reprepro pool.
       This needs a decision on a per-release suite plus a version suffix (e.g. `~u24`/`~u26`). The
       decision would also affect the U24 staging in §2.
+      **Decided 2026-09-28 (Christian):** one reprepro repo per distro, each with its own pool. Versions stay
+      untagged. noble is unchanged at `/scls/ubuntu`; resolute gets its own repo (proposed
+      `/scls/ubuntu-resolute`, provisional on belfem until Christian confirms it there). The staging side is
+      done: column `U26` maps to `resolute`, and the script refuses to run on a host whose `VERSION_CODENAME`
+      doesn't match. Still open: `deb_builder` must write the URI and Suite into `scls-archive-keyring` from
+      `VERSION_CODENAME` (noble keeps `/scls/ubuntu`), then rebuild the keyring on U26. belfem needs a second
+      reprepro base and an `update_repo` entry for it.
 - [ ] **6.4 sudo-rs on 26.04.** `sudo -n -v` fails even with `--scope all` (sudo-rs ignores
       `verifypw`), so `scls build all`'s keepalive (`scls:151-168`) can't work there. Either
       switch U26's sudo alternative to sudo.ws, or make the keepalive test `sudo -n apt-get --version`.

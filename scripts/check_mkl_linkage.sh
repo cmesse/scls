@@ -18,6 +18,7 @@
 # Usage:
 #   scripts/check_mkl_linkage.sh --flavor mkl --prefix /opt/scls/mkl
 #   scripts/check_mkl_linkage.sh --flavor mkl --dir work/staging/<DROP>/el9/x86_64
+#   scripts/check_mkl_linkage.sh --flavor mkl --dir work/staging/<DROP>/ubuntu/pkgs
 #
 # Exit 0 = uniform, 1 = violation, 2 = usage/environment error.
 
@@ -33,7 +34,7 @@ while [ $# -gt 0 ]; do
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
-[ -n "$FLAVOR" ] || { echo "usage: $0 --flavor <f> [--prefix DIR | --dir RPMDIR]" >&2; exit 2; }
+[ -n "$FLAVOR" ] || { echo "usage: $0 --flavor <f> [--prefix DIR | --dir PKGDIR]" >&2; exit 2; }
 [ -n "$PREFIX" ] || [ -n "$DIR" ] || { echo "error: need --prefix or --dir" >&2; exit 2; }
 # Resolve to absolute paths: RPMs are extracted after cd'ing into a scratch dir,
 # where a relative --dir no longer points anywhere.
@@ -62,10 +63,10 @@ PY
 
 echo "flavor:    $FLAVOR (linalg=$LINALG threading=$THREADING toolchain=$FAMILY)"
 
-# Collect the ELF files to inspect. RPMs are extracted to a scratch dir: reading
-# DT_NEEDED needs the real object, and grepping the compressed payload for
-# library names gives false hits from .cmake files and docs that merely mention
-# them.
+# Collect the ELF files to inspect. Packages (.rpm or .deb) are extracted to a
+# scratch dir: reading DT_NEEDED needs the real object, and grepping the
+# compressed payload for library names gives false hits from .cmake files and
+# docs that merely mention them.
 WORK=""
 cleanup() { [ -n "$WORK" ] && rm -rf "$WORK"; }
 trap cleanup EXIT
@@ -81,7 +82,13 @@ if [ -n "$DIR" ]; then
         ( cd "$d" && rpm2cpio "$f" 2>/dev/null | cpio -idm --quiet 2>/dev/null )
         n=$((n + 1))
     done
-    echo "extracted: $n binary RPMs"
+    for f in "$DIR"/*.deb; do
+        [ -e "$f" ] || continue
+        d="$WORK/$(basename "$f" .deb)"; mkdir -p "$d"
+        dpkg-deb -x "$f" "$d" 2>/dev/null
+        n=$((n + 1))
+    done
+    echo "extracted: $n binary packages"
     ROOT="$WORK"
 else
     [ -d "$PREFIX" ] || { echo "error: $PREFIX is not a directory" >&2; exit 2; }

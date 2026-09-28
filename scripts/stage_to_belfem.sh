@@ -1,8 +1,9 @@
 #!/bin/bash
 # Stage one flavor's artifacts for belfem.lbl.gov signing and publication.
 #
-# Written against transfer contract v1.5. The contract is authoritative and lives in
-# the publishing host's staging root; it cannot be read back over the upload key
+# Written against transfer contract v1.6; the DEB manifest body follows belfem's
+# proposed v1.7. The contract is authoritative and lives in the publishing host's
+# staging root; it cannot be read back over the upload key
 # (forced write-only rsync), so revisions arrive over the AI relay.
 #
 # THIS SCRIPT ENDS AT "READY UPLOADED, REPORTED". It never signs, never promotes,
@@ -10,7 +11,8 @@
 # doc/BUILD_EXECUTION.md §5.4 — repository mutation is permanently manual.
 #
 # Usage:
-#   scripts/stage_to_belfem.sh --flavor <f> --column <c> [--stage DIR] [--build] [--upload]
+#   scripts/stage_to_belfem.sh --flavor <f> --column <R9|R10|AMZN|U24|U26> \
+#                              [--stage DIR] [--build] [--upload --drop <DROP>]
 #
 #   (no --build/--upload)  select + report only; nothing is written or sent
 #   --build                stage locally, write MANIFEST.txt/SHA256SUMS/READY, verify
@@ -73,10 +75,17 @@ case "$COLUMN" in
     R9)   DISTRO=el9      ;;
     R10)  DISTRO=el10     ;;
     AMZN) DISTRO=amzn2023 ;;
-    U24)  DISTRO=ubuntu   ;;
-    *) echo "unknown column: $COLUMN (expected R9, R10, AMZN or U24)" >&2; exit 2 ;;
+    U24)  DISTRO=ubuntu; CODENAME=noble    ;;
+    U26)  DISTRO=ubuntu; CODENAME=resolute ;;
+    *) echo "unknown column: $COLUMN (expected R9, R10, AMZN, U24 or U26)" >&2; exit 2 ;;
 esac
-[ "$DISTRO" = ubuntu ] && { echo "DEB staging not implemented; this host is RPM" >&2; exit 2; }
+# Each Ubuntu release has its own repo on the publishing host, so a drop staged on the
+# wrong host would land in the wrong pool with nothing to flag it. Check, don't trust.
+if [ "$DISTRO" = ubuntu ]; then
+    host_cn=$(. /etc/os-release 2>/dev/null; echo "${VERSION_CODENAME:-}")
+    [ "$host_cn" = "$CODENAME" ] || {
+        echo "error: column $COLUMN is $CODENAME but this host is '${host_cn:-unknown}'" >&2; exit 2; }
+fi
 
 DROP="${USE_DROP:-${COLUMN}-${FLAVOR}-$(date -u +%Y%m%dT%H%MZ)}"
 STAGE="${STAGE:-$REPO/work/staging}"
@@ -84,10 +93,13 @@ STAGE="${STAGE:-$REPO/work/staging}"
 # dir, so a relative --stage silently yields "no ELF objects found" (R10, 2026-09-25).
 STAGE=$(realpath -m -- "$STAGE") || { echo "error: cannot resolve --stage $STAGE" >&2; exit 2; }
 DROPDIR="$STAGE/$DROP"
-DIST=$(rpm --eval '%{dist}')
+# One READY per drop, beside (never inside) the drop directory. A single shared
+# READY let staging a second flavor overwrite the first one's (AMZN, 2026-09-25).
+READY_FILE="$STAGE/READY.$DROP"
+[ "$DISTRO" = ubuntu ] || DIST=$(rpm --eval '%{dist}')
 
 echo "drop:   $DROP"
-echo "distro: $DISTRO"
+echo "distro: ${CODENAME:-$DISTRO}"
 echo "stage:  $DROPDIR"
 echo
 
@@ -98,7 +110,9 @@ echo
 # subpackages (blas/cblas/lapacke from lapack, *-examples from petsc/slepc/sundials)
 # share a parent SRPM and a name-based guess reports them as missing sources.
 
-declare -a PAYLOAD_BIN=() PAYLOAD_SRC=() EXCLUDED=() ALREADY=()
+declare -a PAYLOAD_BIN=() PAYLOAD_SRC=() EXCLUDED=() ALREADY=() DEB_NAMES=()
+
+if [ "$DISTRO" != ubuntu ]; then
 
 recipe_nevr() {
     python3 -c "import yaml,sys;r=yaml.safe_load(open('$REPO/recipes/$1.yaml'));print(f\"{r['version']}-{r.get('release',1)}\")" 2>/dev/null
@@ -215,12 +229,54 @@ for f in "${PAYLOAD_BIN[@]}"; do
 done
 PAYLOAD_BIN=("${KEEP[@]}")
 
+else
+# ---------------------------------------------------------- selection (DEB) ---
+# The published state is read from the repo's own signed indexes over HTTPS, not
+# from a list someone typed: InRelease is verified against the SCLS key shipped in
+# this tree, and each index against the SHA256 InRelease records for it. If any
+# of that fails we stop, because a missing index would make every published
+# filename look new and ship replacements for signed files.
+DEB_INDEX_URL="${PUBLISH_DEB_INDEX_URL:-https://belfem.lbl.gov/scls/ubuntu}"
+IDX="$REPO/work/publish/$CODENAME"
+mkdir -p "$IDX"
+for f in InRelease main/binary-amd64/Packages.gz main/source/Sources.gz; do
+    curl -fsS -o "$IDX/$(basename "$f")" "$DEB_INDEX_URL/dists/$CODENAME/$f" \
+        || { echo "error: cannot fetch $DEB_INDEX_URL/dists/$CODENAME/$f" >&2; exit 1; }
+done
+KEYRING=$(mktemp) || exit 2
+gpg --batch --yes --dearmor -o "$KEYRING" "$REPO/RPM-GPG-KEY-SCLS" 2>/dev/null
+want_fpr=$(gpg --show-keys --with-colons "$REPO/RPM-GPG-KEY-SCLS" 2>/dev/null | awk -F: '/^fpr/{print $10; exit}')
+got_fpr=$(gpgv --keyring "$KEYRING" --status-fd 1 "$IDX/InRelease" 2>/dev/null | awk '/VALIDSIG/{print $NF}')
+rm -f "$KEYRING"
+[ -n "$want_fpr" ] && [ "$got_fpr" = "$want_fpr" ] \
+    || { echo "error: InRelease signature not valid for SCLS key ${want_fpr:-?}" >&2; exit 1; }
+for f in main/binary-amd64/Packages.gz main/source/Sources.gz; do
+    want=$(awk -v f="$f" '/^SHA256:/{s=1;next} /^[^ ]/{s=0} s && $3==f{print $1}' "$IDX/InRelease")
+    [ -n "$want" ] && [ "$want" = "$(sha256sum "$IDX/$(basename "$f")" | cut -d' ' -f1)" ] \
+        || { echo "error: $f does not match its InRelease SHA256" >&2; exit 1; }
+done
+echo "published index: $DEB_INDEX_URL/dists/$CODENAME (InRelease signed by $got_fpr)"
+
+SEL=$(python3 "$REPO/scripts/deb_drop_select.py" "$REPO" "$FLAVOR" "$REPO/work/pkgs" \
+      "$REPO/work/spkgs" "$IDX/Packages.gz" "$IDX/Sources.gz") \
+    || { echo "error: deb_drop_select.py failed" >&2; exit 1; }
+while IFS=$'\t' read -r kind a b; do
+    case "$kind" in
+        bin)      PAYLOAD_BIN+=("$a"); DEB_NAMES+=("$b") ;;
+        src)      PAYLOAD_SRC+=("$a"); DEB_NAMES+=("$b") ;;
+        srcfile)  PAYLOAD_SRC+=("$a") ;;
+        excluded) EXCLUDED+=("$a") ;;
+        already)  ALREADY+=("$a") ;;
+    esac
+done <<< "$SEL"
+fi
+
 TOTAL=0; COUNT=0
 for f in "${PAYLOAD_BIN[@]}" "${PAYLOAD_SRC[@]}"; do
     TOTAL=$((TOTAL + $(stat -c %s "$f"))); COUNT=$((COUNT + 1))
 done
 
-echo "payload:           ${#PAYLOAD_BIN[@]} binaries + ${#PAYLOAD_SRC[@]} srpms = $COUNT files"
+echo "payload:           ${#PAYLOAD_BIN[@]} binaries + ${#PAYLOAD_SRC[@]} source files = $COUNT files"
 echo "total_bytes:       $TOTAL"
 echo "excluded:          ${#EXCLUDED[@]}"
 echo "already_published: ${#ALREADY[@]}"
@@ -234,12 +290,12 @@ fi
 # drop is immutable once READY is sent.
 if [ "$DO_BUILD" -eq 0 ]; then
     [ -d "$DROPDIR" ] || { echo "error: $DROPDIR does not exist — stage it first." >&2; exit 2; }
-    [ -f "$STAGE/READY" ] || { echo "error: $STAGE/READY missing — stage it first." >&2; exit 2; }
+    [ -f "$READY_FILE" ] || { echo "error: $READY_FILE missing — stage it first." >&2; exit 2; }
     echo "re-using staged drop (no restage)"
     ( cd "$DROPDIR" && sha256sum -c --quiet SHA256SUMS ) \
         || { echo "STAGED DROP FAILED ITS OWN SHA256SUMS — refusing to upload" >&2; exit 1; }
     READY_SHA=$(sha256sum "$DROPDIR/SHA256SUMS" | cut -d' ' -f1)
-    [ "$READY_SHA" = "$(cat "$STAGE/READY")" ] \
+    [ "$READY_SHA" = "$(cat "$READY_FILE")" ] \
         || { echo "READY does not match SHA256SUMS — refusing to upload" >&2; exit 1; }
     COUNT=$(grep -c . "$DROPDIR/SHA256SUMS")
     TOTAL=$(awk '/^total_bytes:/{print $2}' "$DROPDIR/MANIFEST.txt")
@@ -248,13 +304,20 @@ fi
 
 # ------------------------------------------------------------------ staging ---
 if [ "$DO_BUILD" -eq 1 ]; then
-rm -rf "$DROPDIR"
-mkdir -p "$DROPDIR/$DISTRO/x86_64" "$DROPDIR/$DISTRO/source"
+rm -rf "$DROPDIR" "$READY_FILE"
+if [ "$DISTRO" = ubuntu ]; then
+    # Contract v1.6: every .deb (amd64 and all) in ubuntu/pkgs, every source file
+    # in ubuntu/spkgs. update_repo ingests exactly these two globs.
+    BINDIR="$DROPDIR/$DISTRO/pkgs"; SRCDIR="$DROPDIR/$DISTRO/spkgs"
+else
+    BINDIR="$DROPDIR/$DISTRO/x86_64"; SRCDIR="$DROPDIR/$DISTRO/source"
+fi
+mkdir -p "$BINDIR" "$SRCDIR"
 # noarch goes in x86_64/ — contract §2. There is no noarch/ directory and none will
 # be added; the live repo keeps noarch in el9/x86_64/Packages and update_repo only
 # handles x86_64 and source.
-for f in "${PAYLOAD_BIN[@]}"; do ln "$f" "$DROPDIR/$DISTRO/x86_64/" 2>/dev/null || cp "$f" "$DROPDIR/$DISTRO/x86_64/"; done
-for f in "${PAYLOAD_SRC[@]}"; do ln "$f" "$DROPDIR/$DISTRO/source/" 2>/dev/null || cp "$f" "$DROPDIR/$DISTRO/source/"; done
+for f in "${PAYLOAD_BIN[@]}"; do ln "$f" "$BINDIR/" 2>/dev/null || cp "$f" "$BINDIR/"; done
+for f in "${PAYLOAD_SRC[@]}"; do ln "$f" "$SRCDIR/" 2>/dev/null || cp "$f" "$SRCDIR/"; done
 
 {
     echo "drop: $DROP"
@@ -263,7 +326,7 @@ for f in "${PAYLOAD_SRC[@]}"; do ln "$f" "$DROPDIR/$DISTRO/source/" 2>/dev/null 
     echo "host: ${PUBLISH_HOST_LABEL:-$(hostname -f 2>/dev/null || hostname)}"
     echo "column: $COLUMN"
     echo "flavor: $FLAVOR"
-    echo "distro: $DISTRO"
+    echo "distro: ${CODENAME:-$DISTRO}"
     echo "git_head: $(git -C "$REPO" rev-parse HEAD)"
     echo "created_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "file_count: $COUNT"
@@ -274,7 +337,11 @@ for f in "${PAYLOAD_SRC[@]}"; do ln "$f" "$DROPDIR/$DISTRO/source/" 2>/dev/null 
     # querying %{ARCH} makes a binary and its source render as byte-identical
     # lines and the manifest silently loses the distinction — 76 lines, 43 of
     # them duplicates, with nothing to say which entry is the source.
-    {
+    if [ "$DISTRO" = ubuntu ]; then
+        # Proposed v1.7 body: one name_version_arch per .deb, one
+        # name_version_source per source package (not per file).
+        printf '%s\n' "${DEB_NAMES[@]}" | sort
+    else {
         for f in "${PAYLOAD_BIN[@]}"; do
             rpm -qp --qf '%{NAME}-%|EPOCH?{%{EPOCH}}:{0}|:%{VERSION}-%{RELEASE}.%{ARCH}\n' "$f" 2>/dev/null
         done
@@ -282,6 +349,7 @@ for f in "${PAYLOAD_SRC[@]}"; do ln "$f" "$DROPDIR/$DISTRO/source/" 2>/dev/null 
             rpm -qp --qf '%{NAME}-%|EPOCH?{%{EPOCH}}:{0}|:%{VERSION}-%{RELEASE}.src\n' "$f" 2>/dev/null
         done
     } | sort
+    fi
     if [ "${#EXCLUDED[@]}" -gt 0 ]; then
         echo; echo "excluded:"; printf '%s\n' "${EXCLUDED[@]}"
     fi
@@ -306,7 +374,7 @@ echo "local sha256sum -c: OK"
 # the per-package checks all passed because each object is well-formed alone and
 # only wrong in company. The rule is per-flavor, so the gate has to be too.
 echo "checking math/threading uniformity..."
-if ! "$REPO/scripts/check_mkl_linkage.sh" --flavor "$FLAVOR" --dir "$DROPDIR/$DISTRO/x86_64"; then
+if ! "$REPO/scripts/check_mkl_linkage.sh" --flavor "$FLAVOR" --dir "$BINDIR"; then
     echo >&2
     echo "LINKAGE GATE FAILED — READY not written, so this drop cannot be uploaded." >&2
     echo "Fix the recipes, rebuild the offending packages, and stage a new drop." >&2
@@ -317,7 +385,7 @@ echo
 # READY is built OUTSIDE the drop directory so the payload rsync cannot carry it up
 # by accident. Sending READY early would mark an incomplete drop consumable.
 READY_SHA=$(sha256sum "$DROPDIR/SHA256SUMS" | cut -d' ' -f1)
-echo "$READY_SHA" > "$STAGE/READY"
+echo "$READY_SHA" > "$READY_FILE"
 echo "sha256(SHA256SUMS): $READY_SHA"
 echo
 fi   # end staging
@@ -342,7 +410,7 @@ fi
 echo "payload uploaded rc=0"
 
 echo "uploading READY..."
-rsync -rt -p --chmod=D2775,F664 -e "ssh ${SSH_OPTS[*]}" "$STAGE/READY" "$REMOTE:$DROP/READY"
+rsync -rt -p --chmod=D2775,F664 -e "ssh ${SSH_OPTS[*]}" "$READY_FILE" "$REMOTE:$DROP/READY"
 rc=$?
 [ $rc -eq 0 ] || { echo "READY UPLOAD FAILED rc=$rc" >&2; exit $rc; }
 
