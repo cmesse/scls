@@ -133,6 +133,17 @@ For macOS distribution, SCLS may provide binary package contents together with
 the original upstream source tarballs and SCLS build recipes on the same DMG.
 This keeps source access coupled to the distributed binary artifact.
 
+For Debian/Ubuntu distribution the same rule holds with Debian source packages:
+each shipped `.deb` comes with its `.dsc`, `.orig.tar.*` and `.debian.tar.*`.
+The one exception is a closed list of packages that SCLS generates itself and
+that contain no upstream code: `scls-archive-keyring` (APT key and sources
+file), the flavor meta-packages `scls-<flavor>` (dependencies only) and
+`scls-<flavor>-environment` (SCLS's own activation scripts and configuration).
+Their source is the SCLS repository, published under `BSD-3-Clause-LBNL`, so
+they may ship without a source package. Each drop lists them under `no_source:`
+with that reason. Any other binary without a source package is not shipped, and
+the list grows only by explicit decision (Christian, 2026-09-28).
+
 ## Current Policy Summary
 
 - Allowed: permissive libraries.
