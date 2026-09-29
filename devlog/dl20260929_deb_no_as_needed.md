@@ -77,3 +77,23 @@ After each promotion, Cloudflare kept serving the pre-promotion `Packages.gz` an
 the fresh `InRelease`, which gives every apt client a Hash Sum mismatch. The staging script's index
 hash check caught it both times. belfem's httpd now sends `Cache-Control: no-cache, max-age=0` on
 `dists/`, and the index fetch adds a `?nocache=` query.
+
+## First relink attempt: libtool defeats `-Wl,--no-as-needed`
+
+The rebuild at `6291844` stopped after its first package. libevent's new libraries still NEEDED
+only `libc` (el9: also `libssl`, `libcrypto`), although its Makefile had
+`LDFLAGS = -Wl,--no-as-needed …`. libtool's link template is
+`$CC -shared $pic_flag $libobjs $deplibs $compiler_flags …`, so every `-Wl` flag lands after the
+libraries it was meant to govern. The auditors had named this risk.
+
+What works: Ubuntu injects the flag through gcc's `*link` spec (`%{!fsanitize=*:--as-needed}`),
+which is emitted before all objects and libraries. A gcc `specs` file in
+`$(gcc -print-file-name=)` without that token restores el9 behaviour for gcc, g++ and gfortran,
+whatever the flag order. Christian chose this host-level fix over passing `-specs=<path>`, because
+hdf5 (`h5cc`), PETSc and pkg-config files record LDFLAGS and would embed a build-host path.
+`doc/BUILD_EXECUTION.md` §1.1a documents it. `deb_builder` refuses to build until it is in effect:
+it links an unused `-lgomp` with each flavor compiler and requires it in NEEDED.
+
+The same run also showed that a same-version reinstall fails once the SCLS apt source is
+configured: apt sees the local rebuild as a downgrade of the repo copy. The reinstall path now
+passes `--allow-downgrades` (Christian).

@@ -718,6 +718,10 @@ def get_configure_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, inst
 # through some other library's dependency chain. The publishing host checks every
 # object's NEEDED against el9's, so the .deb path links the way el9 does. The RPM
 # path does not add it: el9 already behaves this way, and its specs stay unchanged.
+# This flag alone is NOT sufficient: libtool puts -Wl flags after the libraries.
+# The effective fix is the host-level gcc specs override in doc/BUILD_EXECUTION.md
+# §1.1a, which deb_builder.assert_links_without_as_needed enforces; this stays as
+# a second layer for cmake and plain-LDFLAGS builds.
 # Christian, 2026-09-29; see devlog/dl20260929_deb_no_as_needed.md.
 NO_AS_NEEDED = '-Wl,--no-as-needed'
 

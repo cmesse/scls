@@ -55,6 +55,22 @@ tracker column:
 Anything else: stop and report. The `scls` wrapper's own RPM/DEB detection must agree — if
 `./scls list` reports a format you did not expect, trust the wrapper and stop.
 
+**1.1a Ubuntu hosts: link without `--as-needed`.** Ubuntu's gcc injects `--as-needed` through
+its built-in `*link` spec, so every object keeps only the NEEDED entries it references directly.
+el9 does not, and the publishing host checks each object's NEEDED against el9's. `-Wl,--no-as-needed`
+in LDFLAGS cannot undo this for libtool packages, because libtool places `-Wl` flags after the
+libraries. Instead, give gcc a specs file without the injected flag, once per host and again
+after any gcc major upgrade:
+
+```bash
+gcc -dumpspecs | sed 's/%{!fsanitize=\*:--as-needed}//' > /tmp/gcc-specs
+sudo install -m 644 /tmp/gcc-specs "$(gcc -print-file-name=)specs"
+```
+
+`deb_builder` refuses to build until this is in effect: it links an unused `-lgomp` with each
+of the flavor's compilers and requires it in NEEDED (`assert_links_without_as_needed`). Decided
+2026-09-29; see `devlog/dl20260929_deb_no_as_needed.md`.
+
 **1.2 Git.** Be on `devel` (`git checkout devel` if not, and say so). `git pull --ff-only` once,
 here, so that manifest fixes committed from another host are picked up before anything is built —
 never mid-run, where it could change a recipe between a build and its install. Record `HEAD`;
