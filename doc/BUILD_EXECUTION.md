@@ -60,7 +60,9 @@ its built-in `*link` spec, so every object keeps only the NEEDED entries it refe
 el9 does not, and the publishing host checks each object's NEEDED against el9's. `-Wl,--no-as-needed`
 in LDFLAGS cannot undo this for libtool packages, because libtool places `-Wl` flags after the
 libraries. Instead, give gcc a specs file without the injected flag, once per host and again
-after any gcc major upgrade:
+after **any** gcc package update. The specs directory is keyed by major version only, so a
+same-major update would otherwise keep a stale copy of the old specs, and the guard below would
+not notice (it tests only the as-needed behaviour):
 
 ```bash
 gcc -dumpspecs | sed 's/%{!fsanitize=\*:--as-needed}//' > /tmp/gcc-specs
