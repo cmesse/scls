@@ -141,10 +141,13 @@ file), the flavor meta-packages `scls-<flavor>` (dependencies only) and
 `scls-<flavor>-environment` (SCLS's own activation scripts and configuration).
 Their source is the SCLS repository, published under `BSD-3-Clause-LBNL`, so
 they may ship without a source package. A drop that ships one of them lists it
-under `no_source:` with the reason `SCLS-generated packaging, no upstream
-source; source in the SCLS repository`; one already published is listed under
-`already_published:` as usual. Any other binary without a source package is not shipped, and
-the list grows only by explicit decision (Christian, 2026-09-28).
+under `no_source:` with this exact reason:
+
+`SCLS-generated packaging, no upstream source; source in the SCLS repository`
+
+One that is already published is listed under `already_published:` as usual. Any
+other binary without a source package is not shipped, and the list grows only by
+explicit decision (Christian, 2026-09-28).
 
 ## Current Policy Summary
 

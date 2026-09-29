@@ -56,8 +56,10 @@ while f.get("inherits") and f["inherits"] not in seen:      # follow the fallbac
     f = parent
 math = f.get("math", {}) or {}
 cc = str((f.get("compilers", {}) or {}).get("cc", "gcc"))
-# Compare the driver's basename: a substring test would call mpicc an Intel compiler.
-fam = "intel" if pathlib.Path(cc.split()[0]).name in ("icx", "icc", "icpx", "ifx", "ifort") else "gnu"
+# The family rule lives in math_common.compiler_family; reuse it rather than re-derive it.
+sys.path.insert(0, str(pathlib.Path(repo) / "python"))
+from math_common import compiler_family
+fam = "intel" if compiler_family(f) == "intel" else "gnu"
 print(math.get("linalg", "reference"), math.get("threading", "openmp"), fam,
       math.get("interface", "lp64"))
 PY
