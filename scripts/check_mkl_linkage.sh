@@ -128,6 +128,28 @@ if [ "$LINALG" = "mkl" ]; then
     [ "$count" -eq 1 ] && [ "$layers" != "$expect" ] && fail "threading layer is $layers, flavor declares $expect"
     for l in $layers; do [ "$l" != "$expect" ] && { echo "  carried by:"; carriers "$l"; }; done
 
+    # Per-object rule (belfem verifier, 2026-09-29): every object that NEEDs any
+    # libmkl_* must NEED the interface, the threading layer, core and the OpenMP
+    # runtime DIRECTLY, as el9 links them. Ubuntu's default --as-needed left six
+    # mkl objects with only libmkl_gf_lp64 and the rest arriving transitively.
+    # The flavor-wide set above cannot see that: it was uniform all along.
+    iface="libmkl_$([ "$FAMILY" = intel ] && echo intel || echo gf)_lp64"
+    want="$iface $expect libmkl_core"
+    [ "$expect" != libmkl_sequential ] && want="$want $([ "$FAMILY" = intel ] && echo libiomp5 || echo libgomp)"
+    partial=0
+    for f in "${ELVES[@]}"; do
+        n=$(readelf -d "$f" 2>/dev/null | sed -n 's/.*(NEEDED).*\[\(.*\)\].*/\1/p')
+        echo "$n" | grep -q '^libmkl_' || continue
+        lack=""
+        for w in $want; do echo "$n" | grep -q "^$w\.so" || lack="$lack $w"; done
+        if [ -n "$lack" ]; then
+            [ "$partial" -eq 0 ] && echo "  objects missing a direct MKL NEEDED:"
+            echo "    $(basename "$f"): lacks$lack"
+            partial=$((partial + 1))
+        fi
+    done
+    [ "$partial" -eq 0 ] || fail "$partial object(s) NEED libmkl_* without all of: $want"
+
     if echo "$needed_all" | grep -q 'libmkl_rt'; then
         fail "libmkl_rt present. It is the single-dynamic-library model and picks its threading layer at runtime; alongside the layered libs the layer in force depends on load order"
         echo "  carried by:"; carriers 'libmkl_rt'

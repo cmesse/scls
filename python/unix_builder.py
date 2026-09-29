@@ -36,6 +36,7 @@ from build_common import (
     resolve_flavor_key,
     resolve_gcc_runtime_lib,
     gcc_identity,
+    NO_AS_NEEDED,
 )
 
 from patch_common import (
@@ -224,6 +225,10 @@ class UnixBuilder:
 
         # Get ldflags from flavor
         self.ldflags = self.flavor['flags'].get('ldflags', '').replace('%{prefix}', str(self.prefix))
+        # Link like el9: see build_common.NO_AS_NEEDED. It goes first so it governs
+        # every library after it, including the math line appended below.
+        if self.platform == 'linux':
+            self.ldflags = f"{NO_AS_NEEDED} {self.ldflags}".strip()
 
         # Add math flags to existing flags
         if self.math:
@@ -368,7 +373,8 @@ class UnixBuilder:
             # Get CMake arguments
             args = get_cmake_args(
                 self.recipe, self.host, self.flavor, self.prefix, self.install_prefix,
-                build_libdir=build_dir / 'lib')
+                build_libdir=build_dir / 'lib',
+                no_as_needed=(self.platform == 'linux'))
 
             # Add interface-specific arguments (LP64/ILP64)
             args.extend(get_interface_args(self.recipe, self.flavor))

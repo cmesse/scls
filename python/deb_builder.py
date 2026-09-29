@@ -2001,6 +2001,35 @@ def build_flavor_meta_package(flavor: str) -> Path:
 SCLS_RELEASE = 'scls-release'
 SCLS_RELEASE_DEB_NAME = 'scls-archive-keyring'
 
+# One APT repository per Ubuntu release, each with its own reprepro pool
+# (decided 2026-09-28). Package versions carry no distro tag, so U24 and U26
+# builds of one recipe share a filename with different bytes; a shared pool
+# would refuse the second. noble keeps the original path that existing clients
+# already point at; later releases are separate reprepro bases nested under it. A new release is added here on purpose, never derived: a
+# guessed path would ship a keyring pointing at a repo that does not exist.
+APT_REPO_BASE = 'https://belfem.lbl.gov/scls'
+APT_REPO_BY_CODENAME = {
+    'noble': 'ubuntu',
+    'resolute': 'ubuntu/resolute',
+}
+
+
+def _apt_repo_for_host(os_release: Path = Path('/etc/os-release')) -> Tuple[str, str]:
+    """Return (URI, suite) of this host's SCLS APT repository."""
+    codename = ''
+    try:
+        for line in os_release.read_text().splitlines():
+            if line.startswith('VERSION_CODENAME='):
+                codename = line.split('=', 1)[1].strip().strip('"')
+    except OSError as e:
+        raise BuildError(f"cannot read {os_release}: {e}")
+    if codename not in APT_REPO_BY_CODENAME:
+        raise BuildError(
+            f"no SCLS APT repository for release '{codename or 'unknown'}'; "
+            f"add it to APT_REPO_BY_CODENAME once the publishing host has one"
+        )
+    return f"{APT_REPO_BASE}/{APT_REPO_BY_CODENAME[codename]}", codename
+
 
 def build_scls_release_package() -> Path:
     """Build the scls-archive-keyring .deb (Debian-side counterpart of scls-release).
@@ -2045,10 +2074,11 @@ def build_scls_release_package() -> Path:
 
     sources_list_dir = destdir / 'etc' / 'apt' / 'sources.list.d'
     sources_list_dir.mkdir(parents=True)
+    repo_uri, suite = _apt_repo_for_host()
     sources_content = (
         "Types: deb\n"
-        "URIs: https://belfem.lbl.gov/scls/ubuntu\n"
-        "Suites: noble\n"
+        f"URIs: {repo_uri}\n"
+        f"Suites: {suite}\n"
         "Components: main\n"
         f"Signed-By: /etc/apt/keyrings/{SCLS_RELEASE_DEB_NAME}.gpg\n"
     )

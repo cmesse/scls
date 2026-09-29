@@ -75,8 +75,10 @@ case "$COLUMN" in
     R9)   DISTRO=el9      ;;
     R10)  DISTRO=el10     ;;
     AMZN) DISTRO=amzn2023 ;;
-    U24)  DISTRO=ubuntu; CODENAME=noble    ;;
-    U26)  DISTRO=ubuntu; CODENAME=resolute ;;
+    # One APT repo per Ubuntu release; keep in step with APT_REPO_BY_CODENAME in
+    # python/deb_builder.py. noble keeps the original path existing clients use.
+    U24)  DISTRO=ubuntu; CODENAME=noble;    APT_REPO=ubuntu          ;;
+    U26)  DISTRO=ubuntu; CODENAME=resolute; APT_REPO=ubuntu/resolute ;;
     *) echo "unknown column: $COLUMN (expected R9, R10, AMZN, U24 or U26)" >&2; exit 2 ;;
 esac
 # Each Ubuntu release has its own repo on the publishing host, so a drop staged on the
@@ -110,7 +112,7 @@ echo
 # subpackages (blas/cblas/lapacke from lapack, *-examples from petsc/slepc/sundials)
 # share a parent SRPM and a name-based guess reports them as missing sources.
 
-declare -a PAYLOAD_BIN=() PAYLOAD_SRC=() EXCLUDED=() ALREADY=() DEB_NAMES=()
+declare -a PAYLOAD_BIN=() PAYLOAD_SRC=() EXCLUDED=() ALREADY=() DEB_NAMES=() NO_SOURCE=()
 
 if [ "$DISTRO" != ubuntu ]; then
 
@@ -236,11 +238,14 @@ else
 # this tree, and each index against the SHA256 InRelease records for it. If any
 # of that fails we stop, because a missing index would make every published
 # filename look new and ship replacements for signed files.
-DEB_INDEX_URL="${PUBLISH_DEB_INDEX_URL:-https://belfem.lbl.gov/scls/ubuntu}"
+DEB_INDEX_URL="${PUBLISH_DEB_INDEX_URL:-https://belfem.lbl.gov/scls/$APT_REPO}"
 IDX="$REPO/work/publish/$CODENAME"
 mkdir -p "$IDX"
 for f in InRelease main/binary-amd64/Packages.gz main/source/Sources.gz; do
-    curl -fsS -o "$IDX/$(basename "$f")" "$DEB_INDEX_URL/dists/$CODENAME/$f" \
+    # The query string bypasses the CDN edge cache. On 2026-09-28 and -29 it served
+    # pre-promotion Packages.gz/Sources.gz next to a fresh InRelease; the hash
+    # check below caught it, and this keeps staging from waiting out the TTL.
+    curl -fsS -o "$IDX/$(basename "$f")" "$DEB_INDEX_URL/dists/$CODENAME/$f?nocache=$(date +%s)" \
         || { echo "error: cannot fetch $DEB_INDEX_URL/dists/$CODENAME/$f" >&2; exit 1; }
 done
 KEYRING=$(mktemp) || exit 2
@@ -267,6 +272,7 @@ while IFS=$'\t' read -r kind a b; do
         srcfile)  PAYLOAD_SRC+=("$a") ;;
         excluded) EXCLUDED+=("$a") ;;
         already)  ALREADY+=("$a") ;;
+        nosrc)    NO_SOURCE+=("$a") ;;
     esac
 done <<< "$SEL"
 fi
@@ -280,6 +286,7 @@ echo "payload:           ${#PAYLOAD_BIN[@]} binaries + ${#PAYLOAD_SRC[@]} source
 echo "total_bytes:       $TOTAL"
 echo "excluded:          ${#EXCLUDED[@]}"
 echo "already_published: ${#ALREADY[@]}"
+[ "$DISTRO" = ubuntu ] && echo "no_source:         ${#NO_SOURCE[@]}"
 echo
 if [ "$DO_BUILD" -eq 0 ] && [ "$DO_UPLOAD" -eq 0 ]; then
     echo "(selection only — pass --build to stage)"; exit 0
@@ -349,6 +356,9 @@ for f in "${PAYLOAD_SRC[@]}"; do ln "$f" "$SRCDIR/" 2>/dev/null || cp "$f" "$SRC
             rpm -qp --qf '%{NAME}-%|EPOCH?{%{EPOCH}}:{0}|:%{VERSION}-%{RELEASE}.src\n' "$f" 2>/dev/null
         done
     } | sort
+    fi
+    if [ "${#NO_SOURCE[@]}" -gt 0 ]; then
+        echo; echo "no_source:"; printf '%s\n' "${NO_SOURCE[@]}"
     fi
     if [ "${#EXCLUDED[@]}" -gt 0 ]; then
         echo; echo "excluded:"; printf '%s\n' "${EXCLUDED[@]}"

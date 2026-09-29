@@ -711,9 +711,25 @@ def get_configure_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, inst
     return args
 
 
+# Ubuntu's gcc passes --as-needed to the linker by default; el9's does not. Under
+# --as-needed an object keeps a NEEDED entry only for libraries whose symbols it
+# references directly, so on Ubuntu libpetsc lost libmkl_core/libmkl_gnu_thread and
+# ~220 objects per flavor lost libopenblas/libscalapack/libgomp, getting them only
+# through some other library's dependency chain. The publishing host checks every
+# object's NEEDED against el9's, so the .deb path links the way el9 does. The RPM
+# path does not add it: el9 already behaves this way, and its specs stay unchanged.
+# Christian, 2026-09-29; see devlog/dl20260929_deb_no_as_needed.md.
+NO_AS_NEEDED = '-Wl,--no-as-needed'
+
+
 def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path,
-                   install_prefix: Path, build_libdir: Optional[Union[Path, str]] = None) -> List[str]:
-    """Get CMake arguments"""
+                   install_prefix: Path, build_libdir: Optional[Union[Path, str]] = None,
+                   no_as_needed: bool = False) -> List[str]:
+    """Get CMake arguments.
+
+    no_as_needed: prefix the linker flags with NO_AS_NEEDED (Linux only). The
+    .deb/unix path sets it; the RPM path does not.
+    """
     # Determine compilers based on MPI feature
     features = recipe.get('features', {})
     use_mpi = features.get('mpi', False)
@@ -762,6 +778,8 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path,
         rpath_link_dirs.append(f"{prefix}/lib")
     rpath_link_flag = ''.join(f" -Wl,-rpath-link,{path}" for path in rpath_link_dirs)
     macos_linker_flags = " -Wl,-headerpad_max_install_names" if is_macos else ""
+    # First on the line, so it governs every library that follows.
+    as_needed_flag = f"{NO_AS_NEEDED} " if (no_as_needed and is_linux) else ""
     if flavor.get('math', {}).get('linalg') == 'mkl':
         import os as _os
         mkl_root = _os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
@@ -825,9 +843,9 @@ def get_cmake_args(recipe: Dict, host: str, flavor: Dict, prefix: Path,
         # -rpath-link helps the linker resolve indirect shared library
         # dependencies (e.g. libopenblas.so -> libgfortran.so, libcholmod.so
         # -> libmkl_*.so.2) during try_compile checks and demo/test linking.
-        f"-DCMAKE_SHARED_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}{macos_linker_flags}",
-        f"-DCMAKE_MODULE_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}{macos_linker_flags}",
-        f"-DCMAKE_EXE_LINKER_FLAGS=-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}{macos_linker_flags}",
+        f"-DCMAKE_SHARED_LINKER_FLAGS={as_needed_flag}-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}{macos_linker_flags}",
+        f"-DCMAKE_MODULE_LINKER_FLAGS={as_needed_flag}-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}{macos_linker_flags}",
+        f"-DCMAKE_EXE_LINKER_FLAGS={as_needed_flag}-L{prefix}/lib -Wl,-rpath,{prefix}/lib{rpath_link_flag}{extra_link_dirs}{macos_linker_flags}",
         # Libraries that every link command needs, appended at the END (after
         # target libs). For MKL: the full MKL link line so transitive deps
         # resolve. For non-MKL: just -lm (catches CMakeLists that forgot it).
