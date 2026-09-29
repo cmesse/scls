@@ -9,6 +9,7 @@ same job in shell. Emits one tab-separated record per line on stdout:
     srcfile  <path to .orig/.debian> -
     excluded <line for MANIFEST excluded:>
     already  <line for MANIFEST already_published:>
+    nosrc    <line for MANIFEST no_source:>
 
 The published state comes from the repo's signed indexes (Packages.gz, Sources.gz),
 which the caller has already verified against InRelease. Membership is decided by
@@ -28,6 +29,18 @@ from pathlib import Path
 import yaml
 
 # Same rule as NEVER_SHIP_REASON in stage_to_belfem.sh: licence first, mechanism second.
+# The ONLY packages that may ship without a source package: SCLS's own generated
+# packaging, with no upstream code (Christian, 2026-09-28; doc/LICENSE_POLICY.md).
+# The list is closed. Anything else without a .dsc stays excluded, and the
+# publishing host's verifier rejects a no_source: entry outside this list.
+NO_SOURCE_REASON = ('SCLS-generated packaging, no upstream source; '
+                    'source in the SCLS repository')
+
+
+def no_source_names(flavor):
+    return {'scls-archive-keyring', f'scls-{flavor}', f'scls-{flavor}-environment'}
+
+
 NEVER_SHIP_REASON = {
     'suitesparse': 'licence — GPL-2 linkable, not shipped as a binary (doc/LICENSE_POLICY.md); '
                    'recipe carries include_flavors: [] so it is never built by default',
@@ -90,14 +103,18 @@ def main():
 
     installed = subprocess.run(
         ['dpkg-query', '-W', '-f', '${Package} ${Version} ${Architecture}\n',
-         f'scls-{flavor}', f'scls-{flavor}-*'],
+         f'scls-{flavor}', f'scls-{flavor}-*', 'scls-archive-keyring'],
         capture_output=True, text=True).stdout.split('\n')
 
     shipped_src = set()
     for line in sorted(filter(None, installed)):
         name, ver, arch = line.split()
         nva = f'{name}_{ver}_{arch}'
-        short = name[len(f'scls-{flavor}-'):] if name != f'scls-{flavor}' else None
+        # The keyring belongs to no flavor: it rides in whichever drop reaches a
+        # repo first and is already_published in every later one.
+        generated = name in no_source_names(flavor)
+        short = None if name in ('scls-archive-keyring', f'scls-{flavor}') \
+            else name[len(f'scls-{flavor}-'):]
         recipe = short.replace('-', '_') if short else None
 
         # Licence exclusion first: it holds whether or not an artifact exists.
@@ -110,6 +127,18 @@ def main():
             print(f'excluded\t{nva}  reason: installed but no .deb in {pkgs.name}/')
             continue
 
+        # Generated packages have no recipe of their own, but their versions still
+        # follow one: environment is version-release of recipes/environment.yaml,
+        # and the metas and keyring are its version with release 1 (deb_builder
+        # hard-codes it). Checked here because they skip the source-package path.
+        if generated:
+            env = yaml.safe_load((repo / 'recipes' / 'environment.yaml').read_text())
+            want = (f"{env['version']}-{env.get('release', 1)}"
+                    if name == f'scls-{flavor}-environment' else f"{env['version']}-1")
+            if want != ver:
+                print(f'excluded\t{nva}  reason: installed {ver} does not match expected {want}')
+                continue
+
         local = sha256(deb)
         if deb.name in pub_deb:
             note = '' if pub_deb[deb.name] == local else \
@@ -121,9 +150,9 @@ def main():
                 print(f'already\t{hit[1]["Source"]}_{ver}_source  SHA256={sha256(hit[0])}')
             continue
 
-        # The flavor meta-package is Depends-only: no upstream code, no source to ship.
-        if short is None:
+        if generated:
             print(f'bin\t{deb}\t{nva}')
+            print(f'nosrc\t{nva}  reason: {NO_SOURCE_REASON}')
             continue
 
         hit = by_binary.get((name, ver))

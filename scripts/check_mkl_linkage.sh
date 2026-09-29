@@ -44,7 +44,7 @@ command -v readelf >/dev/null || { echo "error: readelf not found (binutils)" >&
 
 # The expected model comes from the flavor file, never from a hardcoded list, so
 # a new flavor is covered the day it is added rather than silently unchecked.
-read -r LINALG THREADING FAMILY < <(python3 - "$REPO" "$FLAVOR" <<'PY'
+read -r LINALG THREADING FAMILY INTERFACE < <(python3 - "$REPO" "$FLAVOR" <<'PY'
 import sys, yaml, pathlib
 repo, flavor = sys.argv[1], sys.argv[2]
 f = yaml.safe_load(open(pathlib.Path(repo) / "flavors" / f"{flavor}.yaml")) or {}
@@ -56,8 +56,12 @@ while f.get("inherits") and f["inherits"] not in seen:      # follow the fallbac
     f = parent
 math = f.get("math", {}) or {}
 cc = str((f.get("compilers", {}) or {}).get("cc", "gcc"))
-fam = "intel" if any(t in cc for t in ("icx", "icc", "ifx")) else "gnu"
-print(math.get("linalg", "reference"), math.get("threading", "openmp"), fam)
+# The family rule lives in math_common.compiler_family; reuse it rather than re-derive it.
+sys.path.insert(0, str(pathlib.Path(repo) / "python"))
+from math_common import compiler_family
+fam = "intel" if compiler_family(f) == "intel" else "gnu"
+print(math.get("linalg", "reference"), math.get("threading", "openmp"), fam,
+      math.get("interface", "lp64"))
 PY
 ) || { echo "error: could not read flavors/$FLAVOR.yaml" >&2; exit 2; }
 
@@ -127,6 +131,28 @@ if [ "$LINALG" = "mkl" ]; then
     [ "$count" -eq 1 ] || fail "$count MKL threading layers in one flavor; mixing them is unsupported and load-order dependent"
     [ "$count" -eq 1 ] && [ "$layers" != "$expect" ] && fail "threading layer is $layers, flavor declares $expect"
     for l in $layers; do [ "$l" != "$expect" ] && { echo "  carried by:"; carriers "$l"; }; done
+
+    # Per-object rule (belfem verifier, 2026-09-29): every object that NEEDs any
+    # libmkl_* must NEED the interface, the threading layer, core and the OpenMP
+    # runtime DIRECTLY, as el9 links them. Ubuntu's default --as-needed left six
+    # mkl objects with only libmkl_gf_lp64 and the rest arriving transitively.
+    # The flavor-wide set above cannot see that: it was uniform all along.
+    iface="libmkl_$([ "$FAMILY" = intel ] && echo intel || echo gf)_${INTERFACE:-lp64}"
+    want="$iface $expect libmkl_core"
+    [ "$expect" != libmkl_sequential ] && want="$want $([ "$FAMILY" = intel ] && echo libiomp5 || echo libgomp)"
+    partial=0
+    for f in "${ELVES[@]}"; do
+        n=$(readelf -d "$f" 2>/dev/null | sed -n 's/.*(NEEDED).*\[\(.*\)\].*/\1/p')
+        echo "$n" | grep -q '^libmkl_' || continue
+        lack=""
+        for w in $want; do echo "$n" | grep -q "^$w\.so" || lack="$lack $w"; done
+        if [ -n "$lack" ]; then
+            [ "$partial" -eq 0 ] && echo "  objects missing a direct MKL NEEDED:"
+            echo "    $(basename "$f"): lacks$lack"
+            partial=$((partial + 1))
+        fi
+    done
+    [ "$partial" -eq 0 ] || fail "$partial object(s) NEED libmkl_* without all of: $want"
 
     if echo "$needed_all" | grep -q 'libmkl_rt'; then
         fail "libmkl_rt present. It is the single-dynamic-library model and picks its threading layer at runtime; alongside the layered libs the layer in force depends on load order"
