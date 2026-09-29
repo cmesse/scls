@@ -50,12 +50,17 @@ SSH_OPTS=(-i "$PUBLISH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes
 REMOTE="$PUBLISH_REMOTE"
 
 FLAVOR=""; COLUMN=""; STAGE=""; DO_BUILD=0; DO_UPLOAD=0; USE_DROP=""
+REPLACE_FILE=""; REPLACE_REASON=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --flavor) FLAVOR="$2"; shift 2 ;;
         --column) COLUMN="$2"; shift 2 ;;
         --stage)  STAGE="$2";  shift 2 ;;
         --drop)   USE_DROP="$2"; shift 2 ;;
+        # Same-version replacement of published .debs (contract v1.2 override;
+        # Christian's explicit approval per occasion). FILE lists binary names.
+        --replace)        REPLACE_FILE="$2"; shift 2 ;;
+        --replace-reason) REPLACE_REASON="$2"; shift 2 ;;
         --build)  DO_BUILD=1;  shift ;;
         --upload) DO_UPLOAD=1; shift ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -64,6 +69,9 @@ done
 # --upload without --drop would restage under a NEW timestamp, so the thing
 # uploaded would not be the drop whose total_bytes the publishing host approved.
 # Approval is granted against a specific DROP name; honour it.
+if [ -n "$REPLACE_FILE" ] && { [ ! -f "$REPLACE_FILE" ] || [ -z "$REPLACE_REASON" ]; }; then
+    echo "error: --replace needs an existing FILE and --replace-reason TEXT" >&2; exit 2
+fi
 if [ "$DO_UPLOAD" -eq 1 ] && [ -z "$USE_DROP" ]; then
     echo "error: --upload requires --drop <DROP>, naming the already-staged drop." >&2
     echo "Stage with --build first, get the size approved, then upload THAT drop." >&2
@@ -112,7 +120,7 @@ echo
 # subpackages (blas/cblas/lapacke from lapack, *-examples from petsc/slepc/sundials)
 # share a parent SRPM and a name-based guess reports them as missing sources.
 
-declare -a PAYLOAD_BIN=() PAYLOAD_SRC=() EXCLUDED=() ALREADY=() DEB_NAMES=() NO_SOURCE=()
+declare -a PAYLOAD_BIN=() PAYLOAD_SRC=() EXCLUDED=() ALREADY=() DEB_NAMES=() NO_SOURCE=() REPLACED=()
 
 if [ "$DISTRO" != ubuntu ]; then
 
@@ -263,7 +271,8 @@ done
 echo "published index: $DEB_INDEX_URL/dists/$CODENAME (InRelease signed by $got_fpr)"
 
 SEL=$(python3 "$REPO/scripts/deb_drop_select.py" "$REPO" "$FLAVOR" "$REPO/work/pkgs" \
-      "$REPO/work/spkgs" "$IDX/Packages.gz" "$IDX/Sources.gz") \
+      "$REPO/work/spkgs" "$IDX/Packages.gz" "$IDX/Sources.gz" \
+      ${REPLACE_FILE:+"$REPLACE_FILE" "$REPLACE_REASON"}) \
     || { echo "error: deb_drop_select.py failed" >&2; exit 1; }
 while IFS=$'\t' read -r kind a b; do
     case "$kind" in
@@ -273,6 +282,7 @@ while IFS=$'\t' read -r kind a b; do
         excluded) EXCLUDED+=("$a") ;;
         already)  ALREADY+=("$a") ;;
         nosrc)    NO_SOURCE+=("$a") ;;
+        replace)  REPLACED+=("$a") ;;
     esac
 done <<< "$SEL"
 fi
@@ -287,6 +297,7 @@ echo "total_bytes:       $TOTAL"
 echo "excluded:          ${#EXCLUDED[@]}"
 echo "already_published: ${#ALREADY[@]}"
 [ "$DISTRO" = ubuntu ] && echo "no_source:         ${#NO_SOURCE[@]}"
+[ "$DISTRO" = ubuntu ] && echo "replace_published: ${#REPLACED[@]}"
 echo
 if [ "$DO_BUILD" -eq 0 ] && [ "$DO_UPLOAD" -eq 0 ]; then
     echo "(selection only — pass --build to stage)"; exit 0
@@ -356,6 +367,9 @@ for f in "${PAYLOAD_SRC[@]}"; do ln "$f" "$SRCDIR/" 2>/dev/null || cp "$f" "$SRC
             rpm -qp --qf '%{NAME}-%|EPOCH?{%{EPOCH}}:{0}|:%{VERSION}-%{RELEASE}.src\n' "$f" 2>/dev/null
         done
     } | sort
+    fi
+    if [ "${#REPLACED[@]}" -gt 0 ]; then
+        echo; echo "replace_published:"; printf '%s\n' "${REPLACED[@]}"
     fi
     if [ "${#NO_SOURCE[@]}" -gt 0 ]; then
         echo; echo "no_source:"; printf '%s\n' "${NO_SOURCE[@]}"

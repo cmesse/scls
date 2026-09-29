@@ -10,6 +10,14 @@ same job in shell. Emits one tab-separated record per line on stdout:
     excluded <line for MANIFEST excluded:>
     already  <line for MANIFEST already_published:>
     nosrc    <line for MANIFEST no_source:>
+    replace  <line for MANIFEST replace_published:>
+
+Optional arguments 7 and 8 name a file of binary package names and a reason. A
+listed package whose published filename exists with DIFFERENT bytes ships as a
+same-version replacement instead of going under already_published:, together
+with its complete source package if that differs from the published one too.
+Replacing a published version needs Christian's explicit override of contract
+v1.2 (first granted 2026-09-29 for the --no-as-needed relink).
 
 The published state comes from the repo's signed indexes (Packages.gz, Sources.gz),
 which the caller has already verified against InRelease. Membership is decided by
@@ -81,6 +89,10 @@ def checksums(st):
 def main():
     repo, flavor, pkgs, spkgs, packages_gz, sources_gz = sys.argv[1:7]
     repo, pkgs, spkgs = Path(repo), Path(pkgs), Path(spkgs)
+    replace, replace_reason = set(), ''
+    if len(sys.argv) > 8:
+        replace = {l.split('#')[0].strip() for l in open(sys.argv[7])} - {''}
+        replace_reason = sys.argv[8]
 
     pub_deb = {}                       # pool filename -> sha256
     for st in stanzas(gzip.open(packages_gz, 'rt').read()):
@@ -140,7 +152,9 @@ def main():
                 continue
 
         local = sha256(deb)
-        if deb.name in pub_deb:
+        replacing = (deb.name in pub_deb and name in replace and not generated
+                     and pub_deb[deb.name] != local)
+        if deb.name in pub_deb and not replacing:
             note = '' if pub_deb[deb.name] == local else \
                 '  (local rebuild differs; published copy stands, contract v1.2)'
             print(f'already\t{nva}  SHA256={local}{note}')
@@ -174,7 +188,13 @@ def main():
 
         srcid = (st['Source'], st['Version'])
         nvs = f'{st["Source"]}_{st["Version"]}_source'
-        if srcid in pub_src:
+        # A replaced binary's source is replaced too only if its bytes changed; the
+        # publishing host drops the old pool files first, so it must ship complete.
+        src_replacing = (replacing and srcid in pub_src
+                         and pub_srcfile.get(dsc.name) != sha256(dsc))
+        if replacing:
+            print(f'replace\t{nva}  reason: {replace_reason}')
+        if srcid in pub_src and not src_replacing:
             if srcid not in shipped_src:
                 shipped_src.add(srcid)
                 print(f'already\t{nvs}  SHA256={sha256(dsc)}')
@@ -186,7 +206,8 @@ def main():
                if not (spkgs / f).is_file() or sha256(spkgs / f) != h]
         # A pool filename that is already published with other bytes would be refused
         # by reprepro; an identical one is harmless and ships with its .dsc.
-        clash = [f for f, h in files.items() if f in pub_srcfile and pub_srcfile[f] != h]
+        clash = [] if src_replacing else \
+            [f for f, h in files.items() if f in pub_srcfile and pub_srcfile[f] != h]
         if bad or clash:
             why = (f'source file missing or fails .dsc checksum: {", ".join(bad)}' if bad else
                    f'source file already published with other bytes: {", ".join(clash)}')
@@ -196,6 +217,8 @@ def main():
         print(f'bin\t{deb}\t{nva}')
         if srcid not in shipped_src:
             shipped_src.add(srcid)
+            if src_replacing:
+                print(f'replace\t{nvs}  reason: {replace_reason}')
             print(f'src\t{dsc}\t{nvs}')
             for f in sorted(files):
                 print(f'srcfile\t{spkgs / f}\t-')
