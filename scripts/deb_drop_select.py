@@ -127,6 +127,18 @@ def main():
             print(f'excluded\t{nva}  reason: installed but no .deb in {pkgs.name}/')
             continue
 
+        # Generated packages have no recipe of their own, but their versions still
+        # follow one: environment is version-release of recipes/environment.yaml,
+        # and the metas and keyring are its version with release 1 (deb_builder
+        # hard-codes it). Checked here because they skip the source-package path.
+        if generated:
+            env = yaml.safe_load((repo / 'recipes' / 'environment.yaml').read_text())
+            want = (f"{env['version']}-{env.get('release', 1)}"
+                    if name == f'scls-{flavor}-environment' else f"{env['version']}-1")
+            if want != ver:
+                print(f'excluded\t{nva}  reason: installed {ver} does not match expected {want}')
+                continue
+
         local = sha256(deb)
         if deb.name in pub_deb:
             note = '' if pub_deb[deb.name] == local else \

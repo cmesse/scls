@@ -44,7 +44,7 @@ command -v readelf >/dev/null || { echo "error: readelf not found (binutils)" >&
 
 # The expected model comes from the flavor file, never from a hardcoded list, so
 # a new flavor is covered the day it is added rather than silently unchecked.
-read -r LINALG THREADING FAMILY < <(python3 - "$REPO" "$FLAVOR" <<'PY'
+read -r LINALG THREADING FAMILY INTERFACE < <(python3 - "$REPO" "$FLAVOR" <<'PY'
 import sys, yaml, pathlib
 repo, flavor = sys.argv[1], sys.argv[2]
 f = yaml.safe_load(open(pathlib.Path(repo) / "flavors" / f"{flavor}.yaml")) or {}
@@ -56,8 +56,10 @@ while f.get("inherits") and f["inherits"] not in seen:      # follow the fallbac
     f = parent
 math = f.get("math", {}) or {}
 cc = str((f.get("compilers", {}) or {}).get("cc", "gcc"))
-fam = "intel" if any(t in cc for t in ("icx", "icc", "ifx")) else "gnu"
-print(math.get("linalg", "reference"), math.get("threading", "openmp"), fam)
+# Compare the driver's basename: a substring test would call mpicc an Intel compiler.
+fam = "intel" if pathlib.Path(cc.split()[0]).name in ("icx", "icc", "icpx", "ifx", "ifort") else "gnu"
+print(math.get("linalg", "reference"), math.get("threading", "openmp"), fam,
+      math.get("interface", "lp64"))
 PY
 ) || { echo "error: could not read flavors/$FLAVOR.yaml" >&2; exit 2; }
 
@@ -133,7 +135,7 @@ if [ "$LINALG" = "mkl" ]; then
     # runtime DIRECTLY, as el9 links them. Ubuntu's default --as-needed left six
     # mkl objects with only libmkl_gf_lp64 and the rest arriving transitively.
     # The flavor-wide set above cannot see that: it was uniform all along.
-    iface="libmkl_$([ "$FAMILY" = intel ] && echo intel || echo gf)_lp64"
+    iface="libmkl_$([ "$FAMILY" = intel ] && echo intel || echo gf)_${INTERFACE:-lp64}"
     want="$iface $expect libmkl_core"
     [ "$expect" != libmkl_sequential ] && want="$want $([ "$FAMILY" = intel ] && echo libiomp5 || echo libgomp)"
     partial=0

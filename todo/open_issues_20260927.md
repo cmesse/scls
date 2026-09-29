@@ -122,8 +122,8 @@ Reported by the U26 session. Details are in `devlog/dl20260927_u26_full_stack_bu
       This needs a decision on a per-release suite plus a version suffix (e.g. `~u24`/`~u26`). The
       decision would also affect the U24 staging in §2.
       **Decided 2026-09-28 (Christian):** one reprepro repo per distro, each with its own pool. Versions stay
-      untagged. noble is unchanged at `/scls/ubuntu`; resolute gets its own repo (proposed
-      `/scls/ubuntu-resolute`, provisional on belfem until Christian confirms it there). The staging side is
+      untagged. noble is unchanged at `/scls/ubuntu`; resolute is a separate reprepro base nested at
+      `/scls/ubuntu/resolute` (Christian, 2026-09-28, confirmed on belfem). The staging side is
       done: column `U26` maps to `resolute`, and the script refuses to run on a host whose `VERSION_CODENAME`
       doesn't match. Still open: `deb_builder` must write the URI and Suite into `scls-archive-keyring` from
       `VERSION_CODENAME` (noble keeps `/scls/ubuntu`), then rebuild the keyring on U26. belfem needs a second
