@@ -171,3 +171,45 @@ Reported by the U26 session. Details are in `devlog/dl20260927_u26_full_stack_bu
 - [ ] U24 state at shutdown: `flavor.conf` = `lbl` (restored), sudo grant `--scope pkg` active, MKL
       2026.1.0-236, suitesparse removed from all flavors, desktop/snaps removed, repo-local git
       identity set, `gh` authenticated.
+
+## 8. Round 2 (after the Ubuntu drops ship): RPM-side fixes found by the el9 parity check
+
+**Ruled 2026-09-29 (Christian):** "We will fix RPM later. I plan to do a second round where I add
+ipopt to SCLS. But I want the Ubuntu issues cleaned up first." Everything here waits for that round.
+Found by the per-object DT_NEEDED comparison of the U26 resolute .debs against the published el9
+RPMs (2026-09-29/30). Each item is a recipe or build-configuration change and needs Christian's
+approval and the audit gate.
+
+- [ ] **ipopt**: add the recipe (Christian's round-2 goal).
+- [ ] **gperftools without libunwind on the RPM hosts**: see §1, including the planned fix and the
+      release bump on R9/R10/AMZN.
+- [ ] **scotch's compression flags are inert on every host.** `recipes/scotch.yaml:53-56` passes
+      `-DCOMMON_FILE_COMPRESS_{BZ2,GZ,LZMA}=OFF` under "Disable compression support (reduces
+      dependencies)", but scotch 7.0.15's CMake never reads those names. Its options are
+      `USE_ZLIB`, `USE_LZMA` and `USE_BZ2` (`CMakeLists.txt:115-117`), each ON by default and used
+      whenever the library is found. Result:
+      - el9: `libscotch.so.7.0` really uses bz2, lzma and zlib (7 `BZ2_*`, 4 `lzma_*` and 2 `gz*`
+        imports), because the three `-devel` packages were installed on the build host.
+      - U26 resolute: zlib only (`libz.so.1`). There was no bzip2 or lzma dev package, so CMake
+        said "Could NOT find BZip2".
+      Neither matches the recipe's intent, and the result depends on what the build host happens
+      to have installed. Decide between (a) honouring the intent with `-DUSE_ZLIB=OFF -DUSE_LZMA=OFF
+      -DUSE_BZ2=OFF`, or (b) keeping compression, dropping the inert flags, and declaring
+      `rpm_build_requires`/`rpm_requires` (zlib, xz, bzip2) so every host is identical. Either choice
+      rebuilds scotch (and changes its runtime deps) on all hosts. Reverse dependencies from
+      `python/build_order.py`: mumps, petsc, strumpack and friends link libscotch, so check the
+      closure before choosing. Ubuntu parity reports list this under ALLOWED (distro libs).
+- [ ] **netcdf bzip2 (Ubuntu, optional).** On U26 there's no `libbz2-dev`, so netcdf uses its built-in
+      bz2 ("libbz2 not found using built-in version"). The filter is present ("Standard Filters:
+      deflate bz2"), while el9 links the system `libbz2.so.1`. Optional: map a `bzip2-devel` build
+      dependency to `libbz2-dev` for .deb builds, so both link the system library. Functionally
+      equivalent today.
+- [ ] **PRRTE and libnl (Ubuntu, informational).** On resolute, `bin/prte` and five other PRRTE tools
+      NEED `libnl-3`/`libnl-route-3` without using any symbol from them (over-linked under
+      `--no-as-needed`). `libprrte.so` really uses libnl (21 symbols). PRRTE's configure found libnl
+      on Ubuntu (it comes in with the rdma dev packages), but el9's didn't. That's harmless;
+      decide only if the RPM side should enable it too.
+- [ ] **No action (recorded so nobody chases them):** `libquadmath` is missing on the Ubuntu side
+      because gfortran's own `libgfortran.spec` links it `--as-needed`, and the objects import no
+      quadmath symbol. `libmvec` is extra on the Ubuntu side because gcc 15 vectorizes libm calls
+      into glibc's vector ABI (`_ZGVdN4v_cos` etc.).
