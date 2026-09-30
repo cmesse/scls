@@ -27,6 +27,21 @@ release bumps have to reach every host that already published the old NEVRA. Nei
 - [ ] `lbl` openmpi becomes **4.1.6-2 with no content change**, because `release:` is recipe-wide. `lbl` is
       source-only and untracked. Either accept that, or add a per-flavor release override (a
       build-config change that needs Christian's approval).
+- [ ] **gperftools built WITHOUT libunwind on the RPM hosts, silently** (found 2026-09-29 by the el9
+      parity check). `recipes/gperftools.yaml` requires `libunwind` on every Linux flavor and passes
+      `--enable-libunwind`. The published el9/el10 `scls-<F>-gperftools` 2.18.1-1 nevertheless NEED
+      no libunwind and import only libgcc_s's `_Unwind_*`, with zero `unw_`/`_ULx86_64` symbols, yet
+      they *Require* `scls-<F>-libunwind` (verified by belfem). Cause: the RPM build env exports
+      no `CPATH`/`LIBRARY_PATH`, and the recipe adds no `-I`/`-L` for the prefix, so configure finds no
+      `libunwind.h` and falls back without an error. The Ubuntu builds find it through the DEB env's
+      `CPATH` (see §4) and link `libunwind.so.8`, which is the recipe's intent. Impact: the CPU
+      profiler and heap checker unwind with gcc's unwinder (less reliable in signal handlers),
+      there's a misleading runtime dependency, and noble/resolute differ from el9.
+      **Ruling needed (Christian):** recommended (Server and U24) is recipe = reference. Fix the RPM
+      path, either with explicit `CPPFLAGS=-I%{prefix}/include LDFLAGS=-L%{prefix}/lib` in the recipe or a
+      fix to the RPM env, then rebuild gperftools on R9/R10/AMZN with a release bump. Consider
+      making configure fail if libunwind isn't found, so this can't recur silently. Until the ruling,
+      parity reports list these objects as "HARD: pending gperftools reference ruling".
 
 ## 2. Staging and upload (deferred by Christian)
 
