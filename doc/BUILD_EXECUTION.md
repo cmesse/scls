@@ -73,6 +73,11 @@ sudo install -m 644 /tmp/gcc-specs "$(gcc -print-file-name=)specs"
 of the flavor's compilers and requires it in NEEDED (`assert_links_without_as_needed`). Decided
 2026-09-29; see `devlog/dl20260929_deb_no_as_needed.md`.
 
+**1.1b Ubuntu hosts: InfiniBand MAD headers.** `libibmad-dev` and `libibumad-dev` must be
+installed so UCX builds `lib/ucx/libucx_perftest_mad.so`, as el9 does. The Build-Depends come
+from `packaging/system_packages.yaml` (`libibverbs-devel` maps to all three -dev packages), and
+the resulting runtime Depends on `libibmad5`/`libibumad3` is accepted (Christian, 2026-09-29).
+
 **1.2 Git.** Be on `devel` (`git checkout devel` if not, and say so). `git pull --ff-only` once,
 here, so that manifest fixes committed from another host are picked up before anything is built —
 never mid-run, where it could change a recipe between a build and its install. Record `HEAD`;

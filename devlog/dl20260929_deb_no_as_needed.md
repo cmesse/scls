@@ -97,3 +97,13 @@ it links an unused `-lgomp` with each flavor compiler and requires it in NEEDED.
 The same run also showed that a same-version reinstall fails once the SCLS apt source is
 configured: apt sees the local rebuild as a downgrade of the repo copy. The reinstall path now
 passes `--allow-downgrades` (Christian).
+
+## UCX MAD module on Ubuntu
+
+The el9 builds ship `lib/ucx/libucx_perftest_mad.so`, and the Ubuntu builds did not. el9's rdma-core
+devel packages include the InfiniBand MAD headers; Debian splits them into `libibmad-dev` and
+`libibumad-dev`. Christian accepted the resulting runtime dependency and chose a .deb-only route:
+`packaging/system_packages.yaml` maps `libibverbs-devel` and `libibverbs` to lists (deb_builder now
+accepts list values). The ucx recipe and the RPM specs are unchanged, and `changelogs/ucx.md` is
+left alone because it feeds the RPM `%changelog`. `doc/BUILD_EXECUTION.md` §1.1b notes the host
+packages.

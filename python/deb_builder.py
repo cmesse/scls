@@ -309,7 +309,9 @@ class DebBuilder(UnixBuilder):
             deb_name = self.system_package_map[name]
             if deb_name is None:
                 continue  # Explicitly dropped.
-            out.append(deb_name)
+            # A list maps one RHEL package onto several Debian ones, where RHEL
+            # bundles what Debian splits (e.g. MAD headers in rdma-core-devel).
+            out.extend(deb_name if isinstance(deb_name, list) else [deb_name])
         return out
 
     def _collect_recipe_system_deps(self) -> Tuple[List[str], List[str]]:

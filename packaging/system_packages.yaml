@@ -54,7 +54,12 @@ zlib:                     zlib1g
 # UCX runtime transports (declared explicitly so the installed package
 # pulls them in; UCX dlopen's transports at runtime and silently falls
 # back to TCP without them).
-libibverbs:               libibverbs1
+# libibmad/libibumad: el9's rdma-core packages carry InfiniBand MAD, so UCX's
+# configure finds it there and ships lib/ucx/libucx_perftest_mad.so. Debian splits
+# it out, so the Ubuntu builds lacked that module. Mapped here rather than in the
+# ucx recipe so the RPM specs stay unchanged. ucx is the only recipe using these
+# names. Christian, 2026-09-29.
+libibverbs:               [libibverbs1, libibmad5, libibumad3]
 librdmacm:                librdmacm1
 
 # Development headers
@@ -75,7 +80,7 @@ hwloc-devel:              libhwloc-dev
 libevent-devel:           libevent-dev
 # UCX HPC transports (verbs + rdmacm). Declared so configure fails
 # loudly if missing, instead of UCX silently skipping the transport.
-libibverbs-devel:         libibverbs-dev
+libibverbs-devel:         [libibverbs-dev, libibmad-dev, libibumad-dev]
 librdmacm-devel:          librdmacm-dev
 
 # Intel oneAPI (Intel's apt repo uses the same package names as the RPM repo)
