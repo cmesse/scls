@@ -63,6 +63,10 @@ libibverbs:               [libibverbs1, libibmad5, libibumad3]
 librdmacm:                librdmacm1
 
 # Development headers
+# bzip2-devel: no recipe declares it. el9 build hosts have it installed, so netcdf
+# (and scotch) link system libbz2; Ubuntu hosts install libbz2-dev as host prep
+# (doc/BUILD_EXECUTION.md 1.1b). Christian, 2026-09-30.
+bzip2-devel:              libbz2-dev
 gmp-devel:                libgmp-dev
 mpfr-devel:               libmpfr-dev
 ncurses-devel:            libncurses-dev
