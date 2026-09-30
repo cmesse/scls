@@ -65,7 +65,7 @@ same-major update would otherwise keep a stale copy of the old specs, and the gu
 not notice (it tests only the as-needed behaviour):
 
 ```bash
-gcc -dumpspecs | sed 's/%{!fsanitize=\*:--as-needed}//' > /tmp/gcc-specs
+gcc -dumpspecs | sed 's/%{!fsanitize=\*:--as-needed}//g' > /tmp/gcc-specs
 sudo install -m 644 /tmp/gcc-specs "$(gcc -print-file-name=)specs"
 ```
 
