@@ -67,6 +67,10 @@ librdmacm:                librdmacm1
 # (and scotch) link system libbz2; Ubuntu hosts install libbz2-dev as host prep
 # (doc/BUILD_EXECUTION.md 1.1b). Christian, 2026-09-30.
 bzip2-devel:              libbz2-dev
+# Same treatment for xz and zstd (Christian, 2026-09-30): el9 links liblzma
+# (libunwind minidebuginfo, scotch) and libzstd (netcdf) from host packages.
+xz-devel:                 liblzma-dev
+libzstd-devel:            libzstd-dev
 gmp-devel:                libgmp-dev
 mpfr-devel:               libmpfr-dev
 ncurses-devel:            libncurses-dev

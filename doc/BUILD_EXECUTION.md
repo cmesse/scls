@@ -77,9 +77,11 @@ of the flavor's compilers and requires it in NEEDED (`assert_links_without_as_ne
 installed so UCX builds `lib/ucx/libucx_perftest_mad.so`, as el9 does. The Build-Depends come
 from `packaging/system_packages.yaml` (`libibverbs-devel` maps to all three -dev packages), and
 the resulting runtime Depends on `libibmad5`/`libibumad3` is accepted (Christian, 2026-09-29).
-Also install `libbz2-dev`: no recipe declares it, but netcdf (and scotch) use system `libbz2` when
-it's present, as on el9, where the build hosts have `bzip2-devel`. Without it, netcdf silently
-builds its internal copy (Christian, 2026-09-30).
+Also install `libbz2-dev`, `liblzma-dev` and `libzstd-dev`. No recipe declares them, but
+packages link the system libraries when they are present, as on el9, whose build hosts have
+`bzip2-devel`, `xz-devel` and `libzstd-devel`: netcdf (bz2, zstd), scotch (bz2, lzma) and libunwind
+(lzma, for minidebuginfo). Without them, netcdf silently builds its internal bz2 copy and the others
+drop the feature (Christian, 2026-09-30).
 
 **1.2 Git.** Be on `devel` (`git checkout devel` if not, and say so). `git pull --ff-only` once,
 here, so that manifest fixes committed from another host are picked up before anything is built —
