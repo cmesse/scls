@@ -151,6 +151,43 @@ def _deb_is_already_installed_at_version(name: str, version: str) -> bool:
     return status.startswith('ii') and installed_version.strip() == version
 
 
+def assert_links_without_as_needed(compilers: Dict[str, str]) -> None:
+    """Refuse to build if a compiler driver still links with --as-needed.
+
+    Ubuntu's gcc injects --as-needed through its built-in *link spec, so each
+    object keeps only the NEEDED entries it references directly; el9's gcc does
+    not. -Wl,--no-as-needed in LDFLAGS cannot undo that for libtool packages,
+    because libtool places every -Wl flag after the libraries. The fix is a
+    host-level gcc specs file without the injected flag (doc/BUILD_EXECUTION.md).
+    This checks the effect, not the file: link an unused -lgomp and require it
+    in NEEDED, for every driver the flavor uses.
+    """
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        t = Path(tmp)
+        (t / 'probe.c').write_text('int scls_probe(void) { return 0; }\n')
+        subprocess.run(['gcc', '-fPIC', '-c', 'probe.c', '-o', 'probe.o'],
+                       cwd=t, check=True, capture_output=True)
+        bad = []
+        for key in ('cc', 'cxx', 'fc'):
+            drv = compilers.get(key)
+            if not drv:
+                continue
+            out = t / f'probe_{key}.so'
+            r = subprocess.run([drv, '-shared', 'probe.o', '-lgomp', '-o', str(out)],
+                               cwd=t, capture_output=True, text=True)
+            needed = subprocess.run(['readelf', '-d', str(out)], capture_output=True,
+                                    text=True).stdout if r.returncode == 0 else ''
+            if 'libgomp.so' not in needed:
+                bad.append(drv)
+    if bad:
+        raise BuildError(
+            f"{', '.join(bad)} link with --as-needed: an unused -lgomp was dropped from "
+            f"NEEDED. .deb builds must link like el9. Install the gcc specs override "
+            f"described in doc/BUILD_EXECUTION.md (Ubuntu build hosts) and retry."
+        )
+
+
 def _apt_install_deb(deb_path: Path, label: str = "apt-get install") -> None:
     """Install a single .deb, routing to --reinstall when its exact
     Package+Version is already installed.
@@ -165,7 +202,11 @@ def _apt_install_deb(deb_path: Path, label: str = "apt-get install") -> None:
     name, version = _read_deb_package_version(deb_path)
     if _deb_is_already_installed_at_version(name, version):
         print(f"Reinstalling {deb_path} ({name}={version} already installed)")
-        cmd = ['sudo', 'apt-get', 'install', '--reinstall', '-y', deb_arg]
+        # --allow-downgrades: when the same version is also in a configured SCLS
+        # repo, apt treats a local rebuild with other bytes as a downgrade of
+        # the repo copy and refuses under -y (U24 relink, 2026-09-29).
+        cmd = ['sudo', 'apt-get', 'install', '--reinstall', '--allow-downgrades',
+               '-y', deb_arg]
     else:
         print(f"Installing {deb_path}")
         cmd = ['sudo', 'apt-get', 'install', '-y', deb_arg]
@@ -199,7 +240,8 @@ def _apt_install_debs(deb_paths: List[Path], label: str = "apt-get install") -> 
             needs_reinstall = True
     cmd = ['sudo', 'apt-get', 'install', '-y']
     if needs_reinstall:
-        cmd.append('--reinstall')
+        # --allow-downgrades: see _apt_install_deb.
+        cmd.extend(['--reinstall', '--allow-downgrades'])
         print(f"Installing (with --reinstall): {deb_args}")
     else:
         print(f"Installing: {deb_args}")
@@ -267,7 +309,9 @@ class DebBuilder(UnixBuilder):
             deb_name = self.system_package_map[name]
             if deb_name is None:
                 continue  # Explicitly dropped.
-            out.append(deb_name)
+            # A list maps one RHEL package onto several Debian ones, where RHEL
+            # bundles what Debian splits (e.g. MAD headers in rdma-core-devel).
+            out.extend(deb_name if isinstance(deb_name, list) else [deb_name])
         return out
 
     def _collect_recipe_system_deps(self) -> Tuple[List[str], List[str]]:
@@ -1841,6 +1885,9 @@ exit 0
           * 'source' produces the 3.0 (quilt) triplet from the upstream
             tarball + patches + generated debian/ metadata.
         """
+        if 'build' in commands:
+            assert_links_without_as_needed(self.flavor.get('compilers', {}))
+
         # Narrow fast-paths when only packaging steps are requested.
         # Useful when iterating on control/dep translation without
         # rebuilding; both assume their upstream artifacts already exist.
@@ -2001,6 +2048,35 @@ def build_flavor_meta_package(flavor: str) -> Path:
 SCLS_RELEASE = 'scls-release'
 SCLS_RELEASE_DEB_NAME = 'scls-archive-keyring'
 
+# One APT repository per Ubuntu release, each with its own reprepro pool
+# (decided 2026-09-28). Package versions carry no distro tag, so U24 and U26
+# builds of one recipe share a filename with different bytes; a shared pool
+# would refuse the second. noble keeps the original path that existing clients
+# already point at; later releases are separate reprepro bases nested under it. A new release is added here on purpose, never derived: a
+# guessed path would ship a keyring pointing at a repo that does not exist.
+APT_REPO_BASE = 'https://belfem.lbl.gov/scls'
+APT_REPO_BY_CODENAME = {
+    'noble': 'ubuntu',
+    'resolute': 'ubuntu/resolute',
+}
+
+
+def _apt_repo_for_host(os_release: Path = Path('/etc/os-release')) -> Tuple[str, str]:
+    """Return (URI, suite) of this host's SCLS APT repository."""
+    codename = ''
+    try:
+        for line in os_release.read_text().splitlines():
+            if line.startswith('VERSION_CODENAME='):
+                codename = line.split('=', 1)[1].strip().strip('"')
+    except OSError as e:
+        raise BuildError(f"cannot read {os_release}: {e}")
+    if codename not in APT_REPO_BY_CODENAME:
+        raise BuildError(
+            f"no SCLS APT repository for release '{codename or 'unknown'}'; "
+            f"add it to APT_REPO_BY_CODENAME once the publishing host has one"
+        )
+    return f"{APT_REPO_BASE}/{APT_REPO_BY_CODENAME[codename]}", codename
+
 
 def build_scls_release_package() -> Path:
     """Build the scls-archive-keyring .deb (Debian-side counterpart of scls-release).
@@ -2045,10 +2121,11 @@ def build_scls_release_package() -> Path:
 
     sources_list_dir = destdir / 'etc' / 'apt' / 'sources.list.d'
     sources_list_dir.mkdir(parents=True)
+    repo_uri, suite = _apt_repo_for_host()
     sources_content = (
         "Types: deb\n"
-        "URIs: https://belfem.lbl.gov/scls/ubuntu\n"
-        "Suites: noble\n"
+        f"URIs: {repo_uri}\n"
+        f"Suites: {suite}\n"
         "Components: main\n"
         f"Signed-By: /etc/apt/keyrings/{SCLS_RELEASE_DEB_NAME}.gpg\n"
     )
