@@ -107,7 +107,7 @@ class UnixBuilder:
         # this is set in run after extracting the package
         self.source_dir = ""
 
-        self.nprocs = os.cpu_count()
+        self.nprocs = get_parallel_jobs()   # honours SCLS_JOBS
 
         # Platform-specific settings
         if self.platform == 'macos':

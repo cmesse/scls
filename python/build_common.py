@@ -972,7 +972,17 @@ def gcc_identity(prefix: Path, flavor: Dict) -> Tuple[str, str]:
 
 
 def get_parallel_jobs() -> int:
-    """Get number of parallel build jobs"""
+    """Get number of parallel build jobs.
+
+    SCLS_JOBS overrides the CPU count. vtk at -j8 ran out of memory in 15 GB
+    on both Ubuntu hosts (2026-09-27, 2026-09-29); the override lets a host cap
+    the heavy packages without editing recipes. Approved by Christian 2026-09-29.
+    """
+    override = os.environ.get('SCLS_JOBS', '').strip()
+    if override:
+        if not override.isdigit() or int(override) < 1:
+            raise BuildError(f"SCLS_JOBS must be a positive integer, got {override!r}")
+        return int(override)
     try:
         import multiprocessing
         return min(multiprocessing.cpu_count(), 64)
