@@ -37,11 +37,13 @@ release bumps have to reach every host that already published the old NEVRA. Nei
       `CPATH` (see §4) and link `libunwind.so.8`, which is the recipe's intent. Impact: the CPU
       profiler and heap checker unwind with gcc's unwinder (less reliable in signal handlers),
       there's a misleading runtime dependency, and noble/resolute differ from el9.
-      **Ruling needed (Christian):** recommended (Server and U24) is recipe = reference. Fix the RPM
+      **Ruled 2026-09-29 (Christian):** the recipe is the reference. The Ubuntu debs linking SCLS
+      `libunwind.so.8` are correct and accepted in parity reports ("el9 RPM off-intent"). The RPM fix
+      is deferred to **round 2, together with adding ipopt**; clean up the Ubuntu issues first.
+      Planned fix: Fix the RPM
       path, either with explicit `CPPFLAGS=-I%{prefix}/include LDFLAGS=-L%{prefix}/lib` in the recipe or a
       fix to the RPM env, then rebuild gperftools on R9/R10/AMZN with a release bump. Consider
-      making configure fail if libunwind isn't found, so this can't recur silently. Until the ruling,
-      parity reports list these objects as "HARD: pending gperftools reference ruling".
+      making configure fail if libunwind isn't found, so this can't recur silently.
 
 ## 2. Staging and upload (deferred by Christian)
 
