@@ -107,3 +107,17 @@ devel packages include the InfiniBand MAD headers; Debian splits them into `libi
 accepts list values). The ucx recipe and the RPM specs are unchanged, and `changelogs/ucx.md` is
 left alone because it feeds the RPM `%changelog`. `doc/BUILD_EXECUTION.md` §1.1b notes the host
 packages.
+
+## `check_mkl_linkage.sh` gave load-dependent results (fixed in `f69e8a3`)
+
+U26's mkl staging failed the per-object rule for two objects that did NEED all four libraries,
+and two immediate reruns passed. The cause was `set -o pipefail` combined with
+`echo "$n" | grep -q PATTERN`. `grep -q` exits at its first match; if `echo` is still writing, it
+dies of SIGPIPE, and pipefail turns the match into a miss. The same pattern guarded the
+`libmkl_rt`, ScaLAPACK/BLACS and MKL-in-a-non-MKL-flavor tests, where a miss is a false
+**pass**. U26's reproducer, on libpetsc's 40-line NEEDED list under a concurrent rebuild:
+2 false negatives in 20,000 iterations (0.01%), and 0 in 20,000 as a here-string. At about 4 tests
+× 19 MKL objects per gate run, that's roughly a 1% chance of a spurious result per run. Every match
+now uses a here-string, and a comment at the top of the script forbids the pattern. The U24 debug
+drop uploaded before the fix took only the non-MKL branch, and the el9 parity check and belfem's
+own verification confirmed it independently.
