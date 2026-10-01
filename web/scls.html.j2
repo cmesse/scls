@@ -9,7 +9,7 @@
     <meta http-equiv="Expires" content="0">
 
     <title>SCLS — Scientific Core Library Stack for Linux and macOS</title>
-    <meta name="description" content="SCLS packages a coherent stack of scientific libraries — BLAS/LAPACK, MPI, sparse solvers, PETSc, HDF5 — as RPMs for Enterprise Linux, DEBs for Ubuntu 24.04 LTS, and source-built installs for macOS and Unix systems.">
+    <meta name="description" content="SCLS packages a coherent stack of scientific libraries — BLAS/LAPACK, MPI, sparse solvers, PETSc, HDF5 — as RPMs for Enterprise Linux, DEBs for Ubuntu 24.04 LTS and 26.04 LTS, and source-built installs for macOS and Unix systems.">
     <link rel="canonical" href="https://belfem.lbl.gov/scls.html">
 
     <meta property="og:type" content="website">
@@ -185,7 +185,7 @@
         <div class="scls-hero-text">
             <div class="eyebrow">Scientific Software Stack</div>
             <h1>Scientific Core Library Stack {{ release_version }}</h1>
-            <p class="lead">SCLS packages a coherent stack of scientific libraries &mdash; BLAS/LAPACK, MPI, sparse solvers, PETSc, HDF5, and their dependencies. It provides RPMs for Enterprise Linux, DEBs for Ubuntu 24.04 LTS, and source-built installs for macOS and other Unix systems. After enabling a public binary repository, one package-manager command installs a complete, mutually compatible flavor.</p>
+            <p class="lead">SCLS packages a coherent stack of scientific libraries &mdash; BLAS/LAPACK, MPI, sparse solvers, PETSc, HDF5, and their dependencies. It provides RPMs for Enterprise Linux, DEBs for Ubuntu 24.04 LTS and 26.04 LTS, and source-built installs for macOS and other Unix systems. After enabling a public binary repository, one package-manager command installs a complete, mutually compatible flavor.</p>
 
             <p>Public Linux binary flavors install under <code>/opt/scls/&lt;flavor&gt;</code>, so several stacks can coexist on the same host without interfering with the operating system. Source-built site flavors may choose their own prefix, and the macOS flavor installs directly under <code>/opt/scls</code>.</p>
 
@@ -244,7 +244,7 @@
         <li><code><b>{{ flavor.package }}</b></code> &mdash; {{ flavor.label }}. {{ flavor.description }}</li>
         {% endfor %}
     </ul>
-    <p>The public binary repositories currently target Enterprise Linux 9 and 10, Amazon Linux 2023, and Ubuntu 24.04 LTS. The SCLS source tree can also build local RPMs on other RHEL-family systems, local DEBs on Debian-family systems, and direct Unix installs on macOS and other Unix systems.</p>
+    <p>The public binary repositories currently target Enterprise Linux 9 and 10, Amazon Linux 2023, Ubuntu 24.04 LTS, and Ubuntu 26.04 LTS. The SCLS source tree can also build local RPMs on other RHEL-family systems, local DEBs on Debian-family systems, and direct Unix installs on macOS and other Unix systems.</p>
     <p>Additional source-build flavors include <code>lbl</code> for an LBL-specific prefix, <code>intel</code> for Intel compiler builds, <code>gcc-mkl-cuda</code> for CUDA-enabled experiments, and <code>macos</code>. See the <a href="https://github.com/cmesse/scls/tree/main/flavors"><code>flavors/</code></a> directory for the complete list.</p>
     <p>CUDA binaries are not distributed, because a CUDA-linked stack would tie users to a specific driver and toolkit version. Users who need GPU acceleration can use the <code>gcc-mkl-cuda</code> source-build flavor and link against a locally installed CUDA toolkit.</p>
     <p>On macOS, the stack uses OpenBLAS rather than Apple's Accelerate framework. The <code>macos</code> flavor builds its own GCC for Fortran support. Pairing GCC-built Fortran with Accelerate is fragile: Accelerate is tuned for Apple's Clang toolchain, and its ABI is awkward to use from GCC. OpenBLAS works reliably with GCC, keeps math behavior aligned with the Linux binary flavors, and favors compute throughput over the performance and power tradeoffs that shape Accelerate.</p>
@@ -275,15 +275,38 @@
 
 <section class="section-band">
     <div class="section-head">
-        <h2>Installation on Ubuntu 24.04 LTS</h2>
-        <span class="caption">DEB binary repository</span>
+        <h2>Installation on Ubuntu</h2>
+        <span class="caption">DEB binary repositories</span>
     </div>
-    <p>Ubuntu 24.04 LTS (Noble Numbat) is the supported Debian-family target. Unlike <code>dnf</code>, <code>apt</code> does not install packages directly from a URL. Download and install the keyring and repository-configuration package first:</p>
-    <pre class="command"><code>wget <a href="https://belfem.lbl.gov/scls/ubuntu/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb">https://belfem.lbl.gov/scls/ubuntu/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</a>
+    <p>SCLS publishes one APT repository per Ubuntu LTS release, each with its own package pool. Pick the line that matches your release (<code>lsb_release -cs</code> prints the codename):</p>
+    <div class="table-scroll">
+    <table class="package-table">
+        <thead><tr><th>Release</th><th>Suite</th><th>Repository</th></tr></thead>
+        <tbody>
+            <tr><td>Ubuntu 24.04 LTS (Noble Numbat)</td><td><code>noble</code></td><td><code>https://belfem.lbl.gov/scls/ubuntu/noble</code></td></tr>
+            <tr><td>Ubuntu 26.04 LTS (Resolute Raccoon)</td><td><code>resolute</code></td><td><code>https://belfem.lbl.gov/scls/ubuntu/resolute</code></td></tr>
+        </tbody>
+    </table>
+    </div>
+    <p>Unlike <code>dnf</code>, <code>apt</code> does not install packages directly from a URL. Download and install the keyring and repository-configuration package for your release first. On Ubuntu 26.04:</p>
+    <pre class="command"><code>wget <a href="https://belfem.lbl.gov/scls/ubuntu/resolute/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb">https://belfem.lbl.gov/scls/ubuntu/resolute/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</a>
 sudo apt install ./scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</code></pre>
-    <p>This installs the SCLS public key at <code>/etc/apt/keyrings/scls-archive-keyring.gpg</code> and a deb822-format <code>scls.sources</code> file at <code>/etc/apt/sources.list.d/</code>. Then refresh apt and install a flavor:</p>
+    <p>On Ubuntu 24.04:</p>
+    <pre class="command"><code>wget <a href="https://belfem.lbl.gov/scls/ubuntu/noble/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb">https://belfem.lbl.gov/scls/ubuntu/noble/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</a>
+sudo apt install ./scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</code></pre>
+    <p>This installs the SCLS public key at <code>/etc/apt/keyrings/scls-archive-keyring.gpg</code> and a deb822-format <code>scls.sources</code> file at <code>/etc/apt/sources.list.d/</code>. If you prefer to configure the repository by hand, install the key at that path and write the equivalent <code>/etc/apt/sources.list.d/scls.sources</code> yourself, for example on Ubuntu 26.04:</p>
+    <pre class="command"><code>Types: deb
+URIs: https://belfem.lbl.gov/scls/ubuntu/resolute
+Suites: resolute
+Components: main
+Signed-By: /etc/apt/keyrings/scls-archive-keyring.gpg</code></pre>
+    <p>Then refresh apt and install a flavor:</p>
     <pre class="command"><code>sudo apt update
 sudo apt install scls-&lt;flavor&gt;</code></pre>
+    <p>The original Ubuntu 24.04 repository URL, <code>https://belfem.lbl.gov/scls/ubuntu</code> with suite <code>noble</code>, still works, so existing 24.04 installations need no change.</p>
+    <p><strong>New in this release:</strong> Ubuntu 26.04 LTS is now a supported target. The Ubuntu 24.04 packages were relinked so that every library records its direct dependencies the same way as the Enterprise Linux builds; package versions did not change, so an existing 24.04 installation picks up the relinked files by reinstalling its SCLS packages:</p>
+    <pre class="command"><code>sudo apt update
+sudo apt install --reinstall $(dpkg-query -W -f='${Package}\n' 'scls-*')</code></pre>
     <p>DEB builds produce per-package example subpackages when recipes define them, such as <code>scls-&lt;flavor&gt;-petsc-examples</code>. Unlike the RPM distribution, they do not currently provide an all-examples meta-package.</p>
     <p>After installation, activate the environment the same way as on Enterprise Linux:</p>
     <pre class="command"><code>source /opt/scls/&lt;flavor&gt;/share/scls/activate</code></pre>
@@ -297,8 +320,8 @@ sudo apt install scls-&lt;flavor&gt;</code></pre>
         <span class="caption">macOS and other Unix systems</span>
     </div>
     <p>Outside the public Enterprise Linux and Ubuntu repositories, clone the SCLS source tree and use the <code>./scls</code> wrapper. It selects RPM mode on supported RHEL-family hosts, including Amazon Linux 2023; DEB mode on Debian-family systems; and direct Unix-install mode elsewhere.</p>
-    <p>On Debian-family systems outside the public Ubuntu 24.04 repository, <code>./scls</code> can still build local <code>.deb</code> packages. On macOS and other Unix systems, the Unix builder installs the packages directly into the selected SCLS prefix.</p>
-    <p><strong>macOS support covers both Intel Macs and Apple Silicon</strong>, and the stack has been built from source on each. Upstream GCC carries no <code>aarch64-apple-darwin</code> target of its own, so on arm64 hosts SCLS vendors the <a href="https://github.com/Homebrew/homebrew-core/tree/main/Patches/gcc">Apple Silicon GCC patch maintained by Homebrew</a> and applies it automatically. Rosetta is not a supported path: an <code>x86_64</code> shell gets the Intel toolchain instead.</p>
+    <p>On Debian-family systems outside the public Ubuntu 24.04 and 26.04 repositories, <code>./scls</code> can still build local <code>.deb</code> packages. On macOS and other Unix systems, the Unix builder installs the packages directly into the selected SCLS prefix.</p>
+    <p><strong>macOS is supported on both Intel Macs and Apple Silicon</strong>; Apple Silicon support is no longer beta, and the stack has been built from source on each. Upstream GCC carries no <code>aarch64-apple-darwin</code> target of its own, so on arm64 hosts SCLS vendors the <a href="https://github.com/Homebrew/homebrew-core/tree/main/Patches/gcc">Apple Silicon GCC patch maintained by Homebrew</a> and applies it automatically. Rosetta is not a supported path: an <code>x86_64</code> shell gets the Intel toolchain instead.</p>
     <p>The macOS flavor assumes familiarity with a Unix toolchain: installing Xcode Command Line Tools, understanding linker and sysroot settings, and interpreting build logs that point to an SDK or path issue. It builds its own GCC for Fortran support, which adds time to the first build. If that bootstrap fails (Apple Clang building GCC 16), Homebrew's prebuilt GCC is supported as a fallback on either architecture. See the <a href="https://github.com/cmesse/scls/blob/main/doc/MACOS_BUILD.md">macOS build guide</a> for prerequisites, the step-by-step flow, and the two Homebrew fallback routes.</p>
     <p>Quick start:</p>
     <ol>

@@ -25,7 +25,7 @@ the build flow, and what to do when the GCC bootstrap fails.
   Rosetta is not a supported path — a Rosetta shell reports `x86_64`, so the
   patch is skipped and an Intel toolchain is configured.
 
-macOS support is beta. Expect to read build logs.
+macOS support (Intel and Apple Silicon) is no longer beta. A first build still means reading build logs when something goes wrong.
 
 ## Prerequisites
 
