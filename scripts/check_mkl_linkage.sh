@@ -86,13 +86,16 @@ if [ -n "$DIR" ]; then
         [ -e "$f" ] || continue
         case "$(basename "$f")" in *.src.rpm) continue ;; esac   # sources carry no ELF
         d="$WORK/$(basename "$f" .rpm)"; mkdir -p "$d"
-        ( cd "$d" && rpm2cpio "$f" 2>/dev/null | cpio -idm --quiet 2>/dev/null )
+        # A partial extract would hide objects from the gate, so a failure stops it.
+        ( cd "$d" && rpm2cpio "$f" 2>/dev/null | cpio -idm --quiet 2>/dev/null ) \
+            || { echo "error: could not extract $(basename "$f")" >&2; exit 2; }
         n=$((n + 1))
     done
     for f in "$DIR"/*.deb; do
         [ -e "$f" ] || continue
         d="$WORK/$(basename "$f" .deb)"; mkdir -p "$d"
-        dpkg-deb -x "$f" "$d" 2>/dev/null
+        dpkg-deb -x "$f" "$d" 2>/dev/null \
+            || { echo "error: could not extract $(basename "$f")" >&2; exit 2; }
         n=$((n + 1))
     done
     echo "extracted: $n binary packages"
@@ -116,7 +119,7 @@ carriers() {
     for f in "${ELVES[@]}"; do
         n=$(readelf -d "$f" 2>/dev/null | sed -n 's/.*(NEEDED).*\[\(.*\)\].*/\1/p')
         grep -qE "$1" <<< "$n" && echo "    $(basename "$f")"
-    done | sort -u | head -12
+    done | sort -u | sed -n '1,12p'   # sed reads to EOF: no SIGPIPE into sort
 }
 
 RC=0
