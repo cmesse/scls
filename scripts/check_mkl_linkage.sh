@@ -23,6 +23,9 @@
 # Exit 0 = uniform, 1 = violation, 2 = usage/environment error.
 
 set -u -o pipefail
+# Never test a match with `cmd | grep -q` here: grep -q exits at the first match,
+# the writer can then die of SIGPIPE, and pipefail turns the match into a miss
+# (load-dependent false PASS/FAIL, found on U26 2026-10-01). Use here-strings.
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FLAVOR=""; PREFIX=""; DIR=""
@@ -100,7 +103,7 @@ else
 fi
 
 mapfile -t ELVES < <(find "$ROOT" -type f \( -name '*.so' -o -name '*.so.*' -o -perm -u+x \) 2>/dev/null \
-                     | while read -r f; do head -c4 "$f" 2>/dev/null | grep -q $'\x7fELF' && echo "$f"; done)
+                     | while read -r f; do [ "$(head -c4 "$f" 2>/dev/null | tr -d '\0')" = $'\x7fELF' ] && echo "$f"; done)
 echo "elf files: ${#ELVES[@]}"
 [ "${#ELVES[@]}" -gt 0 ] || { echo "error: no ELF objects found — wrong path?" >&2; exit 2; }
 
@@ -111,8 +114,8 @@ needed_all=$(for f in "${ELVES[@]}"; do readelf -d "$f" 2>/dev/null \
 # the whole point is that the outlier is a single library among hundreds.
 carriers() {
     for f in "${ELVES[@]}"; do
-        readelf -d "$f" 2>/dev/null | sed -n 's/.*(NEEDED).*\[\(.*\)\].*/\1/p' \
-            | grep -qE "$1" && echo "    $(basename "$f")"
+        n=$(readelf -d "$f" 2>/dev/null | sed -n 's/.*(NEEDED).*\[\(.*\)\].*/\1/p')
+        grep -qE "$1" <<< "$n" && echo "    $(basename "$f")"
     done | sort -u | head -12
 }
 
@@ -143,9 +146,9 @@ if [ "$LINALG" = "mkl" ]; then
     partial=0
     for f in "${ELVES[@]}"; do
         n=$(readelf -d "$f" 2>/dev/null | sed -n 's/.*(NEEDED).*\[\(.*\)\].*/\1/p')
-        echo "$n" | grep -q '^libmkl_' || continue
+        grep -q '^libmkl_' <<< "$n" || continue
         lack=""
-        for w in $want; do echo "$n" | grep -q "^$w\.so" || lack="$lack $w"; done
+        for w in $want; do grep -q "^$w\.so" <<< "$n" || lack="$lack $w"; done
         if [ -n "$lack" ]; then
             [ "$partial" -eq 0 ] && echo "  objects missing a direct MKL NEEDED:"
             echo "    $(basename "$f"): lacks$lack"
@@ -154,11 +157,11 @@ if [ "$LINALG" = "mkl" ]; then
     done
     [ "$partial" -eq 0 ] || fail "$partial object(s) NEED libmkl_* without all of: $want"
 
-    if echo "$needed_all" | grep -q 'libmkl_rt'; then
+    if grep -q 'libmkl_rt' <<< "$needed_all"; then
         fail "libmkl_rt present. It is the single-dynamic-library model and picks its threading layer at runtime; alongside the layered libs the layer in force depends on load order"
         echo "  carried by:"; carriers 'libmkl_rt'
     fi
-    if echo "$needed_all" | grep -qE 'libmkl_(scalapack|blacs)'; then
+    if grep -qE 'libmkl_(scalapack|blacs)' <<< "$needed_all"; then
         fail "libmkl_scalapack/libmkl_blacs present — ScaLAPACK must come from the stack (doc/MKL_ABI_POLICY.md)"
         echo "  carried by:"; carriers 'libmkl_(scalapack|blacs)'
     fi
@@ -172,7 +175,7 @@ else
 
     blas=$(echo "$needed_all" | grep -oE 'lib(openblas|blas|flexiblas|mkl_rt)\.so[.0-9]*' | sed 's/\.so.*//' | sort -u)
     echo "blas:      $(echo $blas)"
-    echo "$needed_all" | grep -q 'libmkl' && { fail "MKL linked into a non-MKL flavor"; carriers 'libmkl'; }
+    grep -q 'libmkl' <<< "$needed_all" && { fail "MKL linked into a non-MKL flavor"; carriers 'libmkl'; }
 fi
 
 echo
