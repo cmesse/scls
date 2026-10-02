@@ -228,6 +228,15 @@ approval and the audit gate.
       `host_flags: false` per recipe, or pass `--program-prefix=`. Each one renames shipped binaries,
       so file manifests and any users of the prefixed names change; it's a `python/` change and needs
       Christian's approval. Round 2.
+- [ ] **Website**: regenerate with ipopt and deploy. Already on devel and generated locally but not
+      deployed: 8a5f7f6 (one APT repo per Ubuntu release, noble and resolute; old /scls/ubuntu URL
+      still works) and 8771963 (Apple Silicon no longer beta; full arm64 build during ASC 2026, per
+      Christian). Christian, 2026-10-01: "We will wait with the new website. There is a second
+      iteration we will do to include ipopt."
+- [ ] **One shared el9 parity gate** (Christian, 2026-10-01). U26 turns `work/parity/needed_parity.sh` +
+      `score2.py` into a repo-relative `scripts/` tool (`--flavor`, the HARD/ALLOWED rules and the accepted list
+      as data); U24 hooks it into `stage_to_belfem.sh` before READY. Two blind audits; agree the file
+      names at the start of round 2.
 - [ ] **Stricter compression deps (optional).** Declare bzip2/xz/zstd in the netcdf, scotch and
       libunwind recipes instead of relying on host packages (Ubuntu §1.1b, el9 build hosts).
       Christian chose host packages for round 1.
