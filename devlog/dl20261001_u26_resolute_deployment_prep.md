@@ -4,7 +4,7 @@
 **Topic:** prepare the first resolute (.deb) drops from U26: repo, upload path, keyring, relink without `--as-needed`, per-object el9 parity, local staging
 **AIs involved:** Claude Opus (U26 host session); U24 build session and belfem "Server" session (peers, over Remote Control); Codex gpt-5.6-terra and Grok 4.7 (blind audits)
 **Flavor / Host:** U26 = Ubuntu 26.04.1 VM, GCC 15.2.0-16ubuntu1, DEB; debug, gcc, mkl
-**Verification:** built and installed on U26 (all packages force-rebuilt at the same version-release with the gcc specs override); per-object DT_NEEDED parity against the published el9 RPMs: HARD 0 on debug (497/497 matched), gcc (493/493), mkl (492/492); `scripts/check_mkl_linkage.sh` PASS (fc07a7f); `U26-debug-20261001T1302Z` staged with `--build` (sha256sum -c OK). **Nothing uploaded from U26.**
+**Verification:** built and installed on U26 (all packages force-rebuilt at the same version-release with the gcc specs override); per-object DT_NEEDED parity against the published el9 RPMs: HARD 0 on debug (497/497 matched), gcc (493/493), mkl (492/492); `scripts/check_mkl_linkage.sh` PASS (fc07a7f); `U26-debug-20261001T1302Z` staged with `--build` (sha256sum -c OK). All three drops uploaded and promoted (see Addendum).
 
 ## Summary
 
@@ -85,3 +85,24 @@ confirmed both.
 2. Reinstall the gcc specs override on U26 with `sed …/g` at a quiet moment (cosmetic).
 3. Round 2 (`todo/open_issues_20260927.md` §8): ipopt, gperftools RPM libunwind, scotch compression
    options, PRRTE/libnl (informational).
+
+## Addendum 2026-10-01 — uploaded, promoted, client-verified
+
+Christian approved the U26 drops ahead of U24 mkl; one drop in flight, each after belfem's "slot free".
+
+| Drop | files | bytes | sha256(SHA256SUMS) | upload rc (payload/READY) | state |
+|---|---|---|---|---|---|
+| U26-debug-20261001T1302Z | 153 | 2106566215 | 6244993f…b3d8 | 0 / 0 | promoted |
+| U26-gcc-20261001T2316Z | 149 | 949645519 | 9f462f2d…9482 | 0 / 0 | promoted |
+| U26-mkl-20261001T2320Z | 145 | 918997073 | b2571ff9…b366 | 0 / 0 | promoted |
+
+gcc and mkl were restaged after the debug promotion so the keyring is `already_published`
+(no_source = meta + environment only). Client check on U26 after the last promotion: the resolute
+index has 126 packages (debug 44, gcc 41, mkl 40, keyring), all 126 downloaded `.deb`s are
+byte-identical to the U26 builds, metas plus `scls-<F>-petsc` reinstall cleanly from
+`/scls/ubuntu/resolute`, and `ldd` on all 348 MKL-linked objects in `/opt/scls/mkl` resolves exactly
+one `libmkl_core` and one `libmkl_gnu_thread` with nothing unresolved.
+
+Also during the upload window: the website template now lists one APT repo per Ubuntu release and
+drops the Apple Silicon "beta" label (8a5f7f6, generated locally, not deployed), and
+`doc/MACOS_BUILD.md` records the full arm64 build during ASC 2026 per Christian (8771963).
