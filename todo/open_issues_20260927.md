@@ -213,3 +213,16 @@ approval and the audit gate.
       because gfortran's own `libgfortran.spec` links it `--as-needed`, and the objects import no
       quadmath symbol. `libmvec` is extra on the Ubuntu side because gcc 15 vectorizes libm calls
       into glibc's vector ABI (`_ZGVdN4v_cos` etc.).
+- [ ] **Triplet-prefixed program names on every Linux host (found 2026-10-01).** On U26 the 14 hwloc
+      tools exist only as `x86_64-linux-gnu-lstopo`, `x86_64-linux-gnu-hwloc-ls`, … (no plain
+      `lstopo`/`hwloc-ls` on PATH), and the libunwind test programs are prefixed too. el9 has the same
+      with `x86_64-redhat-linux-`. Cause: `python/build_common.py:684-686` adds
+      `--host/--build/--target=<triplet>` to every autotools configure (`host_flags` defaults to true).
+      An explicit `--target` makes autoconf's `AC_ARG_PROGRAM` prefix installed programs with the
+      target alias. Fix options: drop `--target` (it means nothing for non-toolchain packages), set
+      `host_flags: false` per recipe, or pass `--program-prefix=`. Each one renames shipped binaries,
+      so file manifests and any users of the prefixed names change; it's a `python/` change and needs
+      Christian's approval. Round 2.
+- [ ] **Stricter compression deps (optional).** Declare bzip2/xz/zstd in the netcdf, scotch and
+      libunwind recipes instead of relying on host packages (Ubuntu §1.1b, el9 build hosts).
+      Christian chose host packages for round 1.
