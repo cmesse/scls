@@ -47,7 +47,12 @@ release bumps have to reach every host that already published the old NEVRA. Nei
 
 ## 2. Staging and upload (deferred by Christian)
 
-- [ ] **U24 drops**: debug, gcc, mkl. Use `/stage-drop`, one flavor at a time.
+- [x] **U24 drops**: debug, gcc, mkl. Use `/stage-drop`, one flavor at a time.
+  - **2026-10-02: done after the `--no-as-needed` relink** (devlog `dl20260929_deb_no_as_needed.md`).
+    `U24-debug-20261001T0427Z` and `U24-gcc-20261001T2226Z` were promoted. `U24-mkl-20261002T0118Z`
+    is uploaded and awaiting promotion. It carries `scls-archive-keyring` 2026-2 (noble's new URI
+    `/scls/ubuntu/noble`). All three flavors: el9 parity HARD 0 apart from the accepted gperftools
+    libunwind, and `check_mkl_linkage` PASS. The `scls-<F>` metas are reinstalled from the repo.
   - **Do not stage the rebuilt `scls-<F>` 2026-1 meta .debs.** `deb_builder` hard-codes the meta
     release to 1 (`python/deb_builder.py:1924`), so the rebuilt metas carry the same NEVRA as the ones
     already published on belfem. Their Depends are identical, but the bytes differ. List them under
