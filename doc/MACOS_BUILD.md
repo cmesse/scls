@@ -16,11 +16,12 @@ the build flow, and what to do when the GCC bootstrap fails.
   after `install_name_tool`, Fortran/C++/OpenMP hello-worlds run, and
   `-march=native` is safe. The bootstrap group (21 packages, up to
   `testsweeper`), `gklib` and `openmpi` installed with the fixes recorded in
-  `devlog/dl20260910_apple_silicon_report_fixes.md`. Everything from
-  `openmpi` onward in the build order — ScaLAPACK/MUMPS/SCOTCH, the
+  `devlog/dl20260910_apple_silicon_report_fixes.md`. The rest of the build
+  order from `openmpi` onward — ScaLAPACK/MUMPS/SCOTCH, the
   SLATE/ButterflyPACK/STRUMPACK stack, PETSc, VTK, and the MUMPS
-  install-name normaliser — is unbuilt on arm64 and must be treated as
-  untested. The `hw.cpufamily` detector's `apple-m1` fallback for M4/M5
+  install-name normaliser — was then built and tested on Apple Silicon
+  during ASC 2026 (per Christian, confirmed 2026-10-01), so the full stack
+  is supported on arm64. The `hw.cpufamily` detector's `apple-m1` fallback for M4/M5
   hosts has not been exercised either.
   Rosetta is not a supported path — a Rosetta shell reports `x86_64`, so the
   patch is skipped and an Intel toolchain is configured.
