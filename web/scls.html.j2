@@ -9,7 +9,7 @@
     <meta http-equiv="Expires" content="0">
 
     <title>SCLS — Scientific Core Library Stack for Linux and macOS</title>
-    <meta name="description" content="SCLS packages a coherent stack of scientific libraries — BLAS/LAPACK, MPI, sparse solvers, PETSc, HDF5 — as RPMs for Enterprise Linux, DEBs for Ubuntu 24.04 LTS and 26.04 LTS, and source-built installs for macOS and Unix systems.">
+    <meta name="description" content="SCLS packages a coherent stack of scientific libraries — BLAS/LAPACK, MPI, sparse solvers, PETSc, Ipopt, HDF5 — as RPMs for Enterprise Linux, DEBs for Ubuntu 24.04 LTS and 26.04 LTS, and source-built installs for macOS and Unix systems.">
     <link rel="canonical" href="https://belfem.lbl.gov/scls.html">
 
     <meta property="og:type" content="website">
@@ -26,7 +26,7 @@
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "SCLS (Scientific Core Library Stack)",
-      "description": "A curated build and packaging system for scientific C++ and Fortran libraries. Produces a consistent, tested stack including BLAS/LAPACK, sparse solvers, graph partitioners, MPI, and I/O libraries.",
+      "description": "A curated build and packaging system for scientific C++ and Fortran libraries. Produces a consistent, tested stack including BLAS/LAPACK, sparse solvers, nonlinear optimization (Ipopt), graph partitioners, MPI, and I/O libraries.",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Linux, macOS",
       "softwareVersion": "{{ release_version }}",
@@ -44,7 +44,7 @@
         "name": "Lawrence Berkeley National Laboratory",
         "url": "https://www.lbl.gov/"
       },
-      "keywords": "scientific libraries, numerical computing, HPC, build system, RPM, DEB, PETSc, OpenMPI, HDF5, NetCDF, BLAS, LAPACK"
+      "keywords": "scientific libraries, numerical computing, HPC, build system, RPM, DEB, PETSc, Ipopt, SPRAL, MUMPS, OpenMPI, HDF5, NetCDF, BLAS, LAPACK"
     }
     </script>
 
@@ -185,7 +185,7 @@
         <div class="scls-hero-text">
             <div class="eyebrow">Scientific Software Stack</div>
             <h1>Scientific Core Library Stack {{ release_version }}</h1>
-            <p class="lead">SCLS packages a coherent stack of scientific libraries &mdash; BLAS/LAPACK, MPI, sparse solvers, PETSc, HDF5, and their dependencies. It provides RPMs for Enterprise Linux, DEBs for Ubuntu 24.04 LTS and 26.04 LTS, and source-built installs for macOS and other Unix systems. After enabling a public binary repository, one package-manager command installs a complete, mutually compatible flavor.</p>
+            <p class="lead">SCLS packages a coherent stack of scientific libraries &mdash; BLAS/LAPACK, MPI, sparse solvers, PETSc, Ipopt, HDF5, and their dependencies. It provides RPMs for Enterprise Linux, DEBs for Ubuntu 24.04 LTS and 26.04 LTS, and source-built installs for macOS and other Unix systems. After enabling a public binary repository, one package-manager command installs a complete, mutually compatible flavor.</p>
 
             <p>Public Linux binary flavors install under <code>/opt/scls/&lt;flavor&gt;</code>, so several stacks can coexist on the same host without interfering with the operating system. Source-built site flavors may choose their own prefix, and the macOS flavor installs directly under <code>/opt/scls</code>.</p>
 
@@ -200,8 +200,8 @@
         <span class="caption">What SCLS solves</span>
     </div>
     <p>SCLS exists for the practical problem of getting scientific libraries to build, install, and work together on real machines. It targets environments where the system packages are too old, incomplete, inconsistent across dependencies, or simply unavailable for the platform in front of you.</p>
-    <p>SCLS is intended for scientists, research software engineers, and HPC maintainers who need PETSc, HDF5, NetCDF, OpenMPI, sparse solvers, and math libraries to agree on compiler and ABI choices, MPI, BLAS/LAPACK, rpaths, and install layout.</p>
-    <p>The stack covers the core numerical infrastructure used by downstream scientific software: BLAS/LAPACK, MPI-enabled math libraries, sparse solvers, graph partitioners, I/O libraries, and the dependencies needed to make them coexist. SCLS is not three separate build systems: RPM packages, DEB packages, and direct Unix installs are generated from the same package recipes and flavor definitions, which keeps Linux and macOS behavior aligned.</p>
+    <p>SCLS is intended for scientists, research software engineers, and HPC maintainers who need PETSc, Ipopt, HDF5, NetCDF, OpenMPI, sparse solvers, and math libraries to agree on compiler and ABI choices, MPI, BLAS/LAPACK, rpaths, and install layout.</p>
+    <p>The stack covers the core numerical infrastructure used by downstream scientific software: BLAS/LAPACK, MPI-enabled math libraries, sparse direct solvers (MUMPS, SuperLU, STRUMPACK, SPRAL), nonlinear optimization (Ipopt), graph partitioners, I/O libraries, and the dependencies needed to make them coexist. SCLS is not three separate build systems: RPM packages, DEB packages, and direct Unix installs are generated from the same package recipes and flavor definitions, which keeps Linux and macOS behavior aligned.</p>
     <p>SCLS ships as OS-level packages where possible rather than as Docker images or Spack environments. Docker is useful when an application brings its whole runtime with it, but containers can complicate MPI launches and shift stack management from the OS package manager to a container runtime. Spack is well suited to per-user, bespoke concretizations of a large software graph; SCLS instead favors a stable shared stack. RPMs and DEBs fit existing sysadmin workflows, provide normal install and uninstall semantics, and let users and projects share one managed binary installation in a predictable prefix.</p>
     <p>On macOS, SCLS does not use Homebrew as the stack manager for the same reason. Homebrew puts user tools and scientific libraries in one shared prefix (<code>/usr/local</code> on Intel Macs and <code>/opt/homebrew</code> on Apple Silicon), which makes a controlled, version-pinned scientific stack awkward. Keeping the macOS stack in the SCLS-owned <code>/opt/scls</code> prefix gives it the same isolation and activation model as the Linux binaries, so downstream code and environment variables behave consistently across platforms.</p>
     <p>The intended result is not maximum configurability. It is a coherent, reproducible stack that downstream codes can link against without constant manual repair.</p>
@@ -229,7 +229,7 @@
         <li><strong>No Boost.</strong> Modern C++ (C++17/20) covers most of what scientific code once used Boost for, and the libraries SCLS targets either never required it or have dropped the dependency.</li>
         <li><strong>No GPL-3 linkable libraries in binary flavors</strong>, so downstream codes can link SCLS without copyleft concerns. GPL-3 build tools are fine because they run during the build and are not linked into the delivered libraries; GPL-2, LGPL, and CeCILL-C scientific libraries are allowed when their source and redistribution obligations are practical to satisfy. See the <a href="https://github.com/cmesse/scls/blob/main/doc/LICENSE_POLICY.md">license policy</a> for details.</li>
     </ul>
-    <p>This bias toward curation is intentional. If a project needs many custom feature toggles for a single package, SCLS is probably the wrong tool. If it needs PETSc, HDF5, OpenBLAS, NetCDF, MUMPS, and related libraries to build and coexist predictably, SCLS is built for that job.</p>
+    <p>This bias toward curation is intentional. If a project needs many custom feature toggles for a single package, SCLS is probably the wrong tool. If it needs PETSc, Ipopt, HDF5, OpenBLAS, NetCDF, MUMPS, and related libraries to build and coexist predictably, SCLS is built for that job.</p>
 
 </section>
 
@@ -444,6 +444,7 @@ cmake --build build</code></pre>
         </tbody>
     </table>
     </div>
+    <p>Ipopt is built against the stack's own linear solvers: the MPI build of MUMPS (the default <code>linear_solver</code>) and SPRAL's SSIDS on every flavor, plus MKL Pardiso on the MKL flavors. Users select a solver in <code>ipopt.opt</code>; SSIDS additionally needs <code>OMP_CANCELLATION=TRUE</code> in the environment of the program that uses it.</p>
 
 </section>
 
