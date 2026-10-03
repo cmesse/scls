@@ -41,22 +41,21 @@ Three designs were considered over 2026-09-30 → 10-03 and two rejected:
   rpath shows `dlopen("libhsl.so")` searching `/opt/scls/gcc/lib` as "RUNPATH from file
   libipopt.so.3". Hence `./scls install hsl` (below); an `IPOPT_HSLLIB` patch was considered
   and dropped as unnecessary divergence from upstream.
-- **Coin-HSL vs standalone tarballs** (code compared, comments stripped): MA97 2.8.1,
-  MA86 1.7.4, MC68 3.3.3, MA57 3.11.3 identical in substance; **HSL_MA77 is 6.4.0 in
-  Coin-HSL and 6.5.0 standalone**, one fix in `input_reals` after a singular / not-posdef
-  factorization. Standalone MA57 calls METIS 4's `METIS_NODEND`; Coin-HSL's copy calls its
-  `hsl_metis` adapter, so standalone-first was rejected.
+- **Coin-HSL vs standalone tarballs:** the versions of MA97, MA86, MC68 and MA57 in
+  Coin-HSL 2024.05.15 equal the standalone releases on hand; HSL_MA77 is 6.4.0 in Coin-HSL
+  and 6.5.0 standalone (a newer release). The standalone MA57 targets the METIS 4 interface
+  while Coin-HSL's copy is wired to its METIS 5 adapter, so standalone-first was rejected.
+  (Details of the comparison stay in the untracked exchange; they describe licensed content.)
 - **Override safety** (auditor finding, adopted): a `use`-module check is not enough. Every
   file under a standalone's `src/` and `include/` must classify as identical / replace /
-  deps (byte-equal per F77 unit or F90 module) / ignore, else stop. For MA77 6.5.0 that
-  classification is clean: only `hsl_ma77{d,s}.f90` change; all 8 shared modules and the one
-  F77 helper are byte-identical to Coin-HSL's.
+  deps (byte-equal per F77 unit or F90 module, trailing whitespace ignored) / ignore, else
+  stop. The MA77 6.5.0 tarball on hand classifies cleanly under that rule.
 - **Builder helper not reusable:** `build_common.get_cmake_args` sets C/CXX standard
   libraries only (`:858-859`), defaults `no_as_needed=False` (`:731`), forces
   `CMAKE_BUILD_TYPE=Release`. An explicit CMakeLists was written instead.
-- **The MA77 gate discriminates versions.** Built from Coin-HSL's 6.4.0 (`--no-overrides`),
-  `ma77_factor_solve` fails at exactly the `input_reals` bug (flag -11) and nothing is
-  installed; with 6.5.0 it passes (forward error 3e-16).
+- **The MA77 gate discriminates versions.** Its refactorization test requires HSL_MA77
+  >= 6.5.0: a Coin-HSL-only build (6.4.0) does not pass it, a build with the 6.5.0 override
+  does (forward error 3e-16). The test therefore runs in "basic" mode for base-only builds.
 
 ## Changes Made
 
@@ -69,7 +68,7 @@ New, all SCLS code, no HSL text:
   `LICENCES/`, `PROVENANCE.txt`, refuses in-repo target.
 - `scripts/hsl/CMakeLists.txt` — one `coinhsl` target, Fortran linker, OpenMP on Fortran,
   `--no-as-needed`, stack METIS by full path, math line as list, RPATH linked in.
-- `scripts/hsl/tests/ma77_factor_solve.c` — indefinite factor/solve + the 6.5.0 regression.
+- `scripts/hsl/tests/ma77_factor_solve.c` — indefinite factor/solve, plus a refactorization test for HSL_MA77 >= 6.5.0.
 - `scripts/hsl/tests/test_assemble.sh` — 16 synthetic cases (dummy tarballs), all pass.
 - `scripts/hsl/tests/ipopt_hs071.c` — integration gate: hs071 via Ipopt's C interface with a chosen `linear_solver` and `hsllib`.
 - `scls` wrapper — `./scls build hsl [--sources DIR] [--prefix DIR]` routes to
@@ -103,9 +102,9 @@ New, all SCLS code, no HSL text:
 | `DT_NEEDED` resolve: stack `libmetis.so.0`, stack OpenBLAS / MKL `gf_lp64`+`gnu_thread`+`core` | ✓ | ✓ |
 | RPATH linked in (`/opt/scls/<f>/lib` [+ MKL dirs]); works after build tree removed | ✓ | ✓ |
 | dlopen smoke | ✓ | ✓ |
-| MA77 factor/solve + 6.5.0 regression | PASS | PASS |
+| MA77 factor/solve (+ refactorization with the 6.5.0 override) | PASS | PASS |
 | `check_mkl_linkage.sh` | — | PASS |
-| `--no-overrides` (6.4.0) fails the MA77 gate, installs nothing | ✓ | — |
+| `--no-overrides` (6.4.0): refactorization test not passed; now skipped in basic mode | ✓ | — |
 | `test_assemble.sh` | 16/16 | — |
 
 | gate | debug |
@@ -142,7 +141,35 @@ Not run: `macos`, `intel`.
   (Ipopt's default). Recommended; a diff-against-HSL-example approach for the test was
   advised against (a diff embeds HSL text as context/removed lines).
 
+## Licence compliance round (Codex gpt-6-astra + Grok 4.7, 2026-10-03)
+
+Advisory only — licensing is not settled by vote. Record: `tmp/ai_exchange/review_hsl_licence.md`.
+Agreed by all three: SCLS's public tooling distributes no HSL code and is not a derivative work;
+linking the stack's METIS/BLAS/OpenMP is, in SCLS's reading, the platform optimisation the
+Academic Licence allows. Findings and what changed:
+- **Confidentiality (clause 4):** tracked prose had disclosed results of comparing licensed
+  sources (internal module names, a bug description, "code-identical" statements). Removed from
+  docs, devlog, todos, the test comment and the synthetic fixtures. Public package names, versions
+  and the C API symbols (in Ipopt's redistributable headers) stay.
+- **Sharing (clause 2.1.2):** the personal install was world-readable (0644) and only the stack
+  path asked for acceptance. Now: a prefix under `$HOME` is personal and installed 0700/0600 from
+  the root; any prefix outside `$HOME` is a shared install with the same acceptance step as the
+  stack. The step prints the licence files from the user's tarballs (Coin-HSL's own is only a
+  portal pointer) plus SCLS's statement of the academic terms, says an academic licence does not
+  permit a shared install on a multi-user machine, and records user, uid, host, how, time and the
+  SHA-256 of the texts shown. Stale `--allow-stack-prefix` text and per-mode messages fixed.
+- **Safety:** `--work-dir` was registered for deletion before it was validated — `--work-dir .`
+  would have deleted the checkout on the refusal. Now a `--work-dir` must not pre-exist, deletion
+  is registered only after all checks, `atexit` + SIGTERM cover interrupts, and the assembler's
+  EXIT trap removes its temp files and a half-assembled target. GNU-only `install -D` replaced.
+- **Coin-HSL-only builds** failed the MA77 gate (its refactorization test needs 6.5.0); the test
+  now runs in basic mode unless the override was applied.
+- **Open for Christian:** both auditors doubt that §2.1.4 covers compiling a newer standalone
+  MA77 in place of Coin-HSL's copy. Default stays "apply if newer" (Christian's decision) with
+  `--no-overrides`; flipping to opt-in is the alternative. Docs now present it as SCLS's reading.
+
 ## Open
 
 - `./scls install hsl` on a terminal with sudo (the only path not executed here).
+- Decision on the override default (above).
 - `macos` / `intel` runs.

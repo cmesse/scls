@@ -16,7 +16,7 @@ bad()  { fail=$((fail+1)); echo "  FAIL $1" >&2; }
 
 # --- synthetic Coin-HSL tree ---------------------------------------------------
 DEPS_F77=$'      SUBROUTINE DUMMYA(X)\n      X = 1\n      END\n      SUBROUTINE DUMMYB(X)\n      X = 2\n      END\n'
-DEPS_F90=$'module hsl_of01_double\n  integer :: a = 1\nend module hsl_of01_double\nmodule hsl_kb22_long_integer\n  integer :: b = 2\nend module hsl_kb22_long_integer\n'
+DEPS_F90=$'module mod_alpha\n  integer :: a = 1\nend module mod_alpha\nmodule mod_beta\n  integer :: b = 2\nend module mod_beta\n'
 mk_coin() {   # $1 dir
     local d="$1/coinhsl-2024.05.15"
     mkdir -p "$d/common" "$d/hsl_ma77/C"
@@ -43,14 +43,14 @@ mk_ma77() {   # $1 dir, $2 version, $3 variant (good|extra|hdr|dep)
         echo "/* header $p */" > "$d/include/hsl_ma77$p.h"
     done
     printf '%s' "$DEPS_F77" > "$d/src/common.f"
-    printf 'module hsl_kb22_long_integer\n  integer :: b = 2\nend module hsl_kb22_long_integer\n' > "$d/src/common90.f90"
-    printf 'module hsl_of01_double\n  integer :: a = 1   \nend module hsl_of01_double\n' > "$d/src/ddeps90.f90"   # trailing blanks: must still match
+    printf 'module mod_beta\n  integer :: b = 2\nend module mod_beta\n' > "$d/src/common90.f90"
+    printf 'module mod_alpha\n  integer :: a = 1   \nend module mod_alpha\n' > "$d/src/ddeps90.f90"   # trailing blanks: must still match
     : > "$d/src/sdeps90.f90"
     : > "$d/src/Makefile.am"; : > "$d/src/Makefile.in"
     case "$3" in
         extra) echo "module surprise" > "$d/src/hsl_ma77_extra.f90" ;;
         hdr)   echo "/* changed header d */" > "$d/include/hsl_ma77d.h" ;;
-        dep)   printf 'module hsl_of01_double\n  integer :: a = 99\nend module hsl_of01_double\n' > "$d/src/ddeps90.f90" ;;
+        dep)   printf 'module mod_alpha\n  integer :: a = 99\nend module mod_alpha\n' > "$d/src/ddeps90.f90" ;;
     esac
     tar -czf "$1/hsl_ma77-$2.tar.gz" -C "$1" "hsl_ma77-$2"
     rm -rf "$d"
@@ -96,7 +96,7 @@ s="$T/s6"; mkdir -p "$s"; mk_coin "$s"; mk_ma77 "$s" 6.5.0 hdr
 expect_fail "interface header mismatch stops" 'interface change' "$s"
 # 7. dependency module mismatch stops
 s="$T/s7"; mkdir -p "$s"; mk_coin "$s"; mk_ma77 "$s" 6.5.0 dep
-expect_fail "dependency module mismatch stops" 'unit mod:hsl_of01_double differs' "$s"
+expect_fail "dependency module mismatch stops" 'unit mod:mod_alpha differs' "$s"
 # 8. two coinhsl tarballs
 s="$T/s8"; mkdir -p "$s"; mk_coin "$s"; cp "$s/coinhsl-2024.05.15.tar.gz" "$s/coinhsl-2024.05.16.tar.gz"
 expect_fail "two base tarballs rejected" 'more than one tarball' "$s"

@@ -22,18 +22,22 @@ Pipeline (todo/libhsl_source_selection.md §9):
        - every symbol Ipopt's HSL loader resolves; no METIS defined inside
        - every DT_NEEDED resolves where the flavor says (stack METIS/BLAS, MKL)
        - dlopen smoke test
-       - MA77 factor-and-solve, including the singular-then-refactor case that
-         HSL_MA77 6.5.0 fixed (scripts/hsl/tests/ma77_factor_solve.c)
+       - MA77 factor-and-solve (scripts/hsl/tests/ma77_factor_solve.c); its
+         refactorization part runs only when HSL_MA77 >= 6.5.0 is present
        - check_mkl_linkage.sh on MKL flavors
 """
 
 import argparse
+import atexit
+import hashlib
 import json
 import os
 import platform
 import re
 import shlex
 import shutil
+import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -78,12 +82,21 @@ FILES_RE = re.compile(r"\bsrc\s*\+=\s*files\(([^)]*)\)", re.S)
 QUOTED_RE = re.compile(r"'([^']+)'")
 
 
-CLEANUP_DIR = None   # scratch dir holding HSL sources; removed on exit unless --keep-work
+CLEANUP_DIR = None   # scratch dir holding HSL sources; removed at exit unless --keep-work.
+                     # Only ever a directory THIS run created (mkdtemp, or a --work-dir that did
+                     # not exist), and only registered after every path check has passed, so no
+                     # exit path can remove a pre-existing directory of the user's.
 
 
 def cleanup() -> None:
+    global CLEANUP_DIR
     if CLEANUP_DIR and Path(CLEANUP_DIR).exists():
         shutil.rmtree(CLEANUP_DIR, ignore_errors=True)
+    CLEANUP_DIR = None
+
+
+atexit.register(cleanup)                       # normal exit, sys.exit, uncaught exception
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))   # route SIGTERM through atexit
 
 
 def die(msg: str) -> None:
@@ -208,9 +221,10 @@ def main() -> None:
                          'acceptance (or --accept-licence); publishes with sudo if needed. '
                          'This is `./scls install hsl`.')
     ap.add_argument('--accept-licence', action='store_true',
-                    help='with --install-stack: non-interactive acceptance. You confirm that your HSL '
-                         'licence covers use of the library on this machine by everyone who can use '
-                         'the stack prefix.')
+                    help='non-interactive acceptance for a shared install (--install-stack, or a --prefix '
+                         'outside your home). You confirm that you have read your HSL licence agreement '
+                         'and that it covers use of the library at that location by everyone who can '
+                         'use it.')
     ap.add_argument('--no-overrides', action='store_true',
                     help='build Coin-HSL as shipped, without standalone overrides (for comparison)')
     ap.add_argument('--jobs', type=int, default=os.cpu_count() or 1)
@@ -239,30 +253,39 @@ def main() -> None:
         die("--install-stack and --prefix are exclusive")
     prefix = (stack if args.install_stack
               else (args.prefix or Path.home() / '.local' / 'scls-hsl' / flavor_name)).resolve()
-    work = (args.work_dir.resolve() if args.work_dir
-            else Path(tempfile.mkdtemp(prefix='scls-hsl-')))
-    # The scratch dir holds HSL source from the moment assembly starts. It is
-    # removed on every exit path, success or failure, unless --keep-work asks
-    # otherwise, so a failed run never leaves proprietary source behind.
-    global CLEANUP_DIR
-    if not args.keep_work:
-        CLEANUP_DIR = work
+    if args.work_dir:
+        work = args.work_dir.resolve()
+        if work.exists():
+            die(f"--work-dir {work} already exists; give a path this run may create (it will be "
+                f"removed afterwards unless --keep-work)")
+    else:
+        work = None   # created below, after the path checks
     # Never let HSL source or HSL-derived binaries land in the work tree (tmp/ is
     # git-ignored, but an ignore rule is one `git add -f` away from a leak), and
     # never into the stack prefix, where flavor-wide scans and packaging look.
     for label, p in (('--work-dir', work), ('--prefix', prefix)):
-        if is_within(p, REPO):
+        if p is not None and is_within(p, REPO):
             die(f"{label} {p} is inside the SCLS work tree; HSL output must stay outside it")
     # HSL sources never go into the stack prefix. The built library may, but only
-    # on explicit request: that is the licensee's compliance call (personal-use
-    # licence on a shared machine vs. a single-user box or a site licence), and
-    # the file will be unowned by any RPM/DEB.
-    if is_within(work, stack):
+    # through the acceptance step below; the file will be unowned by any RPM/DEB.
+    if work is not None and is_within(work, stack):
         die(f"--work-dir {work} is inside the stack prefix {stack}; HSL sources must stay out of it")
     if is_within(prefix, stack) and not args.install_stack:
         die(f"--prefix {prefix} is inside the stack prefix {stack}. Use `./scls install hsl` "
             f"(--install-stack), which shows the licence conditions and asks for acceptance")
+    # A prefix outside the user's home is shared by construction (other users may
+    # read it), so it takes the same acceptance step as the stack prefix.
+    shared_install = args.install_stack or not is_within(prefix, Path.home())
 
+    # Create the scratch dir now, after every check, and register it for removal.
+    # It holds HSL source from the moment assembly starts.
+    global CLEANUP_DIR
+    if work is None:
+        work = Path(tempfile.mkdtemp(prefix='scls-hsl-'))
+    else:
+        work.mkdir(parents=True, mode=0o700)
+    if not args.keep_work:
+        CLEANUP_DIR = work
     libmetis = stack / 'lib' / ('libmetis.dylib' if is_macos else 'libmetis.so')
     if not (stack / 'include' / 'metis.h').exists() or not libmetis.exists():
         die(f"stack METIS not found under {stack}; install scls-{flavor_name}-metis first")
@@ -437,35 +460,58 @@ def main() -> None:
             die("MA77 test executable does not reference the staged library after install_name_tool")
     ma77_dir = tests / 'ma77-files'
     ma77_dir.mkdir()
-    run([ma77, ma77_dir])
+    # Test 1 always. Test 2 (refactorization after a failed factorization) needs
+    # HSL_MA77 >= 6.5.0, i.e. the standalone override; Coin-HSL's own copy is
+    # expected to fail it, so it is skipped for a base-only build.
+    # Applied overrides are recorded as "override: <pkg> <old> -> <new> ..."; skipped
+    # ones as "override: <pkg> skipped ...". Only the former counts.
+    ma77_overridden = bool(re.search(r"^override: HSL_MA77 [0-9][^\n]* -> ", provenance, re.M))
+    run([ma77, ma77_dir, 'full' if ma77_overridden else 'basic'])
+    if not ma77_overridden:
+        print("note: MA77 refactorization test skipped (needs HSL_MA77 >= 6.5.0; Coin-HSL base only)")
 
     if linalg == 'mkl':
         run([REPO / 'scripts' / 'check_mkl_linkage.sh', '--flavor', flavor_name, '--prefix', stage])
 
     # --- 3b. licence acceptance for a stack-prefix install ------------------------------
-    accepted_by = ''
-    if args.install_stack:
+    acceptance = {}
+    if shared_install:
+        where = str(stack) if args.install_stack else str(prefix)
+        lic_files = sorted((assembled / 'LICENCES').iterdir())
         print("\n" + "=" * 78)
-        print("INSTALLING INTO THE STACK PREFIX: " + str(stack))
-        print("The library will be usable by every user of this prefix and is owned by no package.")
-        print("These are the licence texts shipped in the HSL tarballs you supplied:\n")
-        for lic in sorted((assembled / 'LICENCES').iterdir()):
+        print("INSTALLING INTO A SHARED LOCATION: " + where)
+        print("The library will be readable by every user of that location and is owned by no package.")
+        print("These are the licence files shipped in the HSL tarballs you supplied:\n")
+        for lic in lic_files:
             print(f"----- {lic.name} -----")
             print(lic.read_text(errors='replace').rstrip())
             print()
         print("=" * 78)
-        print("By accepting you confirm that your HSL licence covers use of this library on this")
-        print("machine by everyone who can use " + str(stack) + " (e.g. a single-user machine, or a")
-        print("site/commercial licence). SCLS distributes nothing; compliance is yours.")
+        print("Note: Coin-HSL's own LICENCE is a pointer to the agreement you accepted on the STFC")
+        print("portal; the terms are in that agreement, not in the tarball. Under the HSL ACADEMIC")
+        print("licence (version 2.0), use is personal to you: it may not be shared with anyone,")
+        print("including colleagues at your own institution, and may not be used commercially.")
+        print("An academic licence therefore does NOT permit this shared install on a machine used")
+        print("by others. It is permitted only if nobody else can use this location, or if you hold a")
+        print("licence whose terms allow it. SCLS distributes nothing and grants no rights.")
+        print("By accepting you confirm that you have read your HSL licence agreement and that it")
+        print("covers use of this library here by everyone who can use " + where + ".")
         if args.accept_licence:
             print("Accepted via --accept-licence.")
+            how = '--accept-licence'
         elif sys.stdin.isatty():
             answer = input("Type 'yes' to accept and install, anything else to abort: ").strip()
             if answer != 'yes':
                 die("licence not accepted; nothing installed")
+            how = 'interactive'
         else:
-            die("stack-prefix install needs licence acceptance: run on a terminal or pass --accept-licence")
-        accepted_by = f"{os.environ.get('USER', 'unknown')} {datetime.now().isoformat(timespec='seconds')}"
+            die("a shared install needs licence acceptance: run on a terminal or pass --accept-licence")
+        acceptance = {
+            'accepted_by': os.environ.get('USER') or str(os.getuid()),
+            'uid': os.getuid(), 'host': socket.gethostname(), 'how': how,
+            'when': datetime.now().astimezone().isoformat(timespec='seconds'),
+            'licence_texts_sha256': {l.name: hashlib.sha256(l.read_bytes()).hexdigest() for l in lic_files},
+        }
 
     # --- 4. publish ------------------------------------------------------------------
     libdir = prefix / 'lib'
@@ -485,13 +531,29 @@ def main() -> None:
     alias = libdir / alias_name
 
     def publish_tree(src_root: Path, dst_root: Path) -> None:
-        writable = os.access(dst_root if dst_root.exists() else dst_root.parent, os.W_OK)
+        # A personal prefix is owner-only (dirs 0700, files 0600): "personal use"
+        # must not become sharing through a traversable home directory. A shared
+        # install (accepted above) is world-readable. `install -d` + `install -m`
+        # rather than GNU-only `install -D`, so the same code runs on macOS.
+        dmode, fmode = ('0755', '0644') if shared_install else ('0700', '0600')
+        parent = dst_root
+        while not parent.exists():
+            parent = parent.parent
+        writable = os.access(parent, os.W_OK)
         sudo = [] if writable else ['sudo']
         if not writable:
             print(f"{dst_root} is not writable; publishing with sudo (files only)")
+        # Every directory from the prefix root down gets dmode, so a personal
+        # prefix is closed at its root, not only at the leaves holding files.
+        dirs = {Path('.')}
+        for f in src_root.rglob('*'):
+            if f.is_file():
+                rel = f.parent.relative_to(src_root)
+                dirs.update([rel, *rel.parents])
+        for d in sorted(dirs, key=lambda x: len(x.parts)):
+            run([*sudo, 'install', '-d', '-m', dmode, dst_root / d])
         for f in sorted(p for p in src_root.rglob('*') if p.is_file()):
-            rel = f.relative_to(src_root)
-            run([*sudo, 'install', '-D', '-m', '0644', f, dst_root / rel])
+            run([*sudo, 'install', '-m', fmode, f, dst_root / f.relative_to(src_root)])
         run([*sudo, 'ln', '-sfn', libname, dst_root / 'lib' / alias_name])
 
     cmake_version = run([cmake, '--version'], capture=True).splitlines()[0]
@@ -512,24 +574,30 @@ def main() -> None:
         f"fflags: {json.dumps(shlex.join(fflags + [omp] + fextra))}\n"
         f"math_libs: {json.dumps(shlex.join(math_libs))}\n"
         f"rpath: {json.dumps(':'.join(rpath))}\n"
+        f"install_mode: {'stack' if args.install_stack else ('shared' if shared_install else 'personal')}\n"
         f"needed:\n" + ''.join(f"  {n}: {p}\n" for n, p in needed.items()) +
-        (f"licence_accepted_by: {accepted_by}\n" if accepted_by else ''))
+        (("licence_acceptance:\n" + ''.join(
+            f"  {k}: {json.dumps(v)}\n" for k, v in acceptance.items())) if acceptance else ''))
     publish_tree(pub, prefix)
 
     cleanup()
 
     print(f"\nInstalled {libdir / libname} (+ {alias.name} symlink)")
     print(f"Licences and provenance: {docdir}")
-    if is_within(prefix, stack):
+    if args.install_stack:
         print("Ipopt finds it through libipopt's RUNPATH; no hsllib option is needed. In ipopt.opt:")
         print("  linear_solver ma97")
+        print("Installed for every user of this prefix on the licence you confirmed; the acceptance is")
+        print("recorded in share/hsl/build-info.yaml.")
     else:
         print("Use it from Ipopt by giving the full path, in ipopt.opt or via AddIpoptStrOption:")
         print(f"  hsllib {alias}")
         print("  linear_solver ma97")
-        print("(SCLS policy: never LD_LIBRARY_PATH / DYLD_LIBRARY_PATH. To have Ipopt find it by")
-        print(" default, install into the stack prefix with --allow-stack-prefix, if your licence allows.)")
-    print("This library is for your personal use under your HSL licence; do not share it.")
+        print("(SCLS never uses LD_LIBRARY_PATH / DYLD_LIBRARY_PATH. For Ipopt to find it with no")
+        print(" option, `./scls install hsl` installs into the stack prefix after licence acceptance.)")
+        if not shared_install:
+            print("Installed owner-only (0700/0600): under the HSL Academic Licence the library is for your")
+            print("personal use and may not be shared, including within your institution.")
 
 
 if __name__ == '__main__':

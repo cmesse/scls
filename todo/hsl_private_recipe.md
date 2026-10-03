@@ -54,10 +54,9 @@ so the **unchanged, public** `libipopt` can use MA97/MA57 at runtime (`linear_so
 Facts established:
 - `hsl_ma97d_ciface.f90` defines all seven C symbols Ipopt loads (`ma97_{default_control,analyse,factor,factor_solve,solve,finalise,free_akeep}_d`).
 - The `ma97_control` and `ma97_info` structs in Ipopt's `hsl_ma97d.h` are token-identical to the package's `include/hsl_ma97d.h`.
-- **Duplicate symbols.** `ma57/ddeps.f` and `hsl_ma97/common.f` both define 20 routines: `MC21AD/BD`, `MC22AD`, `MC59AD-FD`, `MC64AD/BD/DD/ED/FD/ID/QD/RD/SD/UD/WD`. The code of all 20 is identical once comment lines are stripped (per-routine hash). Each routine must be compiled exactly once, or the shared-library link fails.
+- **Duplicate symbols.** `ma57/ddeps.f` and `hsl_ma97/common.f` both define 20 routines: a set of shared F77 helper routines. The code of all 20 is identical once comment lines are stripped (per-routine hash). Each routine must be compiled exactly once, or the shared-library link fails.
 - **METIS 4 interface.** Both packages call METIS 4's Fortran entry point
-  `metis_nodend(n, xadj, adjncy, numflag=1, options, invperm, perm)` (`ma57d.f:468`,
-  `common90.f90:4688,4906`). They detect a stub by `perm(1) == -1` after a probe call on a
+  `metis_nodend(n, xadj, adjncy, numflag=1, options, invperm, perm)` . They detect a stub by `perm(1) == -1` after a probe call on a
   1×1 or 2×2 graph. The stack's METIS is 5.2.1 with 32-bit `idx_t`, which matches default Fortran
   `INTEGER` (`recipes/metis.yaml:37-38`), but METIS 5 has no `metis_nodend_`.
 

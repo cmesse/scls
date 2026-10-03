@@ -36,6 +36,21 @@ REPO="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
 die()  { echo "assemble_sources: error: $*" >&2; exit 1; }
 note() { echo "assemble_sources: $*"; }
 
+# Every temporary file/dir this script makes is listed here and removed at exit;
+# on a failed run the partially assembled target (which holds HSL source) is
+# removed too, so no exit path leaves HSL content behind.
+TMPS=()
+TARGET=""
+cleanup() {
+    local rc=$?
+    [ ${#TMPS[@]} -gt 0 ] && rm -rf "${TMPS[@]}"
+    if [ $rc -ne 0 ] && [ -n "$TARGET" ] && [ -d "$TARGET" ]; then
+        rm -rf "$TARGET/src" "$TARGET/originals" "$TARGET/LICENCES" "$TARGET/PROVENANCE.txt" \
+               "$TARGET/PROVENANCE.txt.tmp" "$TARGET/.unpack"
+    fi
+}
+trap cleanup EXIT
+
 NO_OVERRIDES=0
 if [ "${1:-}" = "--no-overrides" ]; then NO_OVERRIDES=1; shift; fi
 [ $# -eq 2 ] || die "usage: $0 [--no-overrides] <tarball-dir> <target-dir>"
@@ -101,7 +116,7 @@ safe_extract() {   # $1 tarball, $2 destination; prints the single top-level dir
     # List once into a file, then inspect it. A `tar | grep -q` pipeline under
     # pipefail can report failure when grep exits early and tar gets SIGPIPE,
     # which would turn a detected unsafe member into a silent pass.
-    listing="$(mktemp)"
+    listing="$(mktemp)"; TMPS+=("$listing" "$listing.names")
     tar -tvzf "$tb" > "$listing" || die "$(basename "$tb"): cannot list archive"
     [ -s "$listing" ] || die "$(basename "$tb"): empty archive listing"
     # Member paths: field 6 of -tv output (name, or "name -> target" / "name link to target").
@@ -146,7 +161,7 @@ unit_hashes() {   # $1 file -> lines "kind:name sha256", then "COVERAGE headers=
     # (END SUBROUTINE form, tab indentation, END followed by a comment) must stop
     # the build rather than silently escape comparison.
     local f="$1" d u
-    d="$(mktemp -d)"
+    d="$(mktemp -d)"; TMPS+=("$d")
     # Portable awk (no gawk extensions): lower-case copies for matching only.
     awk -v f="$f" -v d="$d" '
         { line = $0; sub(/[ \t\r]+$/, "", line); lc = tolower(line) }
@@ -179,7 +194,7 @@ unit_hashes() {   # $1 file -> lines "kind:name sha256", then "COVERAGE headers=
         [ -e "$u" ] && echo "$(basename "$u") $(sha256 "$u")"
     done
     cat "$d/.coverage"
-    rm -rf "$d"
+    rm -rf "$d"   # also in TMPS for the failure path
 }
 check_coverage() {   # $1 label, stdin = unit_hashes output -> echoes everything but the trailer
     local cov h u

@@ -12,14 +12,15 @@ tex/
 .claude/ai_exchange_pos.txt
 
 # HSL is proprietary (STFC licence): its sources and anything built from them
-# must never be committed, wherever they land in the tree. Only
-# scripts/build_libhsl.py is public. See todo/libhsl_build_script.md.
-coinhsl-*
+# must never be committed, wherever they land in the tree. What is public is
+# SCLS's own build tooling (scripts/build_libhsl.py, scripts/hsl/) and docs.
+# Patterns cover tarballs, unpacked trees and built libraries of every HSL
+# package name in doc/HSL_BUILD.md, with or without the hsl_ prefix.
+coinhsl*
 hsl-galahad*
-hsl_ma[0-9]*
-hsl_mc[0-9]*
-ma27-*
-ma57-*
+hsl_m[a-z][0-9]*
+ma[0-9][0-9]-*
+mc[0-9][0-9]-*
 libcoinhsl.*
 libhsl.*
 

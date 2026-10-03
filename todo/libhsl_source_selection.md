@@ -69,12 +69,12 @@ Inputs in `tmp/HSL/` (git-ignored):
 | HSL_MA86 | 1.7.4 | 1.7.4 | module-name letter case only |
 | HSL_MC68 | 3.3.3 | 3.3.3 | same version; inside Coin-HSL it lives in `common/deps90.f90` |
 | MA57 | 3.11.3 | 3.11.3 | Coin-HSL calls its own METIS adapter `hsl_metis`; the standalone calls METIS 4's `METIS_NODEND` |
-| HSL_MA77 | 6.4.0 | **6.5.0** | one bug fix in its `input_reals` routine, for the case where the previous factorization was singular or not positive definite |
+| HSL_MA77 | 6.4.0 | **6.5.0** | a newer release (one bug fix) |
 | MA27, MA28, MC19 | in Coin-HSL | no standalone tarball here | — |
 
 **HSL_MA77 6.5.0 as a drop-in for Coin-HSL's copy:**
 - Its C interface files (`hsl_ma77{d,s}_ciface.f90`) and headers (`hsl_ma77{d,s}.h`) are byte-identical to Coin-HSL's.
-- It `use`s eight modules: `hsl_kb22_long_integer`, `hsl_ma54_{double,single}`, `hsl_ma64_{double,single}`, `hsl_of01_{double,single,integer}`. All eight are in Coin-HSL's `common/deps90.f90`, and each module body is code-identical between the two.
+- It `use`s eight modules: eight dependency modules. All eight are in Coin-HSL's `common/deps90.f90`, and the assembler verifies them against Coin-HSL.
 - Only `hsl_ma77d.f90` and `hsl_ma77s.f90` change.
 
 ## 3. Source selection — options
@@ -285,3 +285,12 @@ replaced by this section wherever they conflict.
   symlink, **hard** install name = `<prefix>/lib/libcoinhsl.dylib` (no `@rpath`, per Christian), stack
   libs by their install names; the pre-publish test is retargeted to staging with
   `install_name_tool -change`. Never run yet.
+
+## 11. Licence round (2026-10-03) — see devlog and `tmp/ai_exchange/review_hsl_licence.md`
+
+- [x] Personal install private (0700/0600); any non-`$HOME` prefix = shared = acceptance.
+- [x] Acceptance states the Academic Licence terms in SCLS's words; extended record.
+- [x] Confidential-looking prose removed from tracked files.
+- [x] `--work-dir` deletion-before-validation fixed; atexit/SIGTERM cleanup; assembler trap.
+- [x] Coin-HSL-only build passes (basic MA77 test).
+- [ ] **Christian:** keep the MA77 override default-on ("apply if newer") or make it opt-in.

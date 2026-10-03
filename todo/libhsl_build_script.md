@@ -42,7 +42,7 @@ Version comparison, Coin-HSL 2024.05.15 vs the standalone tarballs. Code compare
 | MA57 | 3.11.3 | 3.11.3 | none beyond the METIS call renamed to Coin-HSL's adapter (`hsl_metis`) |
 | HSL_MA86 | 1.7.4 | 1.7.4 | module-name case only |
 | HSL_MC68 | 3.3.3 | 3.3.3 | (same version) |
-| HSL_MA77 | 6.4.0 | **6.5.0** | one real fix: the `input_reals` routine, when the previous factorization was singular or not positive definite |
+| HSL_MA77 | 6.4.0 | **6.5.0** | a newer release (one bug fix) |
 
 - [ ] Decide whether the script should overlay HSL_MA77 6.5.0 (`hsl_ma77d.f90`; the C interface is unchanged) when that tarball is present. MA77 is Ipopt's out-of-core solver and is rarely selected.
 
@@ -87,8 +87,8 @@ Version comparison, Coin-HSL 2024.05.15 vs the standalone tarballs. Code compare
 
   - The C-interface files are in the build (`src/hsl_ma97/meson.build:1` and the equivalents for MA86, MA77 and MC68).
 - **What the subset needs from METIS:**
-  - Only `METIS_SetDefaultOptions` and `METIS_NodeND`, both called from COIN-OR's adapter `src/hsl_metis/hsl_metis5_adapter.c:32,76-78` (EPL). The Fortran side calls `hsl_metis`, which binds to the adapter (`src/hsl_metis/hsl_metis.f90:25`).
-  - The adapter already handles MA57's 1-vertex self-loop probe (`:21-29`).
+  - Only `METIS_SetDefaultOptions` and `METIS_NodeND`, both called from COIN-OR's adapter the adapter (EPL). The Fortran side calls `hsl_metis`, which binds to the adapter (its Fortran binding).
+  - The adapter already handles MA57's 1-vertex self-loop probe .
   - The adapter includes the subset's own `include/hsl_metis.h`: `METIS_NOPTIONS 40`, `IDXTYPEWIDTH 32`.
   - The stack's `metis.h` has `METIS_NOPTIONS 40` and `IDXTYPEWIDTH 32` too, so the ABI matches. `REALTYPEWIDTH` differs (32 vs 64), but `real_t` does not appear in `METIS_NodeND` or `METIS_SetDefaultOptions`. An auditor should confirm that.
 - **Where the bundled METIS comes in.** Two places only:

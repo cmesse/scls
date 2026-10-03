@@ -163,10 +163,14 @@ the sources and binaries are private.**
   Nothing HSL-derived may be committed, staged to a repository host, pasted into a
   devlog or audit prompt, or given to another person. Each user needs their own
   licence and their own build.
-- Linking against the stack's own METIS, BLAS/LAPACK and OpenMP runtime is the
-  licensee's platform optimisation, which the licence permits. Whether a given
-  installation layout complies with the personal-use terms is the licensee's
-  decision, not SCLS's.
+- Linking against the stack's own METIS, BLAS/LAPACK and OpenMP runtime is, in SCLS's
+  reading, the platform optimisation the Academic Licence allows a licensee; Coin-HSL
+  itself ships the adapter for an external METIS. The optional override that takes a
+  solver's sources from a newer standalone release the user also holds combines two of
+  the user's distributions in one build; whether that is within their licence is the
+  user's decision (`--no-overrides` builds Coin-HSL as shipped). SCLS states its reading
+  and grants nothing; compliance with the personal-use, no-sharing and non-commercial
+  terms is the licensee's responsibility.
 
 ## Source Availability
 

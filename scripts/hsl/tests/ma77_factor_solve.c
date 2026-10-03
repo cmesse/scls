@@ -7,13 +7,13 @@
  *
  * Test 1: factor and solve a symmetric indefinite tridiagonal system
  *         A x = b with a known solution; check the forward error.
- * Test 2: the case HSL_MA77 6.5.0 fixed. Enter values that are not positive
- *         definite and factor with posdef = true, which must fail. Then
- *         enter positive definite values for the same pattern with
- *         input_reals, refactor, solve, and check the forward error.
+ * Test 2 ("full" mode only): a positive-definite factorization of a matrix
+ *         that is not positive definite must fail; then new values are
+ *         entered for the same pattern, the matrix is refactored and solved,
+ *         and the forward error is checked. Requires HSL_MA77 >= 6.5.0.
  *
- * Usage: ma77_factor_solve <scratch-dir>   (MA77 writes its out-of-core files
- *        there). Exit 0 on success.
+ * Usage: ma77_factor_solve <scratch-dir> [basic|full]   (MA77 writes its
+ *        out-of-core files to <scratch-dir>). Exit 0 on success.
  */
 #include <math.h>
 #include <stdio.h>
@@ -106,6 +106,7 @@ static int open_and_analyse(void **keep, struct ma77_control *control,
 
 int main(int argc, char **argv) {
     const char *dir = argc > 1 ? argv[1] : ".";
+    int full = !(argc > 2 && strcmp(argv[2], "basic") == 0);
     /* MA77 is out-of-core: it keeps its factors in four direct-access files
      * named by the caller. These names are ours; any four distinct names work. */
     const char *base[4] = {"scls_ma77_int", "scls_ma77_real", "scls_ma77_work", "scls_ma77_tmp"};
@@ -128,8 +129,12 @@ int main(int argc, char **argv) {
     failed |= solve_and_check(&keep, &control, &info, diag_indef, 1.0, "test 1 (indefinite)");
     ma77_finalise(&keep, &control, &info);
 
+    if (!full) {
+        puts(failed ? "MA77 functional gate: FAIL" : "MA77 functional gate: PASS (basic)");
+        return failed;
+    }
     /* Test 2: posdef factor of a non-posdef matrix must fail; then new
-     * values via input_reals, refactor and solve must succeed. */
+     * values for the same pattern, refactor and solve must succeed. */
     ma77_default_control(&control);
     if (open_and_analyse(&keep, &control, &info, diag_notposdef, 1.0)) return 1;
     ma77_factor(1, &keep, &control, &info, NULL);
