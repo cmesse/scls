@@ -146,8 +146,24 @@ R9-gcc has since been promoted and cleared on belfem: 53 files in the repo and s
 835e8a44, the 53 superseded files parked in the attic, repodata listing the new versions and both
 `repomd.xml.asc` signatures good.
 
-R9-mkl uploaded and with belfem, awaiting the arrival checks and promotion. Nothing is queued on
-this host.
+**R9-mkl-20260925T0946Z, the drop described above, was REJECTED and deleted — it was never
+promoted.** belfem's `readelf` pass on arrival found `libscalapack.so` linking
+`libmkl_sequential` while the rest of the flavor linked `libmkl_gnu_thread`, and
+`libarmadillo.so` carrying `libmkl_rt` beside the layered libraries. The §5 verification in this
+entry is accurate as far as it goes — the drop was internally consistent, correctly signed-for and
+correctly selected — and it still missed the defect, because every check it ran was per-package
+and the defect is per-flavor. That gap is the subject of
+`devlog/dl20260925_mkl_threading_uniformity.md`, along with the fix
+(`scalapack 2.2.3-4`, `armadillo 15.6.0-2`, commit `6a4d268`) and the new
+`scripts/check_mkl_linkage.sh` gate that now runs before `READY` is written.
+
+The replacement, **R9-mkl-20260925T1022Z** (51 files, 763,258,998 bytes,
+`sha256(SHA256SUMS) = e32f1b7c…737d`), was staged with that gate passing, uploaded, and confirmed
+by belfem: READY and SHA256SUMS OK on 51 files, byte count exact, manifest equal to payload, zero
+overlap with the published list, 28/28 already_published digests matching, and a `readelf` pass
+over 235 ELF files showing all 163 MKL consumers on `core + gf_lp64 + gnu_thread` with no
+`sequential`, no `rt` and no `scalapack`/`blacs`. It is with Christian for promotion. Nothing is
+queued on this host.
 
 **All three R9 columns are now staged** — debug and gcc promoted, mkl in flight. R10, AMZN and U24
 remain untouched open columns in `todo/rebuild_campaign_20260922.md`; each needs a build host, which
