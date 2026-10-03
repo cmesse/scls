@@ -94,6 +94,8 @@ Commands:
 ./scls list                  # List installed packages
 ./scls order                 # Show the resolved build order for the flavor
 ./scls check-updates         # Run the update checker over all recipes
+./scls build hsl [--sources DIR]    # Private libhsl for Ipopt from the licensee's own HSL tarballs into ~/.local; no package (doc/HSL_BUILD.md)
+./scls install hsl [--sources DIR]  # Same, into /opt/scls/<flavor> after the user accepts the HSL licence terms; Ipopt then needs no hsllib option
 ```
 
 `./scls install <package>` installs only the newest build of each package name,

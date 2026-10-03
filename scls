@@ -107,6 +107,23 @@ if [ "$USE_RPM" != true ] && [ "$(uname)" = "Linux" ] && [ -f /etc/os-release ];
     esac
 fi
 
+# 'scls build hsl' is not a package build. HSL is proprietary and never
+# packaged, staged or installed into the stack prefix; scripts/build_libhsl.py
+# builds a private libhsl for Ipopt's runtime loader from the licensee's own
+# tarballs into a per-user prefix (default ~/.local/scls-hsl/<flavor>). It is
+# routed here, before the builders, so it never gets a recipe, a spec, a
+# registry entry or a place in the build order. See doc/LICENSE_POLICY.md.
+# 'scls install hsl' installs into the stack prefix instead: it shows the licence
+# texts from the user's tarballs and requires acceptance (or --accept-licence),
+# then publishes with sudo. Ipopt then finds libhsl.so through its own RUNPATH.
+if [ "${2:-}" = "hsl" ] && { [ "${1:-}" = "build" ] || [ "${1:-}" = "install" ]; }; then
+    MODE="$1"; shift 2
+    if [ "$MODE" = "install" ]; then
+        exec $PYTHON "$SCLS_DIR/scripts/build_libhsl.py" --flavor "$FLAVOR" --install-stack "$@"
+    fi
+    exec $PYTHON "$SCLS_DIR/scripts/build_libhsl.py" --flavor "$FLAVOR" "$@"
+fi
+
 # Handle commands that don't need a package name
 case "$1" in
     list)

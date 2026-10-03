@@ -121,6 +121,53 @@ Some flavors intentionally rely on external proprietary runtimes, most notably
 Intel oneAPI MKL for the `mkl` and `intel` flavors. SCLS should depend on the
 vendor-provided RPMs rather than copying vendor libraries into SCLS packages.
 
+### Proprietary Libraries Built by the Licensee (HSL)
+
+Some solvers Ipopt can use are proprietary and licensed to an individual, not to a
+site. The HSL linear solvers (MA27, MA57, HSL_MA77, HSL_MA86, HSL_MA97, HSL_MC68, MC19; see
+[`HSL_BUILD.md`](HSL_BUILD.md) for which tarballs a licensee provides and how to build)
+are the standing case: the HSL Academic Licence grants *personal* use, forbids sharing
+the software or its use with anyone, including colleagues at the same institution, and
+forbids commercial use. For these, SCLS follows one rule: **the scripts are public,
+the sources and binaries are private.**
+
+- SCLS ships **no** HSL source, no HSL binary, no package that depends on HSL, and no
+  recipe. `recipes/ipopt.yaml` configures `--without-hsl`; Ipopt's runtime loader
+  (`hsllib`) stays on so a licensee can supply the library themselves.
+- What SCLS publishes is build tooling only: `scripts/build_libhsl.py`,
+  `scripts/hsl/assemble_sources.sh`, `scripts/hsl/CMakeLists.txt` and the functional
+  test under `scripts/hsl/tests/`. These contain no HSL text. The test exercises MA77
+  through its documented C API and is compiled against the licensee's own header at
+  build time.
+- The licensee supplies the **original, unmodified** HSL tarballs. The assembler
+  unpacks them into a directory outside the SCLS work tree, keeps each package's
+  `LICENCE` under `LICENCES/`, and records inputs and checksums in `PROVENANCE.txt`.
+  HSL *sources* never enter the work tree or the stack prefix.
+- Two install locations, both the licensee's choice:
+  - `./scls build hsl` installs into a per-user prefix (default
+    `~/.local/scls-hsl/<flavor>`). Ipopt is pointed at it with `hsllib <full path>`
+    in `ipopt.opt` or via the API. This is the default because the HSL Academic
+    Licence is personal-use.
+  - `./scls install hsl` installs into the stack prefix `/opt/scls/<flavor>`, where
+    Ipopt's default `hsllib` finds it through `libipopt`'s RUNPATH with no
+    configuration. Before publishing, it prints the licence texts from the user's
+    own tarballs and requires explicit acceptance (typed `yes`, or `--accept-licence`
+    for scripted use), confirming that the licence covers use on that machine by
+    everyone who can use the prefix (a single-user machine, or a site/commercial
+    licence). The file is owned by no package; the acceptance is recorded in
+    `share/hsl/build-info.yaml`. Compliance is the licensee's responsibility, not
+    SCLS's: SCLS distributes nothing.
+  - `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` are not an option here or anywhere in
+    SCLS.
+- `.gitignore` blocks HSL tarball, tree and library names anywhere in the repository.
+  Nothing HSL-derived may be committed, staged to a repository host, pasted into a
+  devlog or audit prompt, or given to another person. Each user needs their own
+  licence and their own build.
+- Linking against the stack's own METIS, BLAS/LAPACK and OpenMP runtime is the
+  licensee's platform optimisation, which the licence permits. Whether a given
+  installation layout complies with the personal-use terms is the licensee's
+  decision, not SCLS's.
+
 ## Source Availability
 
 For Linux RPM distribution, SCLS should provide matching source RPMs for binary
@@ -159,3 +206,5 @@ explicit decision (Christian, 2026-09-28).
 - Avoid as SCLS-owned Linux binary packages: GMP, MPFR, MPC.
 - Prefer system packages for: GMP, MPFR, MKL, and other libraries where the
   system or vendor package is the clean redistribution boundary.
+- Never shipped, licensee-built only: HSL (public build scripts, private sources
+  and binaries).
