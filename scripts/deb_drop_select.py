@@ -45,6 +45,13 @@ NO_SOURCE_REASON = ('SCLS-generated packaging, no upstream source; '
                     'source in the SCLS repository')
 
 
+def keyring_release():
+    """This host's scls-archive-keyring release, from deb_builder's table."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'python'))
+    from deb_builder import KEYRING_RELEASE_BY_CODENAME, _apt_repo_for_host
+    return KEYRING_RELEASE_BY_CODENAME[_apt_repo_for_host()[1]]
+
+
 def no_source_names(flavor):
     return {'scls-archive-keyring', f'scls-{flavor}', f'scls-{flavor}-environment'}
 
@@ -141,12 +148,17 @@ def main():
 
         # Generated packages have no recipe of their own, but their versions still
         # follow one: environment is version-release of recipes/environment.yaml,
-        # and the metas and keyring are its version with release 1 (deb_builder
-        # hard-codes it). Checked here because they skip the source-package path.
+        # the metas are its version with release 1 (deb_builder hard-codes it), and
+        # the keyring its version with deb_builder's per-codename release.
+        # Checked here because they skip the source-package path.
         if generated:
             env = yaml.safe_load((repo / 'recipes' / 'environment.yaml').read_text())
-            want = (f"{env['version']}-{env.get('release', 1)}"
-                    if name == f'scls-{flavor}-environment' else f"{env['version']}-1")
+            if name == f'scls-{flavor}-environment':
+                want = f"{env['version']}-{env.get('release', 1)}"
+            elif name == 'scls-archive-keyring':
+                want = f"{env['version']}-{keyring_release()}"
+            else:
+                want = f"{env['version']}-1"
             if want != ver:
                 print(f'excluded\t{nva}  reason: installed {ver} does not match expected {want}')
                 continue

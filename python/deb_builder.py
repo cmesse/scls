@@ -2051,13 +2051,24 @@ SCLS_RELEASE_DEB_NAME = 'scls-archive-keyring'
 # One APT repository per Ubuntu release, each with its own reprepro pool
 # (decided 2026-09-28). Package versions carry no distro tag, so U24 and U26
 # builds of one recipe share a filename with different bytes; a shared pool
-# would refuse the second. noble keeps the original path that existing clients
-# already point at; later releases are separate reprepro bases nested under it. A new release is added here on purpose, never derived: a
-# guessed path would ship a keyring pointing at a repo that does not exist.
+# would refuse the second. Each release is a reprepro base nested under
+# ubuntu/; noble moved there from ubuntu itself on 2026-10-01, and belfem keeps
+# ubuntu/{dists,pool} as compatibility symlinks for clients with the old URL.
+# A new release is added here on purpose, never derived: a guessed path would
+# ship a keyring pointing at a repo that does not exist.
 APT_REPO_BASE = 'https://belfem.lbl.gov/scls'
 APT_REPO_BY_CODENAME = {
-    'noble': 'ubuntu',
+    'noble': 'ubuntu/noble',
     'resolute': 'ubuntu/resolute',
+}
+# scls-archive-keyring release per Ubuntu release. Its content differs per
+# release (the sources URI), and a published version is never replaced, so a
+# URI change bumps that release's keyring only. noble 2026-2 carries the
+# ubuntu/noble URI (Christian, 2026-10-01). scripts/deb_drop_select.py reads
+# this table to check the keyring's version before shipping it.
+KEYRING_RELEASE_BY_CODENAME = {
+    'noble': '2',
+    'resolute': '1',
 }
 
 
@@ -2098,7 +2109,7 @@ def build_scls_release_package() -> Path:
     # a fix to the deb822 sources file) without bumping the year.
     env_recipe = load_recipe('environment')
     version = str(env_recipe.get('version', '1'))
-    release = '1'
+    release = KEYRING_RELEASE_BY_CODENAME[_apt_repo_for_host()[1]]
     architecture = 'all'
 
     destdir = PROJECT_ROOT / 'work' / 'build' / f'destdir-{SCLS_RELEASE_DEB_NAME}'

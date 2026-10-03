@@ -28,6 +28,6 @@ patch → Codex+Grok audit → executable gates → devlog. Exchange: `tmp/ai_ex
 - [x] Devlog `devlog/dl20260910_apple_silicon_report_fixes.md` + index
 
 ## Pending an arm64 host (cannot be closed here)
-- [ ] gklib, openmpi, vtk, petsc build on Apple Silicon with these changes
+- [x] gklib, openmpi, vtk, petsc build on Apple Silicon with these changes — done: the full stack was built and tested on Apple Silicon during ASC 2026 (per Christian, confirmed 2026-10-01)
 - [ ] MUMPS install-name normalizer on arm64 (INC-202)
 - [ ] M4/M5 `hw.cpufamily` fallback

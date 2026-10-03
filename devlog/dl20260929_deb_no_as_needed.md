@@ -107,3 +107,39 @@ devel packages include the InfiniBand MAD headers; Debian splits them into `libi
 accepts list values). The ucx recipe and the RPM specs are unchanged, and `changelogs/ucx.md` is
 left alone because it feeds the RPM `%changelog`. `doc/BUILD_EXECUTION.md` §1.1b notes the host
 packages.
+
+## `check_mkl_linkage.sh` gave load-dependent results (fixed in `f69e8a3`)
+
+U26's mkl staging failed the per-object rule for two objects that did NEED all four libraries,
+and two immediate reruns passed. The cause was `set -o pipefail` combined with
+`echo "$n" | grep -q PATTERN`. `grep -q` exits at its first match; if `echo` is still writing, it
+dies of SIGPIPE, and pipefail turns the match into a miss. The same pattern guarded the
+`libmkl_rt`, ScaLAPACK/BLACS and MKL-in-a-non-MKL-flavor tests, where a miss is a false
+**pass**. U26's reproducer, on libpetsc's 40-line NEEDED list under a concurrent rebuild:
+2 false negatives in 20,000 iterations (0.01%), and 0 in 20,000 as a here-string. At about 4 tests
+× 19 MKL objects per gate run, that's roughly a 1% chance of a spurious result per run. Every match
+now uses a here-string, and a comment at the top of the script forbids the pattern. The U24 debug
+drop uploaded before the fix took only the non-MKL branch, and the el9 parity check and belfem's
+own verification confirmed it independently.
+
+## Outcome (2026-10-02)
+
+The relink ran with the gcc specs override in place, `SCLS_JOBS=4` for vtk, and a supervisor that
+would retry at fewer jobs. It never had to retry. debug finished 2026-10-01 03:49Z, gcc 14:46Z and
+mkl 2026-10-02 00:45Z. Per-object el9 parity for all three flavors: every object matched, no
+el9-only objects (ucx ships `libucx_perftest_mad.so`), and HARD 0 apart from gperftools' four
+`libunwind.so.8` objects. Christian ruled the recipe the reference there; the RPM fix is deferred to
+round 2. ALLOWED: libquadmath (gfortran spec), libmvec (toolchain), libbz2 `.so.1`/`.so.1.0` (SONAME
+spelling) and libnl (PRRTE). `check_mkl_linkage` with the per-object rule passes for mkl; the six
+objects that NEEDed only `libmkl_gf_lp64` now NEED all four.
+
+Drops: `U24-debug-20261001T0427Z` (130 files, 68 replace_published) and `U24-gcc-20261001T2226Z`
+(123 files, 63 replace_published) are promoted. `U24-mkl-20261002T0118Z` (144 files, 22
+replace_published, 27 new versions) is uploaded, along with `scls-archive-keyring` 2026-2: belfem
+moved noble's base to `/scls/ubuntu/noble`, the old paths are compatibility symlinks, and
+`KEYRING_RELEASE_BY_CODENAME` gives noble release 2 and resolute 1.
+
+On the way, the disk filled twice, both times during vtk's install. Superseded source packages and
+finished vtk build trees were removed; nothing current was lost. Existing noble installs keep the
+old files of replaced packages until they run `apt install --reinstall`, because the versions are
+unchanged (Christian declined a `+b1` suffix).

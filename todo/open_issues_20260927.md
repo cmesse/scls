@@ -47,7 +47,12 @@ release bumps have to reach every host that already published the old NEVRA. Nei
 
 ## 2. Staging and upload (deferred by Christian)
 
-- [ ] **U24 drops**: debug, gcc, mkl. Use `/stage-drop`, one flavor at a time.
+- [x] **U24 drops**: debug, gcc, mkl. Use `/stage-drop`, one flavor at a time.
+  - **2026-10-02: done after the `--no-as-needed` relink** (devlog `dl20260929_deb_no_as_needed.md`).
+    `U24-debug-20261001T0427Z` and `U24-gcc-20261001T2226Z` were promoted. `U24-mkl-20261002T0118Z`
+    is uploaded and awaiting promotion. It carries `scls-archive-keyring` 2026-2 (noble's new URI
+    `/scls/ubuntu/noble`). All three flavors: el9 parity HARD 0 apart from the accepted gperftools
+    libunwind, and `check_mkl_linkage` PASS. The `scls-<F>` metas are reinstalled from the repo.
   - **Do not stage the rebuilt `scls-<F>` 2026-1 meta .debs.** `deb_builder` hard-codes the meta
     release to 1 (`python/deb_builder.py:1924`), so the rebuilt metas carry the same NEVRA as the ones
     already published on belfem. Their Depends are identical, but the bytes differ. List them under
@@ -213,3 +218,25 @@ approval and the audit gate.
       because gfortran's own `libgfortran.spec` links it `--as-needed`, and the objects import no
       quadmath symbol. `libmvec` is extra on the Ubuntu side because gcc 15 vectorizes libm calls
       into glibc's vector ABI (`_ZGVdN4v_cos` etc.).
+- [ ] **Triplet-prefixed program names on every Linux host (found 2026-10-01).** On U26 the 14 hwloc
+      tools exist only as `x86_64-linux-gnu-lstopo`, `x86_64-linux-gnu-hwloc-ls`, … (no plain
+      `lstopo`/`hwloc-ls` on PATH), and the libunwind test programs are prefixed too. el9 has the same
+      with `x86_64-redhat-linux-`. Cause: `python/build_common.py:684-686` adds
+      `--host/--build/--target=<triplet>` to every autotools configure (`host_flags` defaults to true).
+      An explicit `--target` makes autoconf's `AC_ARG_PROGRAM` prefix installed programs with the
+      target alias. Fix options: drop `--target` (it means nothing for non-toolchain packages), set
+      `host_flags: false` per recipe, or pass `--program-prefix=`. Each one renames shipped binaries,
+      so file manifests and any users of the prefixed names change; it's a `python/` change and needs
+      Christian's approval. Round 2.
+- [ ] **Website**: regenerate with ipopt and deploy. Already on devel and generated locally but not
+      deployed: 8a5f7f6 (one APT repo per Ubuntu release, noble and resolute; old /scls/ubuntu URL
+      still works) and 8771963 (Apple Silicon no longer beta; full arm64 build during ASC 2026, per
+      Christian). Christian, 2026-10-01: "We will wait with the new website. There is a second
+      iteration we will do to include ipopt."
+- [ ] **One shared el9 parity gate** (Christian, 2026-10-01). U26 turns `work/parity/needed_parity.sh` +
+      `score2.py` into a repo-relative `scripts/` tool (`--flavor`, the HARD/ALLOWED rules and the accepted list
+      as data); U24 hooks it into `stage_to_belfem.sh` before READY. Two blind audits; agree the file
+      names at the start of round 2.
+- [ ] **Stricter compression deps (optional).** Declare bzip2/xz/zstd in the netcdf, scotch and
+      libunwind recipes instead of relying on host packages (Ubuntu §1.1b, el9 build hosts).
+      Christian chose host packages for round 1.

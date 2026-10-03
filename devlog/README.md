@@ -11,6 +11,7 @@ file, it is lost.
 
 ## Entries
 
+- [dl20261001_u26_resolute_deployment_prep.md](dl20261001_u26_resolute_deployment_prep.md) — U26 resolute debug/gcc/mkl uploaded, promoted and apt-verified: resolute repo + upload key + keyring, relink via gcc specs, per-object el9 parity HARD 0 on debug/gcc/mkl, bz2/xz/zstd host packages, check_mkl_linkage pipefail/SIGPIPE flake
 - [dl20260929_deb_no_as_needed.md](dl20260929_deb_no_as_needed.md) — U24 .deb drops to belfem (debug, gcc promoted; mkl cancelled); Ubuntu's default `--as-needed` broke per-object el9 link parity, so `.deb` links now use `--no-as-needed`; closed `no_source:` list; CDN stale-index incident
 - [dl20260927_u26_full_stack_build.md](dl20260927_u26_full_stack_build.md) — U26 (Ubuntu 26.04) first full-stack build: debug 37, gcc 37, mkl 36 installed; sudo-rs, curl, vtk OOM job cap; MKL linkage PASS
 - [dl20260926_ipopt_recipe.md](dl20260926_ipopt_recipe.md) — new Ipopt 3.14.20 recipe (EPL-2.0, MPI MUMPS, MKL Pardiso for free); macOS build + 7/7 tests; found that the RPM builder writes autotools configure args verbatim (no SCLS-macro expansion, no quoting) — fix prototyped, awaiting approval; one blind Codex+Grok round

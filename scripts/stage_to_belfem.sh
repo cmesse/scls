@@ -83,9 +83,10 @@ case "$COLUMN" in
     R9)   DISTRO=el9      ;;
     R10)  DISTRO=el10     ;;
     AMZN) DISTRO=amzn2023 ;;
-    # One APT repo per Ubuntu release; keep in step with APT_REPO_BY_CODENAME in
-    # python/deb_builder.py. noble keeps the original path existing clients use.
-    U24)  DISTRO=ubuntu; CODENAME=noble;    APT_REPO=ubuntu          ;;
+    # One APT repo per Ubuntu release. noble moved to ubuntu/noble on 2026-10-01;
+    # belfem keeps ubuntu/{dists,pool} as compatibility symlinks, so the keyring
+    # (python/deb_builder.py APT_REPO_BY_CODENAME) still points clients at ubuntu.
+    U24)  DISTRO=ubuntu; CODENAME=noble;    APT_REPO=ubuntu/noble    ;;
     U26)  DISTRO=ubuntu; CODENAME=resolute; APT_REPO=ubuntu/resolute ;;
     *) echo "unknown column: $COLUMN (expected R9, R10, AMZN, U24 or U26)" >&2; exit 2 ;;
 esac
