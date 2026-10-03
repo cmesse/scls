@@ -1,0 +1,7 @@
+SPRAL (Sparse Parallel Robust Algorithms Library) is an open-source
+library of sparse linear algebra and associated algorithms from the
+Science and Technology Facilities Council (STFC). Its SSIDS solver is a
+parallel direct solver for sparse symmetric indefinite systems, used in
+the stack by Ipopt (linear_solver spral).
+SSIDS requires OMP_CANCELLATION=TRUE (set by the SCLS activate script when
+SPRAL is installed); OMP_PROC_BIND=TRUE is recommended for performance.

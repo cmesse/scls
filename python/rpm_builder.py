@@ -279,21 +279,63 @@ def _partition_rpms_for_install(rpm_files):
     return to_install, to_reinstall
 
 
-def _dnf_install_rpms(rpm_files):
+# Intel's oneAPI dnf repository (MKL, icx/ifx). Matched by URL rather than by
+# repo id, because the id is whatever the host's .repo file chose.
+INTEL_ONEAPI_REPO_HOST = 'yum.repos.intel.com'
+
+
+def _intel_oneapi_repo_ids(repos_dir: Path = Path('/etc/yum.repos.d')) -> List[str]:
+    """Return the ids of dnf repos served from Intel's oneAPI host."""
+    import configparser
+    ids = []
+    for repo_file in sorted(repos_dir.glob('*.repo')):
+        parser = configparser.ConfigParser(interpolation=None, strict=False)
+        try:
+            parser.read(repo_file)
+        except (configparser.Error, OSError, UnicodeDecodeError):
+            continue  # an unreadable .repo file must not abort the install
+        for section in parser.sections():
+            urls = ' '.join(parser.get(section, key, fallback='')
+                            for key in ('baseurl', 'mirrorlist', 'metalink'))
+            if INTEL_ONEAPI_REPO_HOST in urls:
+                ids.append(section)
+    return ids
+
+
+def _flavor_needs_oneapi_repo(flavor: Dict) -> bool:
+    """True when the flavor's packages Require something from Intel's repo:
+    MKL (math.linalg: mkl) or the Intel compilers (the intel flavor)."""
+    if flavor.get('math', {}).get('linalg') == 'mkl':
+        return True
+    try:
+        return compiler_family(flavor) == 'intel'
+    except ValueError:
+        return True  # unrecognised toolchain: leave the repos alone
+
+
+def _dnf_install_rpms(rpm_files, flavor: Dict):
     """Install or reinstall the given RPM files via dnf.
 
     RPMs whose exact NVRA is already installed are passed to
     `dnf reinstall`; the rest go to `dnf install`.
+
+    dnf refreshes the metadata of every enabled repo, even for a local .rpm,
+    so a failing third-party repo blocks unrelated installs. Intel's oneAPI
+    repo (repo_gpgcheck=1, with a signing key that has rotated) is therefore
+    disabled unless the flavor needs MKL or the Intel compilers from it.
     """
+    repo_opts = []
+    if not _flavor_needs_oneapi_repo(flavor):
+        repo_opts = [f'--disablerepo={rid}' for rid in _intel_oneapi_repo_ids()]
     to_install, to_reinstall = _partition_rpms_for_install(rpm_files)
     if to_reinstall:
-        cmd = ['sudo', 'dnf', 'reinstall', '-y'] + [str(r) for r in to_reinstall]
+        cmd = ['sudo', 'dnf', 'reinstall', '-y'] + repo_opts + [str(r) for r in to_reinstall]
         result = subprocess.run(cmd)
         if result.returncode != 0:
             raise BuildError(
                 f"RPM reinstallation failed with return code {result.returncode}")
     if to_install:
-        cmd = ['sudo', 'dnf', 'install', '-y'] + [str(r) for r in to_install]
+        cmd = ['sudo', 'dnf', 'install', '-y'] + repo_opts + [str(r) for r in to_install]
         result = subprocess.run(cmd)
         if result.returncode != 0:
             raise BuildError(
@@ -498,8 +540,13 @@ class RPMBuilder:
 
         # MKL paths if needed. Prefer the MKLROOT env var (set by sourcing
         # /opt/intel/oneapi/setvars.sh or the equivalent module load) and
-        # fall back to the standard oneAPI install location.
-        if 'mkl' in self.flavor_name:
+        # fall back to the standard oneAPI install location. Keyed on the
+        # flavor's math provider, not only its name: `intel` (math.linalg:
+        # mkl) otherwise rendered %{mklroot} as the string "None" into link
+        # args and RPATH (devlog/dl20261003_spral_recipe.md, round-2 review).
+        # unix_builder expands %{mklroot} for every flavor.
+        if (self.flavor.get('math', {}).get('linalg') == 'mkl'
+                or 'mkl' in self.flavor_name):
             self.mkl_root = os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
         else:
             self.mkl_root = None
@@ -939,6 +986,33 @@ class RPMBuilder:
 
         # Get our custom configure arguments with RPM macros preserved
         args = self.get_configure_args_for_rpm()
+
+        # Expand SCLS placeholders (%{math_ldflags}, %{mkl_linker_flags},
+        # %{libext}, ...) exactly as unix_builder.configure does through
+        # check_args, so an autotools recipe renders the same configure line
+        # on every builder. %{prefix} and %{cuda} are defined as RPM macros by
+        # the spec itself (templates/default.spec.j2) and %{host} by rpm; all
+        # three are kept as macros rather than expanded, so existing
+        # autotools specs (binutils' --host=%{host}) render unchanged. Added for ipopt, the
+        # first autotools recipe with placeholders and spaces in
+        # configure.args (devlog/dl20260926_ipopt_recipe.md F1).
+        keep = {'%{prefix}': '@SCLS_RPM_PREFIX@', '%{cuda}': '@SCLS_RPM_CUDA@',
+                '%{host}': '@SCLS_RPM_HOST@'}
+        for macro, sentinel in keep.items():
+            args = [a.replace(macro, sentinel) for a in args]
+        args = self.check_args(args)
+        for macro, sentinel in keep.items():
+            args = [a.replace(sentinel, macro) for a in args]
+
+        # Quote arguments that would otherwise split into several shell
+        # words, the same rule the template applies to cmake, custom and
+        # meson arguments. RPM expands macros before the shell sees the line,
+        # so %{prefix} inside single quotes still expands.
+        def _quote(arg: str) -> str:
+            if any(ch in arg for ch in (' ', ';', '<', '>')):
+                return "'" + arg + "'"
+            return arg
+        args = [_quote(a) for a in args]
 
         # Build the direct configure command
         cmd_parts = ['./configure']
@@ -1505,8 +1579,10 @@ fi
             cmake_args = self.get_cmake_args_with_paths()
 
         # Get custom configure args if needed (for custom configure type like PETSc, SLEPc)
+        # meson takes the same argument list: --prefix=%{prefix} first, then
+        # recipe args, flavor_args and interface args, placeholders expanded.
         configure_args = []
-        if configure_type == 'custom':
+        if configure_type in ('custom', 'meson'):
             configure_args = self.get_custom_configure_args()
 
         # Get build args for make-based builds
@@ -2288,7 +2364,7 @@ fi
         for rpm in rpm_files:
             print(f"  {rpm}")
 
-        _dnf_install_rpms(rpm_files)
+        _dnf_install_rpms(rpm_files, self.flavor)
 
         # Only once the install succeeded: drop the artifacts it superseded, so
         # the output tree holds one build per package and the next install has
@@ -2825,7 +2901,7 @@ def main():
                 )
                 if not rpm_files:
                     raise BuildError(f"No built RPMs found for {scls_name}")
-                _dnf_install_rpms(rpm_files)
+                _dnf_install_rpms(rpm_files, load_flavor(args.flavor))
             else:
                 build_flavor_meta_package(args.flavor, spec_only=args.spec_only)
             return

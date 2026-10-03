@@ -1,6 +1,6 @@
 name: environment
 version: "2026"
-release: 2
+release: 3
 summary: SCLS environment setup, activation scripts, and configuration
 license: BSD-3-Clause
 bootstrap: true

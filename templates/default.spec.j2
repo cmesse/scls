@@ -178,6 +178,35 @@ cmake .. \
 {% endif %}
 {{ make_command }}
 
+{% elif configure_type == 'meson' %}
+{% if configure_pre_commands %}
+# Pre-configure commands
+{% for cmd in configure_pre_commands %}
+{{ cmd }}
+{% endfor %}
+{% endif %}
+# Meson out-of-source build in build/. CWD stays the source root, so
+# configure.post, %check and install.post all run from there. (cmake recipes
+# differ: their CWD after configure is build/.) Meson reads CC/CXX/FC and
+# CFLAGS/CXXFLAGS/FFLAGS/LDFLAGS from the environment exported above.
+meson setup build \
+{% for arg in configure_args %}
+    {% if ';' in arg or ' ' in arg or '<' in arg or '>' in arg %}'{{ arg }}'{% else %}{{ arg }}{% endif %}{% if not loop.last %} \{% endif %}
+
+{% endfor %}
+
+{% if configure_post_commands %}
+# Post-configure commands
+{% for cmd in configure_post_commands %}
+{{ cmd }}
+{% endfor %}
+{% endif %}
+{% if parallel_build %}
+meson compile -C build %{?_smp_mflags}
+{% else %}
+meson compile -C build -j 1
+{% endif %}
+
 {% elif configure_type == 'custom' %}
 # Custom configuration system
 {% if recipe.configure.command is defined %}
@@ -302,6 +331,9 @@ export LDFLAGS="{{ ldflags }}"
 
 {% elif configure_type == 'cmake' %}
 cd build && make install DESTDIR=%{buildroot}{% if install_args %} {{ install_args | join(' ') }}{% endif %}
+{% elif configure_type == 'meson' %}
+DESTDIR=%{buildroot} meson install -C build --no-rebuild{% if install_args %} {{ install_args | join(' ') }}{% endif %}
+
 {% else %}
 make install DESTDIR=%{buildroot}{% if install_args %} {{ install_args | join(' ') }}{% endif %}
 

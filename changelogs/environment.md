@@ -1,5 +1,14 @@
 # Environment Changelog
 
+## Version 2026-3 - Sat Oct 03 2026
+- `activate` exports `OMP_CANCELLATION=TRUE` when SPRAL is installed (its
+  registry entry exists) and the user has not set the variable; `deactivate`
+  removes it only if activate set it; `scls env` lists it. SPRAL's SSIDS
+  solver (Ipopt `linear_solver spral`) fails without it: hs071 ends in
+  "Restoration Failed" (devlog/dl20261003_spral_recipe.md). `OMP_PROC_BIND`,
+  which SPRAL also asks for, is deliberately not set, since it would pin the
+  threads of every OpenMP program.
+
 ## Version 2026-2 - Sun Sep 13 2026
 - Declare the host toolchain as a runtime dependency. The installed stack
   is a development stack and users compile against it, but `AutoReqProv: no`

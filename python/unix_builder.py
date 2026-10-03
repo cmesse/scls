@@ -406,6 +406,45 @@ class UnixBuilder:
             # Update source_dir to build_dir for subsequent steps
             return build_dir
 
+        elif configure_type == 'meson':
+            # Mirrors the RPM template's meson block: `meson setup build`
+            # from the source root, with the same argument list the RPM
+            # builder renders (--prefix first, then args, flavor_args,
+            # interface args). Meson reads CC/CXX/FC and the *FLAGS from env.
+            # Returns source_dir, not build/: build() and install() address
+            # the build tree with `-C build`, so test commands and install
+            # hooks run from the source root on every builder, as rpmbuild's
+            # %check and %install do.
+
+            env = self._prepare_build_env(env, pkg_config_path)
+            env = apply_configure_environment(env, self.recipe, self.flavor, self.prefix, source_dir, self.sdk)
+            env = self.apply_platform_env(env)
+
+            if 'configure' in self.recipe and 'pre' in self.recipe['configure']:
+                for cmd in self.recipe['configure']['pre']:
+                    checked_cmd = self.check_args([cmd])[0]
+                    run_command(['sh', '-c', checked_cmd], source_dir, env, "pre-configure")
+
+            self.run_platform_pre(source_dir, env)
+
+            args = [f"--prefix={self.install_prefix}"]
+            args.extend(self.recipe.get('configure', {}).get('args', []))
+            if 'configure' in self.recipe and 'flavor_args' in self.recipe['configure']:
+                flavor_specific = resolve_flavor_key(self.flavor, self.recipe['configure']['flavor_args'])
+                if flavor_specific:
+                    args.extend(flavor_specific)
+            args.extend(get_interface_args(self.recipe, self.flavor))
+
+            cmd = self.check_args(['meson', 'setup', 'build'] + args)
+            run_command(cmd, source_dir, env, "meson setup")
+
+            if 'configure' in self.recipe and 'post' in self.recipe['configure']:
+                for cmd in self.recipe['configure']['post']:
+                    checked_cmd = self.check_args([cmd])[0]
+                    run_command(['sh', '-c', checked_cmd], source_dir, env, "post-configure")
+
+            return source_dir
+
         elif configure_type == 'custom':
             # Custom configuration system (like OpenSSL's ./config or PETSc's ./configure)
             skip_compiler_env = self.recipe.get('configure', {}).get('skip_compiler_env', False)
@@ -616,7 +655,17 @@ class UnixBuilder:
                     expanded_cmd = self.check_args([cmd])[0]
                     run_command(['sh', '-c', expanded_cmd], build_dir, env, "pre-build (lp64)")
 
-        # Build command
+        # Build command. meson recipes compile the build/ tree configure()
+        # set up; build.args/flavor_args are make arguments and do not apply.
+        if self.recipe.get('configure', {}).get('type') == 'meson':
+            run_command(['meson', 'compile', '-C', 'build', '-j', str(jobs)],
+                        build_dir, env, "build")
+            if 'build' in self.recipe and 'post' in self.recipe['build']:
+                for cmd in self.recipe['build']['post']:
+                    expanded_cmd = self.check_args([cmd])[0]
+                    run_command(['sh', '-c', expanded_cmd], build_dir, env, "post-build")
+            return
+
         make_cmd = ['make', f'-j{jobs}']
         if 'build' in self.recipe and 'args' in self.recipe['build']:
             make_cmd.extend(self.check_args(self.recipe['build']['args']))
@@ -793,6 +842,18 @@ class UnixBuilder:
                 cmd = cmd.replace('%{libext}', self.lib_ext)
                 expanded_cmd = self.check_args([cmd])[0]
                 run_command(['sh', '-c', expanded_cmd], build_dir, env, "install")
+        elif self.recipe.get('configure', {}).get('type') == 'meson':
+            # install.args / flavor_args go to `meson install`, as the spec
+            # template appends them to its meson install line.
+            install_cmd = ['meson', 'install', '-C', 'build', '--no-rebuild',
+                           '--destdir', str(destdir)]
+            if 'install' in self.recipe and 'args' in self.recipe['install']:
+                install_cmd.extend(self.check_args(self.recipe['install']['args']))
+            if 'install' in self.recipe and 'flavor_args' in self.recipe['install']:
+                flavor_specific = resolve_flavor_key(self.flavor, self.recipe['install']['flavor_args'])
+                if flavor_specific:
+                    install_cmd.extend(self.check_args(flavor_specific))
+            run_command(install_cmd, build_dir, env, "install")
         else:
             # Default: make install with DESTDIR
             install_cmd = ['make', 'install', f'DESTDIR={destdir}']
@@ -1353,6 +1414,8 @@ class UnixBuilder:
         configure_type = self.recipe.get('configure', {}).get('type', 'autotools')
         if configure_type == 'cmake':
             base_tools.append('cmake')
+        elif configure_type == 'meson':
+            base_tools.extend(['meson', 'ninja'])
 
         # Feature-specific tools
         features = self.recipe.get('features', {})
@@ -1512,7 +1575,10 @@ class UnixBuilder:
                     raise BuildError("No build directory found. Run 'build' first.")
                 build_dir = build_dirs[0]
                 self.source_dir = build_dir
-            if (build_dir / 'build').exists():  # CMake build
+            # CMake build. Not for meson: its configure() returns the source
+            # root and every meson step addresses the tree with `-C build`.
+            if (build_dir / 'build').exists() and \
+                    self.recipe.get('configure', {}).get('type') != 'meson':
                 build_dir = build_dir / 'build'
             env = setup_environment(self.flavor, self.prefix, self.source_dir, self.recipe)
 

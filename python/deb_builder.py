@@ -631,6 +631,18 @@ class DebBuilder(UnixBuilder):
                 cmd = cmd.replace('%{libext}', self.lib_ext)
                 expanded = self.check_args([cmd])[0]
                 run_command(['sh', '-c', expanded], custom_install_cwd, env, "install")
+        elif self.recipe.get('configure', {}).get('type') == 'meson':
+            # install.args / flavor_args go to `meson install`, as the spec
+            # template appends them to its meson install line.
+            install_cmd = ['meson', 'install', '-C', 'build', '--no-rebuild',
+                           '--destdir', str(self.destdir)]
+            if 'install' in self.recipe and 'args' in self.recipe['install']:
+                install_cmd.extend(self.check_args(self.recipe['install']['args']))
+            if 'install' in self.recipe and 'flavor_args' in self.recipe['install']:
+                flavor_specific = resolve_flavor_key(self.flavor, self.recipe['install']['flavor_args'])
+                if flavor_specific:
+                    install_cmd.extend(self.check_args(flavor_specific))
+            run_command(install_cmd, build_dir, env, "install")
         else:
             install_cmd = ['make', 'install', f'DESTDIR={self.destdir}']
             if 'install' in self.recipe:

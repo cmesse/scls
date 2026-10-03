@@ -148,7 +148,7 @@ class Validator:
             # Configure type validation
             configure = recipe.get('configure', {})
             ctype = configure.get('type', 'autotools')
-            valid_types = ('autotools', 'cmake', 'custom', 'none', 'custom_makefile')
+            valid_types = ('autotools', 'cmake', 'meson', 'custom', 'none', 'custom_makefile')
             if ctype not in valid_types:
                 self.error(f"recipe/{name}: unknown configure.type '{ctype}' "
                            f"(valid: {', '.join(valid_types)})")

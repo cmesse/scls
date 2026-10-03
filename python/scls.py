@@ -387,9 +387,15 @@ def _install_rpm(package: str, flavor: str, prefix: Path, upgrade: bool) -> int:
     rpm_file = rpms[0]
     print(f"Installing {rpm_file}")
 
-    # Use dnf or yum
+    # Use dnf or yum. Intel's oneAPI repo is disabled unless the flavor
+    # needs it, as in rpm_builder._dnf_install_rpms.
+    from build_common import load_flavor
+    from rpm_builder import _flavor_needs_oneapi_repo, _intel_oneapi_repo_ids
+    repo_opts = []
+    if not _flavor_needs_oneapi_repo(load_flavor(flavor)):
+        repo_opts = [f'--disablerepo={rid}' for rid in _intel_oneapi_repo_ids()]
     pkg_manager = 'dnf' if shutil_which('dnf') else 'yum'
-    cmd = ['sudo', pkg_manager, 'install', '-y', str(rpm_file)]
+    cmd = ['sudo', pkg_manager, 'install', '-y'] + repo_opts + [str(rpm_file)]
     result = subprocess.run(cmd)
     return result.returncode
 

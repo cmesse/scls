@@ -11,6 +11,7 @@ file, it is lost.
 
 ## Entries
 
+- [dl20261003_spral_recipe.md](dl20261003_spral_recipe.md) — new SPRAL 2025.09.18 recipe (SSIDS, BSD-3, first `configure.type: meson`), CUDA-probe patch, Ipopt 3.14.20 `--with-spral` + SPRAL `%check`, activate sets `OMP_CANCELLATION`; RPM autotools arg expansion/quoting fix; intel `%{mklroot}`→None fix; oneAPI repo gated per flavor; three review rounds
 - [dl20261003_libhsl_private_build.md](dl20261003_libhsl_private_build.md) — private libhsl for Ipopt from a licensee's own HSL tarballs: Coin-HSL base + verified MA77 6.5.0 override, bash assembler, own CMakeLists, MA77 factor/solve gate; scripts public, sources private; gcc + mkl gated
 - [dl20261001_u26_resolute_deployment_prep.md](dl20261001_u26_resolute_deployment_prep.md) — U26 resolute debug/gcc/mkl uploaded, promoted and apt-verified: resolute repo + upload key + keyring, relink via gcc specs, per-object el9 parity HARD 0 on debug/gcc/mkl, bz2/xz/zstd host packages, check_mkl_linkage pipefail/SIGPIPE flake
 - [dl20260929_deb_no_as_needed.md](dl20260929_deb_no_as_needed.md) — U24 .deb drops to belfem (debug, gcc promoted; mkl cancelled); Ubuntu's default `--as-needed` broke per-object el9 link parity, so `.deb` links now use `--no-as-needed`; closed `no_source:` list; CDN stale-index incident

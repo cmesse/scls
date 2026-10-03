@@ -38,6 +38,13 @@ macOS support (Intel and Apple Silicon) is no longer beta. A first build still m
 
   You need a working `clang`, `clang++`, `ld`, and `as` on `PATH`.
 
+- **Meson (≥ 0.63) and Ninja** on `PATH`, for meson-built recipes (today only
+  `spral`). Build-time tools only; nothing in the stack links or ships them.
+
+  ```bash
+  brew install meson ninja
+  ```
+
 - **General comfort with the Unix toolchain** — installing CLT, understanding
   how linker and sysroot settings work, and knowing what to do when a build
   log points at an SDK or path issue.

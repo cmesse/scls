@@ -58,6 +58,10 @@ _scls_deactivate() {
     unset PETSC_ARCH
     unset SLEPC_DIR
     unset MPI_HOME
+    # Only the value activate set (SPRAL), never one the user exported.
+    if [ -n "${_SCLS_SET_OMP_CANCELLATION:-}" ]; then
+        unset OMP_CANCELLATION _SCLS_SET_OMP_CANCELLATION
+    fi
 
     # Clean up helper functions
     unset -f _scls_remove_from_var

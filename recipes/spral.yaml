@@ -1,0 +1,223 @@
+name: spral
+version: 2025.09.18
+release: 1
+summary: Sparse Parallel Robust Algorithms Library (SSIDS sparse symmetric indefinite solver)
+homepage: https://github.com/ralna/spral
+# BSD-3-Clause (LICENCE in the tarball; GitHub labels it "Other").
+license: BSD-3-Clause
+
+source:
+  url: https://github.com/ralna/spral/archive/refs/tags/v%{version}.tar.gz
+  directory: spral-%{version}
+
+patches:
+  all:
+    # Upstream probes for nvcc and CUDA unconditionally and links
+    # libcudart/libcublas into libspral whenever meson finds them, even with
+    # -Dgpu=false (tag meson.build:21,84-86). On a build host with a CUDA
+    # toolkit that is an undeclared runtime dependency (AutoReqProv: no).
+    # The patch skips both probes unless -Dgpu=true.
+    - spral_gpu_off_no_cuda.patch
+
+update:
+  strategy: github_release
+  repo: ralna/spral
+  tag_prefix: "v"
+
+requires:
+  all:
+    # One METIS in the stack: SPRAL links ours, never a bundled copy.
+    - metis
+  # hwloc gives SSIDS's CPU task scheduler the machine topology (optional
+  # upstream, meson.build:84,99-101; linked deliberately, so libhwloc is a
+  # runtime dependency of libspral). The stack's hwloc everywhere except
+  # lbl, which excludes the hwloc recipe and uses the system hwloc for Slurm
+  # compatibility, as openmpi does there. lbl: [] stops the fallback to its
+  # parent flavor gcc.
+  gcc:
+    - hwloc
+  debug:
+    - hwloc
+  mkl:
+    - hwloc
+  gcc-mkl-cuda:
+    - hwloc
+  intel:
+    - hwloc
+  macos:
+    - hwloc
+  lbl: []
+
+features:
+  fortran: true
+  mpi: false
+  # SPRAL adds the OpenMP flag and runtime itself (meson.build:130-167).
+  openmp: true
+  math: serial
+
+# Build-time host tools only; neither ships nor is needed to use libspral.
+# meson >= 0.63.0 (SPRAL meson.build:6). Meson is a Python program: that is
+# build-time use of the system Python, which CLAUDE.md allows.
+rpm_build_requires:
+  all:
+    - meson >= 0.63.0
+    - ninja-build
+  lbl:
+    - hwloc-devel
+
+# lbl links the system libhwloc (see requires:); AutoReqProv is off, so the
+# runtime package is declared by hand.
+rpm_requires:
+  lbl:
+    - hwloc-libs
+
+configure:
+  type: meson
+  args:
+    # Optimisation comes from the SCLS flags only (flavor flags plus
+    # optimization.O_level below, appended last as on every recipe, so debug
+    # also gets -O3). SPRAL's default_options pick buildtype=release, which
+    # would add meson's own -O3 and NDEBUG; plain adds nothing, and NDEBUG is
+    # set per flavor with b_ndebug in flavor_args.
+    - --buildtype=plain
+    - --libdir=lib
+    # The SCLS link policy is --no-as-needed everywhere (dl20260929). It
+    # matters here because the BLAS/LAPACK line below is passed as link args.
+    # Under meson's default b_asneeded=true it could be dropped from
+    # DT_NEEDED, leaving libspral's BLAS symbols to whatever the consumer
+    # happens to link.
+    - -Db_asneeded=false
+    # No CUDA in the stack. Upstream defaults gpu=true and enables it whenever
+    # nvcc is found, so this is pinned to keep a CUDA-equipped build host from
+    # changing what ships.
+    - -Dgpu=false
+    - -Dtests=true
+    - -Dexamples=false
+    # No -Dbinaries: the v2025.09.18 tag has no such option (master does)
+    # and always builds the spral_ssids driver; install.post removes it.
+    # Fortran modules would install into <prefix>/modules
+    # (install_modules.py), a new top-level directory in the prefix. Ipopt
+    # uses the C interface. Off until a Fortran consumer asks for it.
+    - -Dmodules=false
+    - -Dopenmp=true
+    - -Dlibmetis=metis
+    - -Dlibmetis_path=%{prefix}/lib
+    - -Dlibmetis_version=5
+    - -Dmetis64=false
+    - -Dlibhwloc=hwloc
+    # The full flavor BLAS/LAPACK line, on every link. meson's -Dlibblas /
+    # -Dliblapack (below, per flavor) take one library name each and so cannot
+    # express the MKL line. MKL's own pkg-config files do not fit either: they
+    # name mkl_intel_lp64, while the gfortran flavors link mkl_gf_lp64.
+    # A -D*_link_args option replaces LDFLAGS from the environment (meson
+    # environment.py), so the flavor's whole LDFLAGS (%{ldflags}) is repeated
+    # here: the prefix -L and RUNPATH (without them mkl, intel, gcc-mkl-cuda
+    # and debug, whose math line has no prefix rpath, leave libmetis/libhwloc
+    # unresolved at runtime) and macOS's -headerpad_max_install_names, which
+    # install_name_tool rewrites need. On the unix/deb builders %{ldflags}
+    # already ends with the math line, so it appears twice there; the linker
+    # ignores the repeat.
+    - "-Dc_link_args=%{ldflags} %{math_ldflags}"
+    - "-Dcpp_link_args=%{ldflags} %{math_ldflags}"
+    - "-Dfortran_link_args=%{ldflags} %{math_ldflags}"
+  # SPRAL's BLAS/LAPACK/METIS find_library probes must succeed (required:
+  # true) and name a library that is genuinely on the flavor's line. hwloc's
+  # probe is required: false upstream (tag meson.build:89): a wrong
+  # libhwloc_path silently builds libspral without hwloc, so check
+  # "Library hwloc found: YES" in the meson setup log of a new host/flavor. Flavor lookup takes the
+  # first matching key, the flavor's own name before its parent, so debug
+  # and lbl (both inherit gcc) carry complete lists of their own.
+  flavor_args:
+    lbl:
+      # SSIDS C/C++ asserts off, as upstream release builds have them.
+      - -Db_ndebug=true
+      - -Dlibblas=openblas
+      - -Dliblapack=openblas
+      - -Dlibblas_path=%{prefix}/lib
+      - -Dliblapack_path=%{prefix}/lib
+      # System hwloc (see requires:).
+      - -Dlibhwloc_path=/usr/lib64
+      - -Dlibhwloc_include=/usr/include
+    debug:
+      # Asserts stay on in the debug flavor.
+      - -Db_ndebug=false
+      - -Dlibblas=blas
+      - -Dliblapack=lapack
+      - -Dlibblas_path=%{prefix}/lib
+      - -Dliblapack_path=%{prefix}/lib
+      - -Dlibhwloc_path=%{prefix}/lib
+      - -Dlibhwloc_include=%{prefix}/include
+    gcc:
+      # SSIDS C/C++ asserts off, as upstream release builds have them.
+      - -Db_ndebug=true
+      - -Dlibblas=openblas
+      - -Dliblapack=openblas
+      - -Dlibblas_path=%{prefix}/lib
+      - -Dliblapack_path=%{prefix}/lib
+      - -Dlibhwloc_path=%{prefix}/lib
+      - -Dlibhwloc_include=%{prefix}/include
+    macos:
+      # SSIDS C/C++ asserts off, as upstream release builds have them.
+      - -Db_ndebug=true
+      - -Dlibblas=openblas
+      - -Dliblapack=openblas
+      - -Dlibblas_path=%{prefix}/lib
+      - -Dliblapack_path=%{prefix}/lib
+      - -Dlibhwloc_path=%{prefix}/lib
+      - -Dlibhwloc_include=%{prefix}/include
+    mkl:
+      # SSIDS C/C++ asserts off, as upstream release builds have them.
+      - -Db_ndebug=true
+      - -Dlibblas=mkl_gf_lp64
+      - -Dliblapack=mkl_core
+      - -Dlibblas_path=%{mklroot}/lib
+      - -Dliblapack_path=%{mklroot}/lib
+      - -Dlibhwloc_path=%{prefix}/lib
+      - -Dlibhwloc_include=%{prefix}/include
+    gcc-mkl-cuda:
+      # SSIDS C/C++ asserts off, as upstream release builds have them.
+      - -Db_ndebug=true
+      - -Dlibblas=mkl_gf_lp64
+      - -Dliblapack=mkl_core
+      - -Dlibblas_path=%{mklroot}/lib
+      - -Dliblapack_path=%{mklroot}/lib
+      - -Dlibhwloc_path=%{prefix}/lib
+      - -Dlibhwloc_include=%{prefix}/include
+    intel:
+      # SSIDS C/C++ asserts off, as upstream release builds have them.
+      - -Db_ndebug=true
+      - -Dlibblas=mkl_intel_lp64
+      - -Dliblapack=mkl_core
+      - -Dlibblas_path=%{mklroot}/lib
+      - -Dliblapack_path=%{mklroot}/lib
+      - -Dlibhwloc_path=%{prefix}/lib
+      - -Dlibhwloc_include=%{prefix}/include
+  optimization:
+    O_level: 3
+
+build:
+  parallel: true
+
+install:
+  post:
+    # BSD-3-Clause requires the notice with binary redistribution; upstream's
+    # meson install does not ship LICENCE. CWD is the source root for meson
+    # recipes on every builder.
+    - "mkdir -p %{prefix}/share/licenses/spral"
+    - "install -m 644 LICENCE %{prefix}/share/licenses/spral/LICENCE"
+    # The tag always installs the spral_ssids driver (no -Dbinaries option
+    # until after v2025.09.18). No consumer needs it.
+    - "rm -f %{prefix}/bin/spral_ssids"
+
+test:
+  commands:
+    # SSIDS needs OpenMP cancellation and thread binding, read once at
+    # OpenMP start-up (SPRAL README.md:48-49). Both are set explicitly for
+    # the test run. For users, the stack's activate script sets only
+    # OMP_CANCELLATION (environment 2026-3); OMP_PROC_BIND=TRUE is never set
+    # stack-wide because it pins every OpenMP program's threads.
+    - "cd build && OMP_CANCELLATION=TRUE OMP_PROC_BIND=TRUE meson test --no-rebuild --print-errorlogs"
+
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -lspral"

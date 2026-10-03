@@ -1,0 +1,12 @@
+%{prefix}/include/spral.h
+%{prefix}/include/spral_complex.h
+%{prefix}/include/spral_lsmr.h
+%{prefix}/include/spral_matrix_util.h
+%{prefix}/include/spral_random.h
+%{prefix}/include/spral_random_matrix.h
+%{prefix}/include/spral_rutherford_boeing.h
+%{prefix}/include/spral_scaling.h
+%{prefix}/include/spral_ssids.h
+%{prefix}/include/spral_ssmfe.h
+%{prefix}/lib/libspral.so
+%{prefix}/share/licenses/spral/LICENCE

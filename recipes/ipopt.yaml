@@ -30,6 +30,11 @@ requires:
     # src/Algorithm/LinearSolvers/IpMumpsSolverInterface.cpp:56-78).
     - openmpi
     - mumps
+    # SSIDS, linked at build time (Ipopt has no runtime loader for SPRAL).
+    # Opt-in via linear_solver spral; the default stays mumps because Ipopt
+    # ranks linked MUMPS and MKL Pardiso above SPRAL (upstream 3.14.20,
+    # src/Algorithm/IpAlgBuilder.cpp:232-242).
+    - spral
 
 features:
   fortran: true
@@ -51,6 +56,12 @@ configure:
     # so point at the MUMPS we ship. Same link line as the mumps registry.
     - "--with-mumps-cflags=-I%{prefix}/include"
     - "--with-mumps-lflags=-L%{prefix}/lib -ldmumps -lmumps_common -lpord"
+    # SPRAL is skipped unless asked for (default_skip, configure.ac:236-240).
+    # libspral.so carries its own DT_NEEDED and RUNPATH for metis, hwloc,
+    # BLAS/LAPACK and the OpenMP runtime, so -lspral alone links.
+    - --with-spral
+    - "--with-spral-cflags=-I%{prefix}/include"
+    - "--with-spral-lflags=-L%{prefix}/lib -lspral"
     # ASL (AMPL executable) and HSL are looked up via pkg-config
     # (coinasl / coinhsl). Neither is in the stack; turn the lookups off so a
     # stray .pc on a build host cannot change what ships. HSL and
@@ -81,6 +92,12 @@ test:
     # when rpmbuild runs as root, the same way the mumps test passes
     # --allow-run-as-root to mpirun.
     - "OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 make test"
+    # make test only exercises the default solver (MUMPS). Solve hs071 again
+    # with SPRAL, chosen through an ipopt.opt in a scratch directory, and fail
+    # unless Ipopt reports SPRAL and an optimal solution. OMP_CANCELLATION is
+    # required: without it SSIDS's factorisation fails and hs071 ends in
+    # "Restoration Failed" (devlog/dl20261003_spral_recipe.md).
+    - "s=$PWD; t=$(mktemp -d); echo 'linear_solver spral' > $t/ipopt.opt; (cd $t && OMP_CANCELLATION=TRUE OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 $s/test/hs071_cpp > hs071_spral.log 2>&1) || true; cat $t/hs071_spral.log; ok=0; grep -q 'running with linear solver spral' $t/hs071_spral.log && grep -q 'EXIT: Optimal Solution Found' $t/hs071_spral.log || ok=1; rm -rf $t; test $ok -eq 0"
 
 registry:
   cflags: "-I%{prefix}/include/coin-or"

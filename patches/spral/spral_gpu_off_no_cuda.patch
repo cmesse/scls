@@ -1,0 +1,30 @@
+--- a/meson.build
++++ b/meson.build
+@@ -18,7 +18,13 @@
+ cc = meson.get_compiler('c')
+ cxx = meson.get_compiler('cpp')
+ fc = meson.get_compiler('fortran')
+-nvcc_available = add_languages('cuda', required: false, native: false)
++# SCLS: probe for nvcc and CUDA only when -Dgpu=true. Upstream probes
++# unconditionally and links libcudart/libcublas whenever they are found.
++if get_option('gpu')
++  nvcc_available = add_languages('cuda', required: false, native: false)
++else
++  nvcc_available = false
++endif
+ 
+ # Remove messages about deprecated Intel compilers
+ if cc.get_id() == 'intel'
+@@ -81,7 +87,11 @@
+ endif
+ libmetis = fc.find_library(libmetis_name, dirs : libmetis_path, required : true)
+ libhwloc = fc.find_library(libhwloc_name, dirs : libhwloc_path, required : false)
+-libcuda = dependency('cuda', version : '>=10', modules : ['cublas'], required : false)
++if build_gpu
++  libcuda = dependency('cuda', version : '>=10', modules : ['cublas'], required : false)
++else
++  libcuda = dependency('', required : false)
++endif
+ lm = cc.find_library('m', required : false)
+ libspral_deps = [libblas, liblapack, libmetis, libhwloc, libcuda, lm]
+ 
