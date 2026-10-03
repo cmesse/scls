@@ -444,7 +444,7 @@ cmake --build build</code></pre>
         </tbody>
     </table>
     </div>
-    <p>Ipopt is built against the stack's own linear solvers: the MPI build of MUMPS (the default <code>linear_solver</code>) and SPRAL's SSIDS on every flavor, plus MKL Pardiso on the MKL flavors. Users select a solver in <code>ipopt.opt</code>; SSIDS additionally needs <code>OMP_CANCELLATION=TRUE</code> in the environment of the program that uses it.</p>
+    <p>Ipopt is built against the stack's own linear solvers: the MPI build of MUMPS (the default <code>linear_solver</code>) and SPRAL's SSIDS on every flavor, plus MKL Pardiso on the MKL flavors. Users select a solver in <code>ipopt.opt</code>; SSIDS additionally needs <code>OMP_CANCELLATION=TRUE</code> in the environment of the program that uses it. The HSL solvers (MA27, MA57, HSL_MA77, HSL_MA86, HSL_MA97) are supported through Ipopt's runtime loader for users who hold an HSL licence: SCLS does not distribute HSL in any form, but <code>./scls build hsl</code> builds a private library from the user's own licensed Coin-HSL source tarball against the stack's METIS and BLAS/LAPACK. See <a href="https://github.com/cmesse/scls/blob/main/doc/HSL_BUILD.md">HSL_BUILD.md</a>.</p>
 
 </section>
 
