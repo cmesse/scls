@@ -185,7 +185,8 @@ Found by the per-object DT_NEEDED comparison of the U26 resolute .debs against t
 RPMs (2026-09-29/30). Each item is a recipe or build-configuration change and needs Christian's
 approval and the audit gate.
 
-- [ ] **ipopt**: add the recipe (Christian's round-2 goal).
+- [ ] **ipopt**: recipe added with SPRAL (`ipopt` branch, 2026-10-03; `todo/spral_recipe.md`,
+      `devlog/dl20261003_spral_recipe.md`). Remaining: the shipping builds tracked there.
 - [ ] **gperftools without libunwind on the RPM hosts**: see §1, including the planned fix and the
       release bump on R9/R10/AMZN.
 - [ ] **scotch's compression flags are inert on every host.** `recipes/scotch.yaml:53-56` passes
