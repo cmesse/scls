@@ -211,12 +211,18 @@ install:
 
 test:
   commands:
-    # SSIDS needs OpenMP cancellation and thread binding, read once at
-    # OpenMP start-up (SPRAL README.md:48-49). Both are set explicitly for
-    # the test run. For users, the stack's activate script sets only
-    # OMP_CANCELLATION (environment 2026-3); OMP_PROC_BIND=TRUE is never set
-    # stack-wide because it pins every OpenMP program's threads.
-    - "cd build && OMP_CANCELLATION=TRUE OMP_PROC_BIND=TRUE meson test --no-rebuild --print-errorlogs"
+    # SPRAL's own unit tests run in upstream's OpenMP environment:
+    # meson.build:209 passes OMP_CANCELLATION=true and OMP_PROC_BIND=true to
+    # every test (env:, which overrides the caller's). They need it. Without
+    # binding every SSIDS call returns warning 50 (SSIDS_WARNING_OMP_PROC_BIND),
+    # and tests/ssids/ssids.f90:1668-1678 treats any flag other than the
+    # expected one as an error and skips the residual check. A patched run
+    # gave 12 such errors and no wrong answer (devlog/dl20261003_spral_recipe.md).
+    # These tests check SSIDS numerics. The OpenMP environment users actually
+    # get from the SCLS activate script (OMP_CANCELLATION=TRUE, no
+    # OMP_PROC_BIND) is tested end-to-end by Ipopt's %check, which solves
+    # hs071 with linear_solver spral under exactly that environment.
+    - "cd build && meson test --no-rebuild --print-errorlogs"
 
 registry:
   cflags: "-I%{prefix}/include"

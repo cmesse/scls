@@ -94,10 +94,14 @@ test:
     - "OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 make test"
     # make test only exercises the default solver (MUMPS). Solve hs071 again
     # with SPRAL, chosen through an ipopt.opt in a scratch directory, and fail
-    # unless Ipopt reports SPRAL and an optimal solution. OMP_CANCELLATION is
-    # required: without it SSIDS's factorisation fails and hs071 ends in
-    # "Restoration Failed" (devlog/dl20261003_spral_recipe.md).
-    - "s=$PWD; t=$(mktemp -d); echo 'linear_solver spral' > $t/ipopt.opt; (cd $t && OMP_CANCELLATION=TRUE OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 $s/test/hs071_cpp > hs071_spral.log 2>&1) || true; cat $t/hs071_spral.log; ok=0; grep -q 'running with linear solver spral' $t/hs071_spral.log && grep -q 'EXIT: Optimal Solution Found' $t/hs071_spral.log || ok=1; rm -rf $t; test $ok -eq 0"
+    # unless Ipopt reports SPRAL and an optimal solution. The OpenMP
+    # environment is the one the SCLS activate script sets: OMP_CANCELLATION
+    # =TRUE (without it SSIDS's factorisation fails and hs071 ends in
+    # "Restoration Failed", devlog/dl20261003_spral_recipe.md) and no
+    # OMP_PROC_BIND, unset rather than left to the build host's shell. This
+    # is the stack's end-to-end test of that environment; SPRAL's own unit
+    # tests need OMP_PROC_BIND and run with upstream's settings.
+    - "s=$PWD; t=$(mktemp -d); echo 'linear_solver spral' > $t/ipopt.opt; (cd $t && env -u OMP_PROC_BIND OMP_CANCELLATION=TRUE OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 $s/test/hs071_cpp > hs071_spral.log 2>&1) || true; cat $t/hs071_spral.log; ok=0; grep -q 'running with linear solver spral' $t/hs071_spral.log && grep -q 'EXIT: Optimal Solution Found' $t/hs071_spral.log || ok=1; rm -rf $t; test $ok -eq 0"
 
 registry:
   cflags: "-I%{prefix}/include/coin-or"

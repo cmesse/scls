@@ -202,6 +202,31 @@ Spec gate: only the six spral specs change, losing the two BuildRequires lines.
 On macOS SPRAL is built by the SCLS GCC (not a bootstrap package): meson sees cxx id `gcc`, so it
 links `-lgomp` from /opt/scls/lib, not Apple's libomp.
 
+## OpenMP settings: one source of truth (Christian, 2026-10-03)
+
+Requirement: whatever the stack sets for OpenMP must match the `environment` activate script, which
+sets `OMP_CANCELLATION=TRUE` when spral is installed and never sets `OMP_PROC_BIND`.
+
+- Every place an `OMP_*` variable is set or mentioned was swept: activate, the Ipopt and spral
+  `%check`, descriptions, changelogs. Only SPRAL's own unit tests differed.
+  - Upstream `meson.build:209` passes `OMP_CANCELLATION=true` *and* `OMP_PROC_BIND=true` to every
+    test through `env:`, which overrides the caller's environment.
+- **Tried:** a patch that left `omp_env = ['OMP_CANCELLATION=true']`.
+  - Result: `ssidst` failed with 12 errors, the other 8 tests OK.
+  - Every error was flag 50 (`SSIDS_WARNING_OMP_PROC_BIND`, a warning, `src/ssids/ssids.f90:1456`)
+    where the test expects 0. `tests/ssids/ssids.f90:1668-1678` jumps past the residual check on
+    any flag mismatch, so there was no wrong answer, and also no numerical check for those cases.
+  - Upstream's unit tests require binding by design.
+- **Decision: split by purpose.** The patch is dropped.
+  - SPRAL's unit tests check SSIDS numerics in upstream's environment (9/9 again).
+  - Ipopt's `%check` is the end-to-end test of the activate environment: hs071 with
+    `linear_solver spral`, `env -u OMP_PROC_BIND OMP_CANCELLATION=TRUE`. It passes; Ipopt
+    treats flag 50 as a warning.
+- **Not chosen: setting `OMP_PROC_BIND=TRUE` in activate.** The stack sets Open MPI's binding
+  policy to none (`PRTE_MCA_hwloc_default_binding_policy=none`), so every rank sees the whole
+  node, and with `OMP_PROC_BIND=TRUE` all ranks would pin their first thread to the same core.
+- Releases stay spral 2025.09.18-1 and ipopt 3.14.20-1: neither package has been published.
+
 ## Pending
 
 - [x] Install spral (gcc, mkl) and ipopt (gcc).
