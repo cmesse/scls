@@ -41,9 +41,17 @@ macOS support (Intel and Apple Silicon) is no longer beta. A first build still m
 - **Meson (≥ 0.63) and Ninja** on `PATH`, for meson-built recipes (today only
   `spral`). Build-time tools only; nothing in the stack links or ships them.
 
+  Install them with pip, not Homebrew: SCLS does not depend on Homebrew.
+  Meson is pure Python and the `ninja` wheel ships a native binary, so the
+  Command Line Tools' `python3` is enough:
+
   ```bash
-  brew install meson ninja
+  python3 -m pip install --user meson ninja
   ```
+
+  `pip --user` puts both into `~/Library/Python/3.<minor>/bin`. Add that
+  directory to `PATH` before running `./scls`; `./scls` checks that `meson`
+  and `ninja` are on `PATH` before a meson build.
 
 - **General comfort with the Unix toolchain** — installing CLT, understanding
   how linker and sysroot settings work, and knowing what to do when a build
