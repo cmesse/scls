@@ -2094,6 +2094,17 @@ fi
 
     def build_rpm(self, spec_file: Path) -> None:
         """Run rpmbuild to create the RPM"""
+        # meson and ninja come from pip on every host, not from BuildRequires
+        # (Christian, 2026-10-03), so rpmbuild cannot check for them. Fail
+        # here, before rpmbuild, as unix_builder.check_host_tools does.
+        if self.recipe.get('configure', {}).get('type') == 'meson':
+            missing = [t for t in ('meson', 'ninja') if shutil.which(t) is None]
+            if missing:
+                raise BuildError(
+                    f"{self.package} is built with meson; not on PATH: "
+                    f"{', '.join(missing)}. Install with "
+                    f"`python3 -m pip install --user meson ninja` and put the "
+                    f"pip user bin directory on PATH.")
         # Copy spec to rpmbuild/SPECS (if not already there)
         dest_spec = self.specs_dir / spec_file.name
         if spec_file.resolve() != dest_spec.resolve():

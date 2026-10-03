@@ -187,6 +187,21 @@ Both pre-existing items go to `todo/spral_recipe.md` follow-ups with the `config
 gap. Post-fix gcc `readelf`: NEEDED libopenblas.so.0, libmetis.so.0, libhwloc.so.15; RPATH
 /opt/scls/gcc/lib; no CUDA.
 
+## meson/ninja from pip on every host (Christian, 2026-10-03)
+
+meson and ninja are installed with `python3 -m pip install --user meson ninja` on every build host:
+EL, Ubuntu and macOS. Unpinned; SPRAL's meson.build enforces >= 0.63. Reasons: the same tools on all
+platforms and flavors, SCLS needs Python to build anyway, and no Homebrew on the Mac. So:
+- `recipes/spral.yaml` drops them from `rpm_build_requires`; lbl keeps `hwloc-devel`.
+- The `packaging/system_packages.yaml` entries are removed.
+- `rpm_builder.build_rpm` checks `PATH` for meson/ninja before rpmbuild, as
+  `unix_builder.check_host_tools` already did.
+- `doc/BUILD_EXECUTION.md` gains §1.1c and an exception in Class D, so an unattended run never adds
+  them back as BuildRequires.
+Spec gate: only the six spral specs change, losing the two BuildRequires lines.
+On macOS SPRAL is built by the SCLS GCC (not a bootstrap package): meson sees cxx id `gcc`, so it
+links `-lgomp` from /opt/scls/lib, not Apple's libomp.
+
 ## Pending
 
 - [x] Install spral (gcc, mkl) and ipopt (gcc).
@@ -194,5 +209,5 @@ gap. Post-fix gcc `readelf`: NEEDED libopenblas.so.0, libmetis.so.0, libhwloc.so
 - [x] Ipopt mkl, `IPOPT_HAS_PARDISO_MKL`, check_mkl_linkage on the new RPMs.
 - [ ] Reinstall current `scls-mkl-scalapack` (-4) and `scls-mkl-armadillo` (15.6.0-2) on this host.
 - [ ] Rebuild and install `environment` 2026-3 per flavor.
-- [ ] Shipping builds with distro meson; debug, lbl, U24/U26 .deb, macOS.
+- [ ] Shipping builds (meson/ninja from pip); debug, lbl, U24/U26 .deb, macOS.
 - [ ] Round-2 blind audits of the combined diff.

@@ -20,7 +20,9 @@
   `-Dbinaries` option); no Fortran modules.
 - BSD notice installed as `share/licenses/spral/LICENCE`.
 - lbl links the system hwloc and Requires `hwloc-libs`.
-- Build host needs meson >= 0.63.0 and ninja (build time only).
+- Build host needs meson >= 0.63.0 and ninja (build time only), installed
+  with pip on every host (`python3 -m pip install --user meson ninja`), not
+  as distro packages, so they are not BuildRequires.
 - Runtime: SSIDS needs `OMP_CANCELLATION=TRUE`, or its factorisation fails.
   The stack's `activate` sets it when SPRAL is installed (environment
   2026-3). `OMP_PROC_BIND=TRUE` is recommended for performance, but it is

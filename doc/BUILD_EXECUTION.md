@@ -83,6 +83,13 @@ packages link the system libraries when they are present, as on el9, whose build
 (lzma, for minidebuginfo). Without them, netcdf silently builds its internal bz2 copy and the others
 drop the feature (Christian, 2026-09-30).
 
+**1.1c Meson and Ninja, from pip on every host.** Meson-built recipes (today `spral`) need
+`meson` (>= 0.63.0) and `ninja` on `PATH`. They are installed with pip, not dnf/apt/Homebrew, so
+every host and flavor builds with the same tools (Christian, 2026-10-03):
+`python3 -m pip install --user meson ninja`, with the interpreter `flavor.conf` selects, and the
+pip user bin directory (`~/.local/bin` on Linux) on `PATH`. They are deliberately *not*
+`rpm_build_requires`; the builders check `PATH` before a meson build.
+
 **1.2 Git.** Be on `devel` (`git checkout devel` if not, and say so). `git pull --ff-only` once,
 here, so that manifest fixes committed from another host are picked up before anything is built —
 never mid-run, where it could change a recipe between a build and its install. Record `HEAD`;
@@ -283,6 +290,9 @@ Reverse-application means the patch should be *dropped*, and dropping a patch is
 
 **Symptoms.** configure/CMake fails on a header, library or tool that a distro package provides
 and this host simply does not have installed.
+
+**Not Class D: `meson` / `ninja` not found.** They come from pip (§1.1c). Install them on the host
+and rerun; never add them to `rpm_build_requires`.
 
 **Fix.**
 1. Identify the provider: `dnf provides '*/<header>'` (RPM) or `apt-file search <header>` (DEB).

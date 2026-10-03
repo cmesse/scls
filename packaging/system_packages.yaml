@@ -26,12 +26,6 @@ gcc-gfortran:             gfortran
 
 # Build tools
 autoconf:                 autoconf
-# meson-built recipes (spral). Build-time only; same names on Debian/Ubuntu.
-# SPRAL needs meson >= 0.63.0 (its meson.build:6); EL8's meson is older.
-# Debian side unversioned: every supported Ubuntu ships meson >= 1.3, and
-# the host check (deb_builder dpkg-query) takes bare package names only.
-"meson >= 0.63.0":        meson
-ninja-build:              ninja-build
 # glibc-devel is implied by gcc on RHEL; on Debian gcc only Recommends
 # libc6-dev, so the environment recipe lists it explicitly to get the
 # build-essential equivalent (gcc, g++, make, libc6-dev) as hard Depends.

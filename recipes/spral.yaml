@@ -55,13 +55,13 @@ features:
   openmp: true
   math: serial
 
-# Build-time host tools only; neither ships nor is needed to use libspral.
-# meson >= 0.63.0 (SPRAL meson.build:6). Meson is a Python program: that is
-# build-time use of the system Python, which CLAUDE.md allows.
+# meson (>= 0.63.0, SPRAL meson.build:6) and ninja are build-time host tools
+# installed with pip on every host (`python3 -m pip install --user meson
+# ninja`), not distro packages: the same tools on every platform and flavor,
+# and SCLS needs Python to build anyway (Christian, 2026-10-03). They are
+# therefore not BuildRequires; the builders check that both are on PATH
+# before a meson build. Neither ships nor is needed to use libspral.
 rpm_build_requires:
-  all:
-    - meson >= 0.63.0
-    - ninja-build
   lbl:
     - hwloc-devel
 
