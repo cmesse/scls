@@ -293,4 +293,4 @@ replaced by this section wherever they conflict.
 - [x] Confidential-looking prose removed from tracked files.
 - [x] `--work-dir` deletion-before-validation fixed; atexit/SIGTERM cleanup; assembler trap.
 - [x] Coin-HSL-only build passes (basic MA77 test).
-- [ ] **Christian:** keep the MA77 override default-on ("apply if newer") or make it opt-in.
+- [x] **Christian (2026-10-03):** the MA77 override stays default-on, "apply if newer"; `--no-overrides` opts out. Rationale: both tarballs are the licensee's own releases, each used under its own licence; the auditors' 2.1.4 doubt is recorded, the decision is the maintainer's.

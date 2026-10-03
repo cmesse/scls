@@ -164,12 +164,13 @@ Academic Licence allows. Findings and what changed:
   EXIT trap removes its temp files and a half-assembled target. GNU-only `install -D` replaced.
 - **Coin-HSL-only builds** failed the MA77 gate (its refactorization test needs 6.5.0); the test
   now runs in basic mode unless the override was applied.
-- **Open for Christian:** both auditors doubt that §2.1.4 covers compiling a newer standalone
-  MA77 in place of Coin-HSL's copy. Default stays "apply if newer" (Christian's decision) with
-  `--no-overrides`; flipping to opt-in is the alternative. Docs now present it as SCLS's reading.
+- **Override default — decided (Christian, 2026-10-03):** both auditors doubt that §2.1.4
+  covers compiling a newer standalone MA77 in place of Coin-HSL's copy. Christian keeps the
+  override default-on, "apply if newer", with `--no-overrides` as the opt-out: both tarballs
+  are the licensee's own releases, each used under its own licence. Docs present SCLS's reading
+  as a reading and leave the choice with the user.
 
 ## Open
 
 - `./scls install hsl` on a terminal with sudo (the only path not executed here).
-- Decision on the override default (above).
 - `macos` / `intel` runs.
