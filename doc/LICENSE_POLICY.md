@@ -143,22 +143,19 @@ the sources and binaries are private.**
   unpacks them into a directory outside the SCLS work tree, keeps each package's
   `LICENCE` under `LICENCES/`, and records inputs and checksums in `PROVENANCE.txt`.
   HSL *sources* never enter the work tree or the stack prefix.
-- Two install locations, both the licensee's choice:
-  - `./scls build hsl` installs into a per-user prefix (default
-    `~/.local/scls-hsl/<flavor>`). Ipopt is pointed at it with `hsllib <full path>`
-    in `ipopt.opt` or via the API. This is the default because the HSL Academic
-    Licence is personal-use.
-  - `./scls install hsl` installs into the stack prefix `/opt/scls/<flavor>`, where
-    Ipopt's default `hsllib` finds it through `libipopt`'s RUNPATH with no
-    configuration. Before publishing, it prints the licence texts from the user's
-    own tarballs and requires explicit acceptance (typed `yes`, or `--accept-licence`
-    for scripted use), confirming that the licence covers use on that machine by
-    everyone who can use the prefix (a single-user machine, or a site/commercial
-    licence). The file is owned by no package; the acceptance is recorded in
-    `share/hsl/build-info.yaml`. Compliance is the licensee's responsibility, not
-    SCLS's: SCLS distributes nothing.
-  - `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` are not an option here or anywhere in
-    SCLS.
+- `./scls build hsl` only builds and checks; the result is staged owner-only under the
+  system temp dir. `./scls install hsl` installs it after three explicit answers, recorded
+  in `share/hsl/build-info.yaml`, and then deletes the staged build:
+  - install type: *local* (`~/.local/scls-hsl/<flavor>`, owner-only, Ipopt needs
+    `hsllib <full path>`) or *global* (`/opt/scls/<flavor>`, readable by every user, owned
+    by no package, published with sudo; Ipopt's default `hsllib` finds it via RUNPATH);
+  - licence type: *academic* (personal, non-commercial, no sharing even within the
+    institution; a global install is refused unless the user confirms being the machine's
+    sole user) or *commercial* (an agreement with STFC whose terms the user holds);
+  - acceptance: the licence files from the user's tarballs are shown with SCLS's statement
+    of what the user confirms for that combination; typed `yes` or `--accept-licence`.
+  SCLS grants no rights and distributes nothing; compliance is the licensee's. `LD_LIBRARY_PATH`
+  / `DYLD_LIBRARY_PATH` are not an option here or anywhere in SCLS.
 - `.gitignore` blocks HSL tarball, tree and library names anywhere in the repository.
   Nothing HSL-derived may be committed, staged to a repository host, pasted into a
   devlog or audit prompt, or given to another person. Each user needs their own

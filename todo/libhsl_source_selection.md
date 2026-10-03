@@ -279,8 +279,12 @@ replaced by this section wherever they conflict.
 - [x] `LD_LIBRARY_PATH` route vetoed by Christian (SCLS policy); `DYLD_LIBRARY_PATH` dead on
   macOS anyway. An Ipopt env-var patch (`IPOPT_HSLLIB`) was considered and dropped: the stack
   prefix install covers the "no configuration" case without diverging from upstream.
-- [ ] Executable gate still open: `./scls install hsl` on a terminal with sudo (Christian). The
-  non-tty path was run: builds, shows licences, refuses, installs nothing.
+- [x] Final command model (Christian, 2026-10-03): `build hsl` builds + stages under `$TMPDIR`;
+  `install hsl` asks install type / licence type / acceptance, publishes, deletes the stage.
+  Gated: build stages 0700/0600 and installs nothing; install refuses without answers; global +
+  academic refused without `--sole-user`; local academic scripted install lands 0700/0600 with
+  the acceptance record and the stage is removed.
+- [ ] Executable gate still open: `./scls install hsl --global` on a terminal with sudo (Christian).
 - [ ] macOS: same command on the dev Mac with `scls-macos-metis` installed; `libhsl.dylib`
   symlink, **hard** install name = `<prefix>/lib/libcoinhsl.dylib` (no `@rpath`, per Christian), stack
   libs by their install names; the pre-publish test is retargeted to staging with

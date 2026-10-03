@@ -71,13 +71,15 @@ New, all SCLS code, no HSL text:
 - `scripts/hsl/tests/ma77_factor_solve.c` — indefinite factor/solve, plus a refactorization test for HSL_MA77 >= 6.5.0.
 - `scripts/hsl/tests/test_assemble.sh` — 16 synthetic cases (dummy tarballs), all pass.
 - `scripts/hsl/tests/ipopt_hs071.c` — integration gate: hs071 via Ipopt's C interface with a chosen `linear_solver` and `hsllib`.
-- `scls` wrapper — `./scls build hsl [--sources DIR] [--prefix DIR]` routes to
-  `scripts/build_libhsl.py` before any builder is reached (Christian, 2026-10-03: "we just
-  shouldn't create a package file"); per-user prefix. `./scls install hsl` is the stack-prefix
-  variant: licence texts from the user's tarballs are printed, acceptance is required (`yes` on a
-  tty or `--accept-licence`), files are published with `sudo install`, acceptance is recorded in
-  `build-info.yaml`. Christian's rationale: compliance is the licensee's responsibility
-  (single-user machine, or a commercial/site licence); SCLS distributes nothing.
+- `scls` wrapper — routes `build hsl` / `install hsl` to `scripts/build_libhsl.py` before any
+  builder (Christian, 2026-10-03: "we just shouldn't create a package file"). Final shape
+  (Christian, later the same day: "so that it behaves as with the other libraries"): `build`
+  only builds and checks, staging the result owner-only under `$TMPDIR/scls-hsl-<uid>/<flavor>`;
+  `install` asks install type (local = `~/.local/scls-hsl/<flavor>` 0700/0600; global = stack
+  prefix via sudo), licence type (academic | commercial; academic + global only after confirming
+  sole use of the machine), and acceptance (licence files from the tarballs + SCLS's statement of
+  what is confirmed), records all of it in `build-info.yaml`, publishes, and deletes the stage.
+  Rationale: compliance is the licensee's responsibility; SCLS distributes nothing.
 - Implementation review (Codex gpt-6-astra + Grok 4.7, `tmp/ai_exchange/review_libhsl_impl.md`)
   found and I fixed: macOS — the dylib keeps a **hard** install name (Christian: `@rpath` is not used
   in the stack), so the pre-publish MA77 test executable is rewritten with `install_name_tool

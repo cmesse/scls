@@ -44,44 +44,52 @@ Prerequisites: the flavor's `metis` installed in the stack prefix, CMake (the st
 is used when present), the flavor's compilers.
 
 ```bash
-./scls build hsl [--sources DIR]      # per-user install: ~/.local/scls-hsl/<flavor>
-./scls install hsl [--sources DIR]    # stack prefix /opt/scls/<flavor>, after licence acceptance
+./scls build hsl [--sources DIR]    # build and check; stage the result, install nothing
+./scls install hsl                  # install the staged build after three questions
 ```
 
-Both assemble the sources outside the SCLS work tree, build `libcoinhsl.so` (`.dylib` on
-macOS) with a `libhsl.so` / `libhsl.dylib` symlink — the name Ipopt looks for — and run
-these checks on the staged library **before** anything is installed: every symbol Ipopt's
-loader resolves is present; no METIS is compiled in (the stack's `libmetis` is linked);
-every dependency resolves to the stack (METIS, OpenBLAS / reference LAPACK / the flavor's
-MKL layer); a dlopen smoke test; an MA77 factor-and-solve test (its refactorization part
-runs only with HSL_MA77 >= 6.5.0); on MKL flavors `scripts/check_mkl_linkage.sh`. The scratch
-directory, which holds HSL source, is removed at exit, including on errors and interrupts,
-unless `--keep-work`.
+As with every other package, `build` only builds. It assembles the sources outside the SCLS
+work tree, builds `libcoinhsl.so` (`.dylib` on macOS) with a `libhsl.so` / `libhsl.dylib`
+symlink — the name Ipopt looks for — and runs these checks before staging: every symbol
+Ipopt's loader resolves is present; no METIS is compiled in (the stack's `libmetis` is
+linked); every dependency resolves to the stack (METIS, OpenBLAS / reference LAPACK / the
+flavor's MKL layer); a dlopen smoke test; an MA77 factor-and-solve test (its refactorization
+part runs only with HSL_MA77 >= 6.5.0); on MKL flavors `scripts/check_mkl_linkage.sh`. The
+checked result is staged, owner-only, under `$TMPDIR` (or `/tmp`) as
+`scls-hsl-<uid>/<flavor>/`. The scratch tree holding HSL source is removed at exit, including
+on errors and interrupts, unless `--keep-work`.
 
-`./scls build hsl` installs owner-only (directories 0700, files 0600): under the HSL
-Academic Licence the library is for your personal use and may not be shared, including with
-colleagues at your own institution.
+`install` takes the staged build and asks three questions (flags for scripted use):
 
-`./scls install hsl` (or any `--prefix` outside your home directory) is a shared install. It
-prints the licence files from your tarballs, states the Academic Licence's personal-use and
-no-sharing terms in SCLS's own words, and requires you to type `yes` (or pass
-`--accept-licence` for scripted use), confirming that you have read your licence agreement
-and that it covers use of the library at that location by everyone who can use it. An
-academic licence does not; a single-user machine, or a licence whose terms allow shared use,
-can. SCLS grants no rights and distributes nothing. The files are published with `sudo
-install`; the build itself never runs as root. Who accepted, when, from which host, and the
-checksums of the licence texts shown are recorded in `share/hsl/build-info.yaml`.
+1. **Install type** — `local`: `~/.local/scls-hsl/<flavor>`, owner-only (0700/0600); Ipopt
+   needs `hsllib <full path>`. `global`: the stack prefix `/opt/scls/<flavor>`, readable by
+   every user of the machine, owned by no package, published with `sudo install` (only the
+   file copies run as root); Ipopt finds it with no option. `--local` / `--global`.
+2. **Licence type** — `academic` (HSL Academic Licence: personal, non-commercial use by you
+   alone; the software and its use may not be shared with anyone, including colleagues at
+   your institution) or `commercial` (an agreement with STFC whose terms you hold).
+   `--licence academic|commercial`. A global install under an academic licence is permitted
+   only if you are the sole user of the machine, and asks you to confirm that (`--sole-user`);
+   otherwise it is refused.
+3. **Acceptance** — the licence files from your tarballs are printed (Coin-HSL's own is a
+   pointer to the agreement you accepted on the STFC portal), followed by what you confirm for
+   the chosen licence and install type; type `yes` (`--accept-licence`). SCLS grants no rights
+   and distributes nothing.
+
+Install type, licence type, who accepted, when, from which host, and the checksums of the
+licence texts shown are recorded in `<prefix>/share/hsl/build-info.yaml`. The staged build is
+deleted once the install has succeeded.
 
 ## Using it from Ipopt
 
-Per-user install — give the full path, in `ipopt.opt` or via the API:
+Local install — give the full path, in `ipopt.opt` or via the API:
 
 ```
 hsllib /home/<you>/.local/scls-hsl/<flavor>/lib/libhsl.so
 linear_solver ma97
 ```
 
-Stack-prefix install — nothing to configure: Ipopt's default `hsllib` (`libhsl.so` /
+Global install — nothing to configure: Ipopt's default `hsllib` (`libhsl.so` /
 `libhsl.dylib`) is found through `libipopt`'s RUNPATH.
 
 ```

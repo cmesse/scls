@@ -110,18 +110,17 @@ fi
 # 'scls build hsl' / 'scls install hsl' are not package builds. HSL is
 # proprietary and is never packaged or staged; scripts/build_libhsl.py builds a
 # private libhsl for Ipopt's runtime loader from the licensee's own tarballs.
-# 'build' installs owner-only into ~/.local/scls-hsl/<flavor>; 'install' puts it
-# into the stack prefix after showing the licence files and requiring the user's
-# acceptance (or --accept-licence), publishing with sudo; Ipopt then finds it
-# through libipopt's RUNPATH. Both are routed here, before the builders, so HSL
-# never gets a recipe, a spec, a registry entry or a place in the build order.
+# Like every other package, 'build' only builds (it stages the checked library
+# under $TMPDIR/scls-hsl-<uid>/<flavor>, owner-only) and 'install' installs it:
+# it asks for the install type (local = ~/.local/scls-hsl/<flavor>, owner-only;
+# global = the stack prefix, via sudo), the licence type (academic|commercial)
+# and acceptance, publishes, and removes the staged build. Both are routed here,
+# before the builders, so HSL never gets a recipe, spec, registry entry or
+# build-order slot.
 # See doc/HSL_BUILD.md and doc/LICENSE_POLICY.md.
 if [ "${2:-}" = "hsl" ] && { [ "${1:-}" = "build" ] || [ "${1:-}" = "install" ]; }; then
     MODE="$1"; shift 2
-    if [ "$MODE" = "install" ]; then
-        exec $PYTHON "$SCLS_DIR/scripts/build_libhsl.py" --flavor "$FLAVOR" --install-stack "$@"
-    fi
-    exec $PYTHON "$SCLS_DIR/scripts/build_libhsl.py" --flavor "$FLAVOR" "$@"
+    exec $PYTHON "$SCLS_DIR/scripts/build_libhsl.py" --flavor "$FLAVOR" "$MODE" "$@"
 fi
 
 # Handle commands that don't need a package name
