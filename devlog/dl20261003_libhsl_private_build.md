@@ -139,6 +139,11 @@ Not run: `macos`, `intel`.
 - Original tarballs + bash assembler + CMake; scripts public, sources private (2026-10-03).
 - D2: real MA77 factor-and-solve gate — yes. D3: HSL section in LICENSE_POLICY — yes.
   D4: no symbol-export restriction. Test scratch-file names made SCLS's own.
+- No link-time HSL in Ipopt, not even as an opt-in (Christian's question, 2026-10-03: a global
+  HSL install must not make Ipopt link against it). Verified: `--without-hsl` sets
+  `coin_has_hsl=skipping` in configure, and Ipopt's probe is pkg-config (`coinhsl.pc`) +
+  headers, which the HSL install does not ship. The gain of linking (MA27 as Ipopt's default
+  solver) is not worth an HSL-derived, unpackageable `libipopt`.
 - Library name: file `libcoinhsl.so` (SONAME, what it contains) + `libhsl.so` symlink
   (Ipopt's default). Recommended; a diff-against-HSL-example approach for the test was
   advised against (a diff embeds HSL text as context/removed lines).

@@ -98,6 +98,13 @@ linear_solver ma97
 
 `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` are not used in SCLS and not needed here.
 
+An installed HSL library never changes how Ipopt is built: the Ipopt recipe passes
+`--without-hsl`, which disables Ipopt's build-time HSL probe, and the install ships no
+`coinhsl.pc` or headers for that probe to find. Ipopt reaches HSL only through its runtime
+loader, so the packaged Ipopt is identical on every host. There is deliberately no option to
+link HSL into `libipopt`: that would make Ipopt itself HSL-derived and unpackageable, for no
+gain beyond changing Ipopt's default `linear_solver` (set it in `ipopt.opt` instead).
+
 ## What gets installed
 
 ```
