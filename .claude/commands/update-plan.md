@@ -90,7 +90,9 @@ From the approved bumps:
 
 - Bumped packages: `version:` → new, `release:` → `1` if the field exists (leave it absent
   otherwise — absent means 1).
-- Cascade packages: `release:` +1, adding the field after `version:` if absent.
+- Cascade packages: `release:` +1, adding the field after `version:` if absent — but only when
+  the package's current NEVRA is already dropped and published. An unpublished NEVRA keeps its
+  release and is rebuilt as it is (`doc/BUILD_EXECUTION.md` §0.6).
 - `changelogs/<pkg>.md`: new stanza at the top, `## Version <ver>-<rel> - <Day Mon DD YYYY>`.
   Bumped: `- Updated to version X` plus one bullet per patch dropped/refreshed or manifest edit.
   Cascade: `- Release bump only, no recipe content change: rebuilt because <deps> changed in the

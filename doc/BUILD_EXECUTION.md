@@ -33,6 +33,18 @@ recipes and writes the tracker. Nothing in this file ever changes a package vers
 5. **Destructive host operations get explicit confirmation** — uninstalling stack packages,
    `prune_old_packages.sh --apply`, anything touching the published repository. Building and
    installing do not; that is the job.
+6. **A release is bumped only after its NEVRA has been dropped and published** (Christian,
+   2026-10-04: "only bump when the drop and publish has happened"). A fix to a recipe whose
+   current version-release belfem does not publish yet keeps `release:` as it is. Every host and
+   flavor that already built that package rebuilds and reinstalls it at the same NEVRA, so the
+   artifacts, including the changelog rendered into them, match the recipe that is committed.
+   Once the NEVRA is published, a change to what ships needs `release:` +1: a same-NEVRA rebuild
+   is invisible to dnf/apt and must never replace a signed file (`.claude/commands/stage-drop.md`
+   §4). Whether a NEVRA is published is a question for belfem's published list, not for the local
+   output tree. This replaces the earlier reading "one NEVRA per recipe state" (openmpi 5.0.11-2,
+   2026-09-26) for packages that are not published; the changelog still gets a line saying what
+   changed and that the release was kept. First applied to gperftools 2.18.1-2 and
+   spral 2025.09.18-1 (`devlog/dl20261003_r9_round2.md`, round 2).
 
 ---
 
