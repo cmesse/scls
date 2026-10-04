@@ -65,8 +65,8 @@ those dependencies changed.
 | 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a |
 | 28 | 2 | nlopt 2.10.1 → 2.11.0 | stale | [x] | [x] | [x] |
 | 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| 30 | 5 | openmpi 5.0.11-1 → -2 | fix (`--with-prrte=internal`) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | n/a | n/a | n/a |
-| 31 | 3 | lapack 3.12.1-1 → -2 (debug only) | fix (`-ffp-contract=off`, `80a972a`) | [ ] | n/a | n/a | [ ] | n/a | n/a | n/a | n/a | [x] | n/a | n/a |
+| 30 | 5 | openmpi 5.0.11-1 → -2 | fix (`--with-prrte=internal`) | [ ] | [ ] | [ ] | [x] | [x] | [x] | [ ] | [ ] | n/a | n/a | n/a |
+| 31 | 3 | lapack 3.12.1-1 → -2 (debug only) | fix (`-ffp-contract=off`, `80a972a`) | [ ] | n/a | n/a | [x] | n/a | n/a | n/a | n/a | [x] | n/a | n/a |
 
 **Rows 26–28 were added on 2026-09-22, mid-run, and are not part of the original ten-bump
 scope.** `why: stale` means the installed package on the R9 build host was behind its own recipe
@@ -493,6 +493,10 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   **Still open elsewhere:** row 30 (openmpi -2) on R9/R10/AMZN, row 31 (lapack -2) on R9/R10 debug;
   U24 staging/upload not started (deferred by Christian). The rebuilt `scls-<F>` 2026-1 metas are
   same-NEVRA as published and must not be staged.
+- 2026-10-04 — **R10 round 2 complete: debug, gcc, mkl built and installed** from `21f141e`: rows 30
+  and 31, plus environment 2026-3, libunwind 1.8.3-3, gperftools 2.18.1-2 (pprof checks skipped,
+  48/48), hwloc 2.14.0-2, scotch 7.0.15-2, spral 2025.09.18-1, ipopt 3.14.20-1 and `scls-<F>` 2026-2.
+  mkl linkage gate PASS; HSL script test done on gcc. Not staged. `devlog/dl20261004_r10_round2.md`.
 
 ## Blockers
 

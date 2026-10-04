@@ -35,8 +35,8 @@ No consumer rebuild is needed: the SONAMEs of libscotch, libhwloc, libunwind and
 ## 1. Preflight (once per host)
 
 - [ ] `git fetch && git switch ipopt && git pull`. Build from `origin/ipopt` at or after the commit
-      that carries this file (R9 built from `1f16d16` plus this documentation). Do not build from
-      `devel` until `ipopt` is merged there.
+      that carries this file (`21f141e` or later: it carries the gperftools pprof skip, and R9 and
+      R10 are built from it). Do not build from `devel` until `ipopt` is merged there.
 - [ ] meson and ninja on `PATH` for spral: `python3 -m pip install --user meson ninja`, or link them
       from an existing venv into `~/.local/bin`. Do **not** put a venv's whole `bin/` on `PATH`,
       because its `python3` would shadow the system one for every other build.
@@ -49,6 +49,12 @@ No consumer rebuild is needed: the SONAMEs of libscotch, libhwloc, libunwind and
       On AL2023, check that these names resolve before starting.
 - [ ] `flavor.conf` is tracked (default `macos`). Set the flavor per section, and run
       `git checkout flavor.conf` at the end. Never commit it.
+
+- [ ] Host lessons from R10 (2026-10-04), in case they apply: if `./scls build` stops with
+      `No module named 'jinja2'`, the system `python3` lacks it; set `python:` in `flavor.conf` to an
+      interpreter that has `jinja2` and `yaml` (do not commit `flavor.conf`). The Codex and Grok
+      wrappers need a logged-in CLI and `bubblewrap`; they are only needed if a change must be
+      audited, not for building.
 
 ## 2. Build order, per flavor (debug → gcc → mkl; AMZN: gcc → mkl)
 
@@ -70,10 +76,12 @@ marker already exists), so build `_meta` explicitly. `./scls install _meta` inst
 - **libunwind -3:** `ls <prefix>/libexec/libunwind` does not exist, and no
   `x86_64-*-linux*-*` file remains in `bin/`, `sbin/` or `libexec/`.
 - **gperftools -2:** `readelf -d <prefix>/lib/libprofiler.so <prefix>/lib/libtcmalloc.so` NEED
-  `libunwind.so.8`. belfem checks this, because it's the reason for -2. Expected test noise:
-  `profiler_unittest.sh` and both `heap-profiler*_unittest.sh` fail when the host's
-  `/usr/bin/pprof` (EPEL pprof 2.9.1) is picked up. This is pre-existing and doesn't fail the build.
-  Record it; don't fix it in this round.
+  `libunwind.so.8`. belfem checks this, because it's the reason for -2. Since `21f141e` the recipe
+  passes `ac_cv_path_PPROF_PATH=`, so the five pprof-dependent checks are skipped on every host:
+  configure prints `checking for pprof... (cached) no`, the suite is 48/48 with 0 FAIL, and
+  `sampling_test`, `sampling_debug_test`, `profiler_unittest.sh` and both
+  `heap-profiler*_unittest.sh` are absent from the log (R9 and R10, 2026-10-04). A FAIL, or one of
+  those five names in the log, is a finding. The installed file list stays at 73 files.
 - **hwloc -2:** `<prefix>/bin/lstopo` exists, and `<prefix>/bin/*-lstopo` does not. If the RPM
   fails on unpackaged or missing files, `files/hwloc.txt` disagrees with the install: halt and report.
 - **lapack -2 (debug):** ctest passes, then run lapackpp `tester geev` against it

@@ -11,6 +11,7 @@ file, it is lost.
 
 ## Entries
 
+- [dl20261004_r10_round2.md](dl20261004_r10_round2.md) — R10 round 2 on debug/gcc/mkl: linking fixes, spral + ipopt, HSL script test; gperftools pprof-dependent checks skipped (`ac_cv_path_PPROF_PATH=`), agreed with R9 and audited
 - [dl20261003_r9_round2.md](dl20261003_r9_round2.md) — R9 round 2 built and installed on debug/gcc/mkl: gperftools+libunwind, scotch compression, `--target` removal with a triplet-program guard, meta release 2, spral + ipopt; HSL script test; nothing staged yet
 - [dl20261003_xz_macos_lbl_tools.md](dl20261003_xz_macos_lbl_tools.md) — xz 5.8.4 now builds on `macos` and `lbl` with the 0BSD tools (rule: packaged distros use distro xz, self-building flavors provide their own); libunwind and scotch use the stack's xz on lbl; built and tested on macOS, lbl RPM gate pending
 - [dl20261003_spral_recipe.md](dl20261003_spral_recipe.md) — new SPRAL 2025.09.18 recipe (SSIDS, BSD-3, first `configure.type: meson`), CUDA-probe patch, Ipopt 3.14.20 `--with-spral` + SPRAL `%check`, activate sets `OMP_CANCELLATION`; RPM autotools arg expansion/quoting fix; intel `%{mklroot}`→None fix; oneAPI repo gated per flavor; three review rounds
