@@ -80,6 +80,13 @@ Install type, licence type, who accepted, when, from which host, and the checksu
 licence texts shown are recorded in `<prefix>/share/hsl/build-info.yaml`. The staged build is
 deleted once the install has succeeded.
 
+With GNU Fortran the fixed-form (`.f`) sources are compiled with `-std=legacy`. Those Fortran 77
+routines use arithmetic `IF` and labelled `DO` terminations, which gfortran otherwise reports as
+"Fortran 2018 deleted feature" on every use; no `-Wno-` switch covers that message, and the
+sources are your unmodified tarballs. `-std=legacy` is gfortran's default dialect without those
+messages; for sources that already compile it generates the same code. The `.f90` solvers keep the default diagnostics. The flag
+is recorded as `fixed_form_fflags` in `build-info.yaml`.
+
 ## Using it from Ipopt
 
 Local install — give the full path, in `ipopt.opt` or via the API:

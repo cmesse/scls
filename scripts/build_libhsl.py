@@ -334,6 +334,13 @@ def cmd_build(args) -> None:
     # routines pass arrays of different types through the same dummy argument.
     if family == 'gnu' and gfortran_major(fc) >= 10:
         fextra.append('-fallow-argument-mismatch')
+    # Fixed-form (.f) files only: the F77 HSL routines use arithmetic IF and
+    # labelled DO terminations, which gfortran reports as "Fortran 2018 deleted
+    # feature" on every use. No -Wno- switch covers these; -std=legacy is
+    # -std=gnu without them and generates the same code. The sources are the
+    # licensee's unmodified tarballs, so they cannot be edited. The .f90
+    # solvers keep the default diagnostics.
+    ffixed = ['-std=legacy'] if family == 'gnu' else []
 
     # The flavor's BLAS/LAPACK line, built exactly as recipes with features.math get it.
     math_line = shlex.split(expand(get_math_link_line(
@@ -389,6 +396,7 @@ def cmd_build(args) -> None:
          f'-DSCLS_STACK_PREFIX={stack}',
          f'-DHSL_MATH_LIBS={";".join(math_libs)}',
          *([f'-DHSL_FORTRAN_EXTRA_FLAGS={";".join(fextra)}'] if fextra else []),
+         *([f'-DHSL_FIXED_FORM_FLAGS={";".join(ffixed)}'] if ffixed else []),
          *([f'-DHSL_EXTRA_LINK_FLAGS={";".join(ldextra)}'] if ldextra else []),
          f'-DHSL_OPENMP_FLAG={omp}',
          f'-DHSL_INSTALL_RPATH={";".join(rpath)}',
@@ -513,6 +521,7 @@ def cmd_build(args) -> None:
         f"fc: {fc} ({run([fc, '-dumpversion'], capture=True).strip()})\n"
         f"cflags: {json.dumps(shlex.join(cflags))}\n"
         f"fflags: {json.dumps(shlex.join(fflags + [omp] + fextra))}\n"
+        f"fixed_form_fflags: {json.dumps(shlex.join(ffixed))}\n"
         f"math_libs: {json.dumps(shlex.join(math_libs))}\n"
         f"rpath: {json.dumps(':'.join(rpath))}\n"
         f"needed:\n" + ''.join(f"  {n}: {p}\n" for n, p in needed.items()))
