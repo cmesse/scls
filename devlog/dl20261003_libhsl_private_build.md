@@ -276,3 +276,8 @@ matter for a file that fails to compile today. Whether Coin-HSL's own `meson.bui
 `-std=legacy` was not checked and is not claimed.
 Diff round: Codex (`xhigh`) approve, Grok (`xhigh`) approve, no findings; remaining gate is a
 real `./scls build hsl` to confirm every fixed-form unit of the licensee's tree is `.f`/`.F`.
+
+**2026-10-03, reported by Christian (macOS):** HSL build, global install and uninstall work with
+the registry entry and `-std=legacy` in place. The H-format warning ("The H format specifier ...
+is a Fortran 95 deleted feature") is not covered by `-std=legacy` — tested: only `-w` removes
+it — and was left visible by decision ("we'll leave it as is").

@@ -103,3 +103,11 @@ the retry succeeds; outside targets and a missing manifest remove nothing.
 
 `python/build_common.py`, `python/unix_builder.py`, `scls`, `doc/MACOS_BUILD.md`,
 `devlog/dl20261003_unix_install_sudo.md`.
+
+## Real-sudo gate, reported by Christian (2026-10-03, macOS, root-owned `/opt/scls`)
+
+After the commits above (`eed31f2`, `7f54c02`, `2a3f72b`, `f7b4bef`): "building and installing and
+uninstalling works". Observed afterwards from the dev session: no HSL file left under the prefix
+(`lib/*hsl*`, `share/hsl`, `share/doc/hsl`, registry `hsl.yaml` all gone) and `share/man/man1`
+still populated. Which packages were installed and uninstalled, and with which commands, was
+not recorded. Still not run: Linux unix-mode, `scls build all` with the keepalive.
