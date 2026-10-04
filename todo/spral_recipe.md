@@ -34,9 +34,9 @@ Checks per flavor:
 
 | Host / flavor | environment | spral | ipopt |
 |---|---|---|---|
-| EL9 VM gcc | [ ] | [ ] | [ ] |
-| EL9 VM mkl | [ ] | [ ] | [ ] |
-| EL9 VM debug | [ ] | [ ] | [ ] |
+| EL9 VM gcc | [x] | [x] | [x] |
+| EL9 VM mkl | [x] | [x] | [x] |
+| EL9 VM debug | [x] | [x] | [x] |
 | EL10 VM (R10) debug, gcc, mkl | [x] | [x] | [x] |
 | lbl (LBL hosts) | [ ] | [ ] | [ ] |
 | U24 / U26 .deb (debug, gcc, mkl) | [ ] | [ ] | [ ] |

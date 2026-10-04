@@ -65,8 +65,8 @@ those dependencies changed.
 | 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a |
 | 28 | 2 | nlopt 2.10.1 → 2.11.0 | stale | [x] | [x] | [x] |
 | 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| 30 | 5 | openmpi 5.0.11-1 → -2 | fix (`--with-prrte=internal`) | [ ] | [ ] | [ ] | [x] | [x] | [x] | [ ] | [ ] | n/a | n/a | n/a |
-| 31 | 3 | lapack 3.12.1-1 → -2 (debug only) | fix (`-ffp-contract=off`, `80a972a`) | [ ] | n/a | n/a | [x] | n/a | n/a | n/a | n/a | [x] | n/a | n/a |
+| 30 | 5 | openmpi 5.0.11-1 → -2 | fix (`--with-prrte=internal`) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | n/a | n/a | n/a |
+| 31 | 3 | lapack 3.12.1-1 → -2 (debug only) | fix (`-ffp-contract=off`, `80a972a`) | [x] | n/a | n/a | [x] | n/a | n/a | n/a | n/a | [x] | n/a | n/a |
 
 **Rows 26–28 were added on 2026-09-22, mid-run, and are not part of the original ten-bump
 scope.** `why: stale` means the installed package on the R9 build host was behind its own recipe
