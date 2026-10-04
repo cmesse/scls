@@ -24,6 +24,7 @@ from build_common import (
     run_command, setup_environment,
     get_configure_args, get_cmake_args, get_parallel_jobs,
     clean_libtool_files,
+    check_no_triplet_programs,
     should_build_package,
     check_package_installed,
     write_registry_entry,
@@ -907,6 +908,7 @@ class UnixBuilder:
 
         # Clean up .la files in destdir
         clean_libtool_files(destdir / str(self.prefix).lstrip('/'))
+        check_no_triplet_programs(destdir / str(self.prefix).lstrip('/'), self.recipe)
 
         # Drop the staging-only lib -> lib64 symlink before the rglob copy
         # so we don't double-walk files (once via lib/, once via lib64/).

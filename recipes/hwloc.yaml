@@ -1,5 +1,6 @@
 name: hwloc
 version: 2.14.0
+release: 2
 summary: Portable Hardware Locality
 homepage: https://www-lb.open-mpi.org/software/hwloc/
 license: BSD

@@ -1,5 +1,11 @@
 # Libunwind Changelog
 
+## Version 1.8.3-3 - Sat Oct 03 2026
+- No longer ships upstream's test executables (`libexec/libunwind/`, 50 files, which also carried the
+  `<triplet>-` prefix from the builder's old `--target`). The builder no longer passes `--target`
+  (D3), and `install.post` removes the directory (Christian, 2026-10-03). Libraries, headers and
+  `libunwind.so.8` unchanged; nothing that links them needs rebuilding.
+
 ## Version 1.8.3-2 - Tue Aug 18 2026
 - The package now owns the directories it creates. The auto-generated file list
   claimed `%dir` only one level below `lib/` and `share/` and never under

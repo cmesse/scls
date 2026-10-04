@@ -19,6 +19,7 @@ from typing import Dict, List
 
 from build_common import (
     BuildError, load_recipe, load_flavor, load_description,
+    TRIPLET_PROGRAM_ERE, TRIPLET_PROGRAM_DIRS,
     get_optimization_flags, download_source, detect_source_directory,
     should_build_package,
     get_configure_args, get_cmake_args,
@@ -924,13 +925,18 @@ class RPMBuilder:
             args.extend(["--enable-shared", "--disable-static"])
 
         # Same logic for host_flags
+        # --host/--build only; no --target (it prefixes installed programs with
+        # the triplet). Keep in step with build_common.get_configure_args (D3).
         use_host_flags = defaults.get('host_flags', True)
         if use_host_flags:
             args.extend([
                 f"--host={self.host}",
                 f"--build={self.host}",
-                f"--target={self.host}"
             ])
+        # Compilers opt in to --target (see build_common.get_configure_args).
+        # Literal self.host, not the %{host} macro: rpm's is the -gnu form.
+        if defaults.get('target_flag', False):
+            args.append(f"--target={self.host}")
 
         # Add recipe-specific configure args with RPM macro preservation
         if 'configure' in self.recipe and 'args' in self.recipe['configure']:
@@ -1644,6 +1650,10 @@ fi
             'configure_post_commands': configure_post_commands,  # NEW: Post-configure commands
             'install_pre_commands': install_pre_commands,  # NEW: Pre-install commands
             'install_post_commands': install_post_commands,  # NEW: Post-install commands
+            # build_common.check_no_triplet_programs, in shell
+            'triplet_guard': not self.recipe.get('allow_triplet_programs', False),
+            'triplet_program_ere': TRIPLET_PROGRAM_ERE,
+            'triplet_program_dirs': TRIPLET_PROGRAM_DIRS,
             'install_commands': install_commands,  # NEW: Custom install commands (replaces make install)
             'build_pre_commands': build_pre_commands,  # NEW: Pre-build commands
             'build_post_commands': build_post_commands,  # NEW: Post-build commands

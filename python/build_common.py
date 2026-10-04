@@ -5,6 +5,7 @@ Shared between mac_builder.py and rpm_builder.py
 """
 
 import os
+import re
 import sys
 import yaml
 import subprocess
@@ -677,14 +678,23 @@ def get_configure_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, inst
     if use_shared:
         args.extend(["--enable-shared", "--disable-static"])
 
-    # Same logic for host_flags
+    # Same logic for host_flags. --host/--build only, as Fedora's %configure
+    # does: an explicit --target makes every AC_CANONICAL_TARGET package
+    # install its programs as <triplet>-<name> (hwloc's x86_64-redhat-linux-
+    # lstopo). --target is for compilers, which opt in below (gcc).
+    # Keep in step with rpm_builder.get_configure_args_for_rpm. Christian,
+    # 2026-10-03 (D3).
     use_host_flags = defaults.get('host_flags', True)
     if use_host_flags:
         args.extend([
             f"--host={host}",
             f"--build={host}",
-            f"--target={host}"
         ])
+    # Compilers opt in to --target (configure.defaults.target_flag), with the
+    # same host string as --host, so gcc's <triplet>-gcc drivers and
+    # lib/gcc/<triplet>/ keep the name its install.post links point at.
+    if defaults.get('target_flag', False):
+        args.append(f"--target={host}")
 
     # Add flavor-specific configure args from flavor definition
     if 'configure' in flavor.get('flags', {}):
@@ -988,6 +998,41 @@ def get_parallel_jobs() -> int:
         return min(multiprocessing.cpu_count(), 64)
     except Exception:
         return 4
+
+
+# Basename of a program installed under a target-triplet prefix, e.g.
+# x86_64-redhat-linux-lstopo, x86_64-linux-gnu-lstopo,
+# x86_64-apple-darwin24.6.0-lstopo. POSIX ERE, so templates/default.spec.j2
+# can pass the same pattern to grep -E.
+TRIPLET_PROGRAM_ERE = (r'^(x86_64|aarch64|arm64|i[3-6]86|ppc64le|powerpc64le|riscv64|s390x)'
+                       r'-[A-Za-z0-9_.]+-[A-Za-z0-9_.]+-')
+TRIPLET_PROGRAM_DIRS = ('bin', 'sbin', 'libexec')
+
+
+def check_no_triplet_programs(prefix: Path, recipe: Dict) -> None:
+    """Fail if the staged prefix ships a triplet-prefixed program.
+
+    No SCLS package ships <triplet>-<name> programs (Christian, 2026-10-03).
+    Toolchains install them by upstream design and opt out with the recipe key
+    `allow_triplet_programs: true` (gcc, binutils). The RPM spec runs the same
+    check in shell (templates/default.spec.j2).
+    """
+    if recipe.get('allow_triplet_programs', False):
+        return
+    pattern = re.compile(TRIPLET_PROGRAM_ERE)
+    bad = []
+    for sub in TRIPLET_PROGRAM_DIRS:
+        root = prefix / sub
+        if not root.is_dir():
+            continue
+        for path in root.rglob('*'):
+            if (path.is_file() or path.is_symlink()) and pattern.match(path.name):
+                bad.append(str(path.relative_to(prefix)))
+    if bad:
+        listing = '\n  '.join(sorted(bad))
+        raise BuildError(
+            f"{recipe.get('name', '?')} installs triplet-prefixed programs:\n  {listing}\n"
+            "SCLS ships plain program names only; see check_no_triplet_programs.")
 
 
 def clean_libtool_files(prefix: Path) -> None:

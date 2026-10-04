@@ -34,6 +34,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from build_common import (
     BuildError, load_recipe, load_flavor, load_description,
     clean_libtool_files,
+    check_no_triplet_programs,
     extract_source,
     write_registry_entry,
     get_package_dependencies,
@@ -679,6 +680,7 @@ class DebBuilder(UnixBuilder):
 
         # Drop libtool archives and system-managed info directory.
         clean_libtool_files(destdir_prefix)
+        check_no_triplet_programs(destdir_prefix, self.recipe)
         info_dir = destdir_prefix / "share" / "info"
         if info_dir.exists():
             shutil.rmtree(info_dir, ignore_errors=True)

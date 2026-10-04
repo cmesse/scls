@@ -58,6 +58,10 @@ features:
   openmp: false
   math: false
 
+# Installs <triplet>-<tool> names by upstream design (and SCLS links them),
+# so it is exempt from check_no_triplet_programs (build_common.py).
+allow_triplet_programs: true
+
 configure:
   pre:
     # Extract GMP, MPFR, MPC into GCC source tree (Linux From Scratch approach)
@@ -84,6 +88,15 @@ configure:
       CFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"
       CXXFLAGS: "+=-isysroot %{sdk} -I%{sdk}/usr/include"
       LDFLAGS: "+=-isysroot %{sdk}"
+  # The builder passes --target only on request (D3, 2026-10-03). A compiler
+  # is the one place it belongs: it fixes the triplet in lib/gcc/<triplet>/,
+  # libexec/gcc/<triplet>/ and the <triplet>-gcc drivers to the builder's
+  # host string, which install.post's symlinks and binutils'
+  # %{prefix}/%{host}/bin rely on. Without it gcc falls back to config.guess
+  # (x86_64-redhat-linux-gnu). Not `--target=%{host}` in args: in a spec that
+  # stays rpm's own %{host}, the -gnu form.
+  defaults:
+    target_flag: true
   args:
     - --enable-bootstrap
     - --enable-checking=release

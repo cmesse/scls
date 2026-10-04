@@ -349,6 +349,14 @@ make install DESTDIR=%{buildroot}{% if install_args %} {{ install_args | join(' 
 # Remove libtool archives
 find %{buildroot} -name '*.la' -delete 2>/dev/null || true
 
+{% if triplet_guard %}
+# No triplet-prefixed programs (build_common.check_no_triplet_programs)
+# if/fi, not &&: the install scriptlet runs under set -e, and a false `a && b` as the last
+# command of a loop body would end the scriptlet.
+_scls_triplet=$(for d in {{ triplet_program_dirs | join(' ') }}; do if [ -d %{buildroot}%{prefix}/$d ]; then find %{buildroot}%{prefix}/$d \( -type f -o -type l \) -print; fi; done | while read -r f; do if basename "$f" | grep -qE '{{ triplet_program_ere }}'; then echo "${f#%{buildroot}}"; fi; done)
+if [ -n "$_scls_triplet" ]; then echo "ERROR: triplet-prefixed programs installed:" >&2; echo "$_scls_triplet" >&2; exit 1; fi
+{% endif %}
+
 # Remove info directory file - managed by system
 rm -rf %{buildroot}%{prefix}/share/info
 

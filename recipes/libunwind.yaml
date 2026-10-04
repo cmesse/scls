@@ -1,6 +1,6 @@
 name: libunwind
 version: 1.8.3
-release: 2
+release: 3
 summary: Portable C library for determining call-chains from a program's execution
 homepage: https://www.nongnu.org/libunwind/
 license: MIT
@@ -43,6 +43,14 @@ configure:
 
 build:
   parallel: true
+
+install:
+  post:
+    # make install puts ~50 upstream test executables (crasher, forker,
+    # Gperf-simple, test-ptrace, ...) in libexec/libunwind. They are test
+    # drivers, not tools; Fedora moves them to a separate libunwind-tests
+    # package. SCLS does not ship them (Christian, 2026-10-03, jury round).
+    - "rm -rf %{prefix}/libexec/libunwind"
 
 registry:
   cflags: "-I%{prefix}/include"
