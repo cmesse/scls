@@ -113,19 +113,26 @@ IGNORED_GLOBS=('ma57-*.tar.gz' 'hsl_ma57-*.tar.gz' 'hsl_mc68-*.tar.gz' 'hsl-gala
 # --- safe extraction ------------------------------------------------------------
 safe_extract() {   # $1 tarball, $2 destination; prints the single top-level dir
     local tb="$1" dest="$2" top listing
-    # List once into a file, then inspect it. A `tar | grep -q` pipeline under
+    # List once into files, then inspect them. A `tar | grep -q` pipeline under
     # pipefail can report failure when grep exits early and tar gets SIGPIPE,
     # which would turn a detected unsafe member into a silent pass.
+    # Member paths come from the plain listing, never from columns of the verbose
+    # one: GNU tar and bsdtar (macOS) lay those out differently (the name is field
+    # 6 in one, field 9 in the other). LC_ALL=C pins the "link to" marker.
     listing="$(mktemp)"; TMPS+=("$listing" "$listing.names")
-    tar -tvzf "$tb" > "$listing" || die "$(basename "$tb"): cannot list archive"
-    [ -s "$listing" ] || die "$(basename "$tb"): empty archive listing"
-    # Member paths: field 6 of -tv output (name, or "name -> target" / "name link to target").
-    awk '{ n = $6; sub(/^\.\//, "", n); print n }' "$listing" > "$listing.names"
+    # Callers run this in a command substitution, so TMPS above is lost with the
+    # subshell: every exit path below removes the two files itself.
+    LC_ALL=C tar -tvzf "$tb" > "$listing" || { rm -f "$listing"; die "$(basename "$tb"): cannot list archive"; }
+    [ -s "$listing" ] || { rm -f "$listing"; die "$(basename "$tb"): empty archive listing"; }
+    { LC_ALL=C tar -tzf "$tb" | sed -e 's#^\./##' > "$listing.names"; } \
+        || { rm -f "$listing" "$listing.names"; die "$(basename "$tb"): cannot list archive"; }
     if grep -E '(^/|^\.\.(/|$)|/\.\.(/|$))' "$listing.names" >/dev/null; then
         rm -f "$listing" "$listing.names"; die "$(basename "$tb"): unsafe member path (absolute or ..)"
     fi
-    # Links: any symlink or hardlink whose target is absolute or has a '..' component.
-    if awk '$1 ~ /^[lh]/ { t = ""; for (i = 7; i <= NF; i++) if ($i == "->" || ($i == "link" && $(i+1) == "to")) { t = $(NF) } ; if (t != "") print t }' "$listing" \
+    # Hardlinks: refused if the target is absolute or has a '..' component. The
+    # line is split on every " link to " and each piece after the first is tested,
+    # so a target (or a name) containing blanks or the marker cannot hide one.
+    if awk '$1 ~ /^h/ { n = split($0, p, " link to "); for (i = 2; i <= n; i++) print p[i] }' "$listing" \
          | grep -E '(^/|^\.\.(/|$)|/\.\.(/|$))' >/dev/null; then
         rm -f "$listing" "$listing.names"; die "$(basename "$tb"): link member pointing outside the archive"
     fi
@@ -188,7 +195,7 @@ unit_hashes() {   # $1 file -> lines "kind:name sha256", then "COVERAGE headers=
                 buf = ""; uname = ""
             }
         }
-        END { printf "COVERAGE headers=%d units=%d\n", headers, units > d "/.coverage" }
+        END { cov = d "/.coverage"; printf "COVERAGE headers=%d units=%d\n", headers, units > cov }
     ' "$f"
     for u in "$d"/*; do
         [ -e "$u" ] && echo "$(basename "$u") $(sha256 "$u")"

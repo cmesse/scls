@@ -144,6 +144,20 @@ with tarfile.open(p, 'w:gz') as dst:
     dst.addfile(ln)
 PY
 expect_fail "symlink member refused" 'link member pointing outside|contains symlinks' "$s"
+# 12b2. hardlink to a target outside the archive, with a blank in the target
+s="$T/s12b2"; mkdir -p "$s"; mk_coin "$s"
+python3 - "$s/coinhsl-2024.05.15.tar.gz" <<'PY'
+import sys, tarfile, io
+p = sys.argv[1]
+with tarfile.open(p, 'r:gz') as src:
+    members = [(m, src.extractfile(m).read() if m.isfile() else None) for m in src.getmembers()]
+with tarfile.open(p, 'w:gz') as dst:
+    for m, data in members:
+        dst.addfile(m, io.BytesIO(data) if data is not None else None)
+    ln = tarfile.TarInfo('coinhsl-2024.05.15/common/hard.f'); ln.type = tarfile.LNKTYPE; ln.linkname = '../out side.f'
+    dst.addfile(ln)
+PY
+expect_fail "outside hardlink with blank in target refused" 'link member pointing outside' "$s"
 # 12c. dependency file in a form the unit splitter does not parse must stop, not pass
 s="$T/s12c"; mkdir -p "$s"; mk_coin "$s"; mk_ma77 "$s" 6.5.0 good
 d="$s/x"; mkdir -p "$d"; tar -xzf "$s/hsl_ma77-6.5.0.tar.gz" -C "$d"

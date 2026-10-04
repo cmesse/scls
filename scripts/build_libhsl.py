@@ -215,6 +215,34 @@ def build_cache_dir(flavor_name: str) -> Path:
     return Path(tempfile.gettempdir()) / f"scls-hsl-{os.getuid()}" / flavor_name
 
 
+def macos_dylib_id(lib: Path) -> str:
+    out = [l.strip() for l in run(['otool', '-D', lib], capture=True).splitlines() if l.strip()]
+    return out[-1] if len(out) > 1 else ''   # first line is the file name
+
+
+def set_macos_dylib_id(lib: Path, new_id: Path) -> None:
+    """Give `lib` the install name `new_id`, ad-hoc signed; a no-op if it has it.
+
+    Works on a copy and renames it over `lib` only once the id and the signature
+    verify, so `lib` is never left half-rewritten for a later install attempt.
+    """
+    if macos_dylib_id(lib) == str(new_id):
+        return
+    tmp = lib.with_name(lib.name + '.newid')
+    shutil.copy2(lib, tmp)
+    os.chmod(tmp, 0o600)
+    try:
+        run(['install_name_tool', '-id', new_id, tmp])
+        run(['codesign', '-s', '-', '-f', tmp])
+        run(['codesign', '-v', tmp])
+        if macos_dylib_id(tmp) != str(new_id):
+            die(f"{lib}: install name is not {new_id} after install_name_tool")
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, lib)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def common_flavor(args):
     flavor_name = args.flavor or active_flavor()
     flavor = load_flavor(flavor_name, REPO / 'flavors')
@@ -364,7 +392,7 @@ def cmd_build(args) -> None:
          *([f'-DHSL_EXTRA_LINK_FLAGS={";".join(ldextra)}'] if ldextra else []),
          f'-DHSL_OPENMP_FLAG={omp}',
          f'-DHSL_INSTALL_RPATH={";".join(rpath)}',
-         *([f'-DHSL_INSTALL_NAME_DIR={prefix / "lib"}'] if is_macos else [])])
+         *([f'-DHSL_INSTALL_NAME_DIR={stack / "lib"}'] if is_macos else [])])
     run([cmake, '--build', build, '-j', str(max(1, args.jobs))])
     run([cmake, '--install', build, '--prefix', stage])
 
@@ -426,13 +454,15 @@ def cmd_build(args) -> None:
     ma77 = tests / 'ma77_factor_solve'
     # Must test the STAGED library, never a copy already published in --prefix.
     # Linux: DT_NEEDED is the bare SONAME and this rpath resolves it to staging.
-    # macOS: the dylib's id is the hard FINAL path (SCLS convention, no @rpath),
-    # so the test executable's load command is rewritten to the staged file and
-    # the binary re-signed ad hoc, as the stack's install-name normalizer does.
+    # macOS: the dylib's id is the hard path under the stack prefix (SCLS
+    # convention, no @rpath; final for a global install, rewritten by `install`
+    # for a local one), so the test executable's load command is rewritten to the
+    # staged file and the binary re-signed ad hoc, as the stack's install-name
+    # normalizer does.
     run([cc, '-O2', f'-I{src / "hsl_ma77" / "C"}', HSL_DIR / 'tests' / 'ma77_factor_solve.c',
          '-o', ma77, f'-L{staged.parent}', '-lcoinhsl', f'-Wl,-rpath,{staged.parent}', '-lm'])
     if is_macos:
-        run(['install_name_tool', '-change', prefix / 'lib' / libname, staged, ma77])
+        run(['install_name_tool', '-change', stack / 'lib' / libname, staged, ma77])
         run(['codesign', '-s', '-', '-f', ma77])
         loads = run(['otool', '-L', ma77], capture=True)
         if str(staged) not in loads:
@@ -586,14 +616,22 @@ def cmd_install(args) -> None:
         'when': datetime.now().astimezone().isoformat(timespec='seconds'),
         'licence_texts_sha256': {l.name: hashlib.sha256(l.read_bytes()).hexdigest() for l in lic_files},
     }
-    info_file.write_text(info.rstrip('\n') + "\nlicence_acceptance:\n" +
-                         ''.join(f"  {k}: {json.dumps(v)}\n" for k, v in acceptance.items()))
 
     # --- 4. publish ------------------------------------------------------------------
     # Local: owner-only, so personal use cannot become sharing through a traversable
     # home. Global: world-readable, sudo for the root-owned prefix (only the file
     # copies run as root). `install -d/-m` rather than GNU-only `install -D` (macOS).
     dmode, fmode = ('0755', '0644') if itype == 'global' else ('0700', '0600')
+    # macOS: the build linked in the id <stack>/lib/<libname>, which is already
+    # right for a global install (published byte-identical to what was checked).
+    # A local install lives elsewhere, so the id is rewritten on the owner-only
+    # build-dir copy, which needs no sudo. Keyed on the id, not the install type:
+    # a global install after a failed local one sets it back.
+    if is_macos:
+        set_macos_dylib_id(cache / 'lib' / libname, prefix / 'lib' / libname)
+    # Recorded only now, and replacing any record a failed earlier attempt left.
+    info_file.write_text(info.split('\nlicence_acceptance:\n')[0].rstrip('\n') + "\nlicence_acceptance:\n" +
+                         ''.join(f"  {k}: {json.dumps(v)}\n" for k, v in acceptance.items()))
     parent = prefix
     while not parent.exists():
         parent = parent.parent

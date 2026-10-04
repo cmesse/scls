@@ -16,7 +16,7 @@
 #   HSL_OPENMP_FLAG          -fopenmp / -qopenmp
 #   HSL_EXTRA_LINK_FLAGS     flavor ldflags minus -L/-rpath (;-list, optional)
 #   HSL_INSTALL_RPATH        ;-list baked into the library (stack lib, MKL lib)
-#   HSL_INSTALL_NAME_DIR     macOS only: <final prefix>/lib (hard path, never @rpath)
+#   HSL_INSTALL_NAME_DIR     macOS only: <stack prefix>/lib (hard path, never @rpath)
 #
 # Deliberately not used:
 #   CMAKE_BUILD_TYPE flags   only the flavor's flags apply (no extra -O3/-DNDEBUG)
@@ -57,7 +57,7 @@ set_target_properties(coinhsl PROPERTIES
   # records the SONAME in DT_NEEDED.
   # The final RPATH / install name is linked in directly. cmake --install then
   # has no RPATH to rewrite, and the staged copy that build_libhsl.py checks is
-  # byte-identical to the one it installs.
+  # byte-identical to the one it installs (except a macOS local install, below).
   BUILD_WITH_INSTALL_RPATH ON
   INSTALL_RPATH "${HSL_INSTALL_RPATH}"
   INSTALL_RPATH_USE_LINK_PATH OFF)
@@ -65,9 +65,11 @@ if(APPLE)
   # Hard install name, the SCLS macOS convention (tools/fix_macos_install_names.sh
   # makes every stack id absolute; @rpath is not used anywhere in the stack). It
   # is linked in at build time so the staged copy is byte-identical to the one
-  # published. The pre-publish MA77 test must therefore not trust this id, which
-  # points at the FINAL location: build_libhsl.py rewrites the test executable's
-  # load command to the staged file with install_name_tool -change.
+  # published by a global install. A local install goes elsewhere and is only
+  # chosen at `./scls install hsl`, which then rewrites the id and re-signs. The
+  # pre-publish MA77 test must not trust this id, which points at the stack
+  # prefix: build_libhsl.py rewrites the test executable's load command to the
+  # staged file with install_name_tool -change.
   if(NOT HSL_INSTALL_NAME_DIR)
     message(FATAL_ERROR "HSL_INSTALL_NAME_DIR must be set on macOS")
   endif()
