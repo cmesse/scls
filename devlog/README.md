@@ -11,6 +11,7 @@ file, it is lost.
 
 ## Entries
 
+- [dl20261004_amzn_round2.md](dl20261004_amzn_round2.md) — AMZN round 2 on gcc/mkl: same nine NEVRAs as R9/R10, every §3 check passes (gperftools pprof skip held with Perl pprof present), MKL linkage PASS, HSL script test on gcc; nothing staged
 - [dl20261004_r10_round2.md](dl20261004_r10_round2.md) — R10 round 2 on debug/gcc/mkl: linking fixes, spral + ipopt, HSL script test; gperftools pprof-dependent checks skipped (`ac_cv_path_PPROF_PATH=`), agreed with R9 and audited
 - [dl20261003_r9_round2.md](dl20261003_r9_round2.md) — R9 round 2 built and installed on debug/gcc/mkl: gperftools+libunwind, scotch compression, `--target` removal with a triplet-program guard, meta release 2, spral + ipopt; HSL script test; nothing staged yet
 - [dl20261003_xz_macos_lbl_tools.md](dl20261003_xz_macos_lbl_tools.md) — xz 5.8.4 now builds on `macos` and `lbl` with the 0BSD tools (rule: packaged distros use distro xz, self-building flavors provide their own); libunwind and scotch use the stack's xz on lbl; built and tested on macOS, lbl RPM gate pending

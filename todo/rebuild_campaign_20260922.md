@@ -65,7 +65,7 @@ those dependencies changed.
 | 27 | 2 | libunwind 1.8.3-1 → -2 | stale | [x] | [x] | [x] | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a |
 | 28 | 2 | nlopt 2.10.1 → 2.11.0 | stale | [x] | [x] | [x] |
 | 29 | 2 | hwloc 2.13.0 → 2.14.0 | stale (mkl only) | n/a | n/a | [x] | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| 30 | 5 | openmpi 5.0.11-1 → -2 | fix (`--with-prrte=internal`) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | n/a | n/a | n/a |
+| 30 | 5 | openmpi 5.0.11-1 → -2 | fix (`--with-prrte=internal`) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | n/a | n/a | n/a |
 | 31 | 3 | lapack 3.12.1-1 → -2 (debug only) | fix (`-ffp-contract=off`, `80a972a`) | [x] | n/a | n/a | [x] | n/a | n/a | n/a | n/a | [x] | n/a | n/a |
 
 **Rows 26–28 were added on 2026-09-22, mid-run, and are not part of the original ten-bump
@@ -544,3 +544,10 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   flavors plus a release bump to 5.0.11-2, per one NEVRA per recipe state). Verified on U24/debug.
   The two-auditor review gate was not run (Codex 401, Grok sandbox failure on this VM); audit
   from the dev host is pending. R9/R10/AMZN need the -2 rebuild (row 30).
+
+- 2026-10-04 — **AMZN round 2: gcc and mkl built and installed** (row 30 AMZN cells ticked; row 31
+  is `n/a` on AMZN). environment 2026-3, libunwind 1.8.3-3, gperftools 2.18.1-2, hwloc 2.14.0-2,
+  openmpi 5.0.11-2, scotch 7.0.15-2, spral 2025.09.18-1, ipopt 3.14.20-1, `scls-<F>` 2026-2, all
+  `.amzn2023`, built from `bde7be5` (recipe state `21f141e`). Every check in
+  `todo/round2_el10_amzn2023.md` §3 passes; `check_mkl_linkage.sh` PASS on mkl; HSL script test
+  passed on gcc. Not staged. Devlog: `devlog/dl20261004_amzn_round2.md`.

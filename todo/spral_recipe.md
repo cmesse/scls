@@ -38,6 +38,7 @@ Checks per flavor:
 | EL9 VM mkl | [x] | [x] | [x] |
 | EL9 VM debug | [x] | [x] | [x] |
 | EL10 VM (R10) debug, gcc, mkl | [x] | [x] | [x] |
+| AMZN 2023 VM gcc, mkl | [x] | [x] | [x] |
 | lbl (LBL hosts) | [ ] | [ ] | [ ] |
 | U24 / U26 .deb (debug, gcc, mkl) | [ ] | [ ] | [ ] |
 | macOS | [ ] | [ ] | [ ] |
