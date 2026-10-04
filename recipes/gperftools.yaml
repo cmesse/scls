@@ -46,6 +46,19 @@ configure:
     - "--disable-static"
     - "--enable-shared"
     - "--enable-libunwind"
+    # Skip the pprof-dependent checks on every host. configure.ac:500-503
+    # enables them whenever any `pprof` is on PATH, and 2.18.1 expects the Go
+    # pprof: with the Perl /usr/bin/pprof (EPEL `pprof`, el9/el10),
+    # profiler_unittest.sh fails on `--unit=ms` and heap-profiler_unittest.sh
+    # / heap-profiler_debug_unittest.sh on `--hide=`. A set-but-empty cache
+    # variable makes configure skip the PATH search, so PPROF_PATH stays empty
+    # and SKIP_PPROF_TESTS is true. This also drops sampling_test and
+    # sampling_debug_test (5 checks in all; those two passed with the Perl
+    # pprof), accepted so the result does not depend on the build host. We do
+    # not build Go to get the Go pprof. Must be the cache variable: PPROF_PATH=
+    # does not stop the search. Test-only; nothing installed changes.
+    # Christian, 2026-10-04.
+    - "ac_cv_path_PPROF_PATH="
   # RPM %build exports LDFLAGS with -L%{prefix}/lib but no include path, so
   # configure did not find the stack's libunwind.h and silently built
   # without libunwind (el9/el10/amzn 2.18.1-1; the DEB env finds it through
