@@ -1978,7 +1978,10 @@ def uninstall_package(
         if success:
             uninstalled.append(pkg)
         else:
+            # The failed package is still installed (its registry entry is
+            # kept), so do not go on to remove what it depends on.
             all_ok = False
+            break
 
     return all_ok, uninstalled
 
@@ -1986,6 +1989,24 @@ def uninstall_package(
 def _uninstall_single_package(prefix: Path, package_name: str, dry_run: bool = False) -> bool:
     """
     Uninstall a single package (internal function).
+
+    The file list is files/<package>.txt (get_package_files). Removal runs
+    in-process, or with `sudo rm` when the prefix is not writable by the
+    current user (e.g. a root-owned /opt/scls); the rules are the same:
+
+      - Only files and symlinks are removed. A manifest line that names a
+        directory is never removed recursively: share/man/man1 is listed by
+        many packages and holds all of their pages. Directories go away
+        through the empty-directory cleanup once nothing is left in them.
+      - Every existing target's parent must resolve (symlinks followed) to
+        the prefix or below it; otherwise nothing is removed and the
+        uninstall fails. get_package_files() passes non-%{prefix} manifest
+        lines through verbatim.
+      - A missing files/<package>.txt fails the uninstall: removing only the
+        registry entry would leave every installed file with nothing
+        recording it.
+      - The registry entry goes last, and only if every file was removed, so
+        a failed uninstall can be retried.
 
     Args:
         prefix: The installation prefix
@@ -1995,58 +2016,111 @@ def _uninstall_single_package(prefix: Path, package_name: str, dry_run: bool = F
     Returns:
         True if successful
     """
-    import shutil
+    tag = '[DRY RUN] ' if dry_run else ''
+    print(f"\n{tag}Uninstalling {package_name}...")
 
-    print(f"\n{'[DRY RUN] ' if dry_run else ''}Uninstalling {package_name}...")
+    manifest = Path("files") / f"{package_name}.txt"
+    if not manifest.exists():
+        print(f"  ERROR: {manifest} not found (run from the SCLS checkout); nothing removed")
+        return False
 
-    # Get list of files to remove
     files = get_package_files(prefix, package_name)
+    registry_file = prefix / "share" / "scls" / "registry" / f"{package_name}.yaml"
+    use_sudo = _uninstall_needs_sudo(files, registry_file)
+    how = ' (sudo)' if use_sudo else ''
+    if use_sudo:
+        print(f"  {tag}{prefix} is not writable by the current user; uninstalling with sudo")
 
-    if not files:
-        print(f"  Warning: No file list found for {package_name}")
-        print(f"  Will only remove registry entry")
+    real_prefix = os.path.realpath(str(prefix))
 
-    # Unwritable prefix (e.g. root-owned /opt/scls): remove with sudo instead
-    # of warning on every file and reporting success with nothing removed.
-    sudo_registry_file = prefix / "share" / "scls" / "registry" / f"{package_name}.yaml"
-    if _uninstall_needs_sudo(files, sudo_registry_file):
-        return _uninstall_single_package_sudo(
-            prefix, package_name, files, sudo_registry_file, dry_run)
+    def contained(path) -> Optional[str]:
+        norm = os.path.normpath(str(path))
+        parent = os.path.realpath(os.path.dirname(norm) or '.')
+        if parent == real_prefix or parent.startswith(real_prefix + os.sep):
+            return os.path.join(parent, os.path.basename(norm))
+        return None
 
-    # Remove files
-    removed_count = 0
+    registry_target = None
+    refused = False
+    if os.path.lexists(registry_file):
+        registry_target = contained(registry_file)
+        if registry_target is None:
+            print(f"  ERROR: refusing to remove {registry_file}: outside {prefix}")
+            refused = True
+
+    leaves: List[str] = []
     for file_path in files:
-        if file_path.exists():
+        if not os.path.lexists(file_path):
+            continue
+        target = contained(file_path)
+        if target is None:
+            print(f"  ERROR: refusing to remove {file_path}: outside {prefix}")
+            refused = True
+            continue
+        if os.path.isdir(file_path) and not os.path.islink(file_path):
             if dry_run:
-                print(f"  Would remove: {file_path}")
-            else:
-                try:
-                    if file_path.is_dir():
-                        shutil.rmtree(file_path)
-                    else:
-                        file_path.unlink()
-                    removed_count += 1
-                except OSError as e:
-                    print(f"  Warning: Could not remove {file_path}: {e}")
+                print(f"  Would keep directory unless left empty: {file_path}")
+            continue
+        # Some manifests list their own registry entry; it is removed last.
+        if target == registry_target or target in leaves:
+            continue
+        leaves.append(target)
 
-    if not dry_run:
-        print(f"  Removed {removed_count} files")
+    if refused:
+        print(f"  Nothing was removed for {package_name}")
+        return False
+
+    if dry_run:
+        for target in leaves:
+            print(f"  Would remove{how}: {target}")
+        if registry_target:
+            print(f"  Would remove registry{how}: {registry_target}")
+        return True
+
+    failed = 0
+    if use_sudo:
+        for chunk in _chunks(leaves):
+            try:
+                run_sudo(['rm', '-f', '--'] + chunk, f"remove files of {package_name}")
+            except BuildError as e:
+                print(f"  ERROR: {e}")
+        failed = sum(1 for target in leaves if os.path.lexists(target))
+    else:
+        for target in leaves:
+            try:
+                os.unlink(target)
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                print(f"  ERROR: could not remove {target}: {e}")
+                failed += 1
+    print(f"  Removed {len(leaves) - failed} files")
 
     # Clean up empty directories
-    if not dry_run:
+    if use_sudo:
+        _cleanup_empty_dirs_sudo(prefix)
+    else:
         _cleanup_empty_dirs(prefix)
 
-    # Remove registry entry
-    registry_file = prefix / "share" / "scls" / "registry" / f"{package_name}.yaml"
-    if registry_file.exists():
-        if dry_run:
-            print(f"  Would remove registry: {registry_file}")
-        else:
-            try:
-                registry_file.unlink()
-                print(f"  Removed registry entry")
-            except OSError as e:
-                print(f"  Warning: Could not remove registry entry: {e}")
+    if failed:
+        print(f"  ERROR: {failed} files could not be removed; registry entry kept, "
+              f"uninstall of {package_name} can be retried")
+        return False
+
+    if registry_target:
+        try:
+            if use_sudo:
+                run_sudo(['rm', '-f', '--', registry_target],
+                         f"remove registry entry of {package_name}")
+            else:
+                try:
+                    os.unlink(registry_target)
+                except FileNotFoundError:
+                    pass
+            print(f"  Removed registry entry")
+        except (BuildError, OSError) as e:
+            print(f"  ERROR: could not remove registry entry: {e}")
+            return False
 
     return True
 
@@ -2065,96 +2139,6 @@ def _uninstall_needs_sudo(files: List[Path], registry_file: Path) -> bool:
         if not dir_ok[parent]:
             return True
     return False
-
-
-def _uninstall_single_package_sudo(prefix: Path, package_name: str, files: List[Path],
-                                   registry_file: Path, dry_run: bool) -> bool:
-    """
-    Uninstall one package from an unwritable prefix using sudo.
-
-    Differs from the in-process path on purpose, because these commands run
-    as root:
-      - Only files and symlinks are removed (`rm -f`). A manifest line that
-        names a directory is never removed recursively: share/man/man1 is
-        listed by many packages and holds all of their pages. Directories go
-        away through the empty-directory cleanup once nothing is left in them.
-      - Every existing target's parent must resolve (symlinks followed) to
-        the prefix or below it; otherwise nothing is removed and the
-        uninstall fails. get_package_files() passes non-%{prefix} manifest
-        lines through verbatim.
-      - A missing files/<package>.txt fails the uninstall.
-      - A failed removal makes the uninstall fail instead of warning.
-    """
-    tag = '[DRY RUN] ' if dry_run else ''
-    print(f"  {tag}{prefix} is not writable by the current user; uninstalling with sudo")
-
-    real_prefix = os.path.realpath(str(prefix))
-
-    # Without the manifest only the registry entry would go, leaving every
-    # installed file behind with nothing recording them. The in-process path
-    # tolerates that; as root it is refused.
-    manifest = Path("files") / f"{package_name}.txt"
-    if not manifest.exists():
-        print(f"  ERROR: {manifest} not found (run from the SCLS checkout); nothing removed")
-        return False
-
-    def contained(path) -> Optional[str]:
-        norm = os.path.normpath(str(path))
-        parent = os.path.realpath(os.path.dirname(norm) or '.')
-        if parent == real_prefix or parent.startswith(real_prefix + os.sep):
-            return os.path.join(parent, os.path.basename(norm))
-        return None
-
-    leaves: List[str] = []
-    refused = False
-    for file_path in files:
-        if not os.path.lexists(file_path):
-            continue
-        target = contained(file_path)
-        if target is None:
-            print(f"  ERROR: refusing to remove {file_path}: outside {prefix}")
-            refused = True
-            continue
-        if os.path.isdir(file_path) and not os.path.islink(file_path):
-            if dry_run:
-                print(f"  Would keep directory unless left empty: {file_path}")
-            continue
-        leaves.append(target)
-
-    registry_target = None
-    if os.path.lexists(registry_file):
-        registry_target = contained(registry_file)
-        if registry_target is None:
-            print(f"  ERROR: refusing to remove {registry_file}: outside {prefix}")
-            refused = True
-
-    if refused:
-        print(f"  Nothing was removed for {package_name}")
-        return False
-
-    if dry_run:
-        for target in leaves:
-            print(f"  Would remove (sudo): {target}")
-        if registry_target:
-            print(f"  Would remove registry (sudo): {registry_target}")
-        return True
-
-    try:
-        for chunk in _chunks(leaves):
-            run_sudo(['rm', '-f', '--'] + chunk, f"remove files of {package_name}")
-        print(f"  Removed {len(leaves)} files")
-
-        _cleanup_empty_dirs_sudo(prefix)
-
-        if registry_target:
-            run_sudo(['rm', '-f', '--', registry_target],
-                     f"remove registry entry of {package_name}")
-            print(f"  Removed registry entry")
-    except BuildError as e:
-        print(f"  ERROR: {e}")
-        return False
-
-    return True
 
 
 def _cleanup_empty_dirs_sudo(prefix: Path) -> None:
@@ -2182,7 +2166,10 @@ def _cleanup_empty_dirs_sudo(prefix: Path) -> None:
             ordered.append(dirpath)
 
     for chunk in _chunks(ordered):
-        subprocess.run(['sudo', 'rmdir', '--'] + chunk)
+        try:
+            subprocess.run(['sudo', 'rmdir', '--'] + chunk)
+        except OSError:
+            pass  # no sudo binary; as non-fatal as a failed rmdir
 
 
 def _cleanup_empty_dirs(prefix: Path) -> None:

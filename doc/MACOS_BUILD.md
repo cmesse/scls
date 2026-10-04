@@ -108,8 +108,9 @@ install-name fix and the registry entry run through `sudo`, and you are
 asked for your password. Building and staging stay unprivileged, so nothing
 root-owned lands in `work/`. `./scls build all` asks once and keeps the sudo
 timestamp warm. `python/unix_builder.py --uninstall -p <package> -f macos`
-escalates the same way; under sudo it removes files and symlinks only and
-never deletes a directory recursively.
+escalates the same way. Uninstall removes files and symlinks only and never
+deletes a directory recursively (directories go once they are empty); it
+keeps the registry entry when a file could not be removed, so it can be retried.
 
 After activation, the installed `scls` command on `PATH` exposes a few
 runtime queries: `scls help` lists them (`scls flavor`, `scls list`,
