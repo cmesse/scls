@@ -1,11 +1,15 @@
 name: xz
 version: 5.8.4
-summary: XZ Utils data compression library (liblzma)
+summary: XZ Utils data compression library (liblzma) and command line tools
 homepage: https://tukaani.org/xz/
 license: 0BSD
-# liblzma only. The Apple SDK ships zlib and bzip2 but no lzma.h, and scotch's
-# .xz graph-file support needs it (Christian, 2026-10-03). Linux flavors,
-# lbl included, use the distro xz-devel/xz-libs instead.
+bootstrap: true  # Build with system compiler before scls gcc is available
+# liblzma and the xz tools, on the two flavors that build their own toolchain
+# (Christian, 2026-10-03):
+# - macos: the Apple SDK ships zlib and bzip2 but no lzma.h, which scotch's
+#   .xz graph-file support needs, and older macOS has no xz to read .tar.xz.
+# - lbl: the host's xz-devel cannot be assumed to be installed.
+# Mainline Linux flavors use the distro xz-devel/xz-libs instead.
 
 source:
   url: https://github.com/tukaani-project/xz/releases/download/v%{version}/xz-%{version}.tar.gz
@@ -20,6 +24,7 @@ update:
 
 include_flavors:
   - macos
+  - lbl
 
 features:
   fortran: false
@@ -32,16 +37,12 @@ configure:
   # Second line of defence for the ban above, if the version is ever set by hand.
   pre:
     - "case \"%{version}\" in 5.6.0|5.6.1) echo 'ERROR: xz %{version} is the backdoored release (CVE-2024-3094)' >&2; exit 1;; esac"
-  # Library only (LFS ch. 6, without the cross-compile flags). The xz tools
-  # would shadow the system's, and the scripts (xzgrep, xzdiff, ...) are
-  # GPLv2+, which doc/LICENSE_POLICY.md keeps out of binary packages.
+  # Library plus the 0BSD tools (xz, xzdec, lzmadec, lzmainfo and the LZMA
+  # Utils links), so the stack can read .tar.xz where the host has no xz
+  # (Christian, 2026-10-03). The scripts (xzgrep, xzdiff, ...) are GPLv2+,
+  # which doc/LICENSE_POLICY.md keeps out of binary packages.
   args:
     - "--disable-static"
-    - "--disable-xz"
-    - "--disable-xzdec"
-    - "--disable-lzmadec"
-    - "--disable-lzmainfo"
-    - "--disable-lzma-links"
     - "--disable-scripts"
     - "--disable-doc"
     - "--disable-nls"
@@ -62,3 +63,8 @@ install:
     - "mkdir -p %{prefix}/share/licenses/xz"
     - "install -m 644 COPYING %{prefix}/share/licenses/xz/COPYING"
     - "install -m 644 COPYING.0BSD %{prefix}/share/licenses/xz/COPYING.0BSD"
+
+# xz installs liblzma.pc, not xz.pc, so give the registry the full flags.
+registry:
+  cflags: "-I%{prefix}/include"
+  ldflags: "-L%{prefix}/lib -llzma"

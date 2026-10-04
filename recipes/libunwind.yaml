@@ -22,7 +22,14 @@ update:
   repo: libunwind/libunwind
   tag_prefix: v
 
-requires: []
+# lbl builds xz in-stack, and it is installed before libunwind configures.
+# libunwind turns minidebuginfo on whenever it finds liblzma, so on lbl it
+# links the prefix liblzma; declare that edge, since AutoReqProv is off
+# (Christian, 2026-10-03). Other Linux flavors link the host liblzma
+# (doc/BUILD_EXECUTION.md 1.1b).
+requires:
+  lbl:
+    - xz
 
 features:
   fortran: false

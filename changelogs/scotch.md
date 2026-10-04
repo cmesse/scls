@@ -8,6 +8,7 @@
   fails when any library is not found, and declared `rpm_build_requires`/`rpm_requires`.
 - macOS: zlib and bzip2 from the Apple SDK; liblzma from the new in-stack `xz` recipe (the SDK
   has no `lzma.h`).
+- lbl: liblzma from the in-stack `xz` recipe instead of the host's `xz-devel`/`xz-libs`, which cannot be assumed there (Christian, 2026-10-03). Mainline flavors unchanged: their specs differ only in the order of the Requires lines.
 - No consumer rebuild: SONAME `libscotch.so.7.0` and API are unchanged, the compression libraries
   are PRIVATE link dependencies of libscotch.
 

@@ -28,9 +28,12 @@ requires:
     - cmake
     - openmpi
   # liblzma for scotch's .xz graph-file support. The Apple SDK has zlib and
-  # bzip2 but no lzma.h, so macOS builds xz in-stack (recipes/xz.yaml).
+  # bzip2 but no lzma.h, and on lbl the host's xz-devel cannot be assumed,
+  # so macOS and lbl build xz in-stack (recipes/xz.yaml).
   # Merged with all: (build_order.normalize_dependencies).
   macos:
+    - xz
+  lbl:
     - xz
 
 # Compressed graph files (gzip, bzip2, xz) are on everywhere, from the
@@ -43,13 +46,28 @@ rpm_build_requires:
     - flex
     - zlib-devel
     - bzip2-devel
+  # System liblzma on the mainline flavors. lbl links the stack's xz
+  # (requires: above); its empty list stops the fallback to gcc:, which lbl
+  # inherits. debug inherits gcc:, gcc-mkl-cuda matches mkl:.
+  gcc:
     - xz-devel
+  mkl:
+    - xz-devel
+  intel:
+    - xz-devel
+  lbl: []
 
 rpm_requires:
   all:
     - zlib
     - bzip2-libs
+  gcc:
     - xz-libs
+  mkl:
+    - xz-libs
+  intel:
+    - xz-libs
+  lbl: []
 
 features:
   fortran: true
