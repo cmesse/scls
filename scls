@@ -115,8 +115,9 @@ fi
 # it asks for the install type (local = ~/.local/scls-hsl/<flavor>, owner-only;
 # global = the stack prefix, via sudo), the licence type (academic|commercial)
 # and acceptance, publishes, and removes the staged build. Both are routed here,
-# before the builders, so HSL never gets a recipe, spec, registry entry or
-# build-order slot.
+# before the builders, so HSL never gets a recipe, spec or build-order slot.
+# A global install does write a registry entry (a record of that private
+# install: `scls list` shows it, unix_builder.py --uninstall removes it).
 # See doc/HSL_BUILD.md and doc/LICENSE_POLICY.md.
 if [ "${2:-}" = "hsl" ] && { [ "${1:-}" = "build" ] || [ "${1:-}" = "install" ]; }; then
     MODE="$1"; shift 2

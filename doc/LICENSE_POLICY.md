@@ -148,7 +148,11 @@ the sources and binaries are private.**
   in `share/hsl/build-info.yaml`, and then deletes the staged build:
   - install type: *local* (`~/.local/scls-hsl/<flavor>`, owner-only, Ipopt needs
     `hsllib <full path>`) or *global* (`/opt/scls/<flavor>`, readable by every user, owned
-    by no package, published with sudo; Ipopt's default `hsllib` finds it via RUNPATH);
+    by no package, published with sudo; Ipopt's default `hsllib` finds it via RUNPATH).
+    A global install also writes a registry entry (`share/scls/registry/hsl.yaml`) so that
+    `./scls list` shows it and `unix_builder.py --uninstall -p hsl` can remove it. That entry
+    and the tracked `files/hsl.txt` (installed path names only) are a record of that private
+    install; they are not a package and contain nothing HSL-derived;
   - licence type: *academic* (personal, non-commercial, no sharing even within the
     institution; a global install is refused unless the user confirms being the machine's
     sole user) or *commercial* (an agreement with STFC whose terms the user holds);
