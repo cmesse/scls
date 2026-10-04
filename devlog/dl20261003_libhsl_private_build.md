@@ -217,3 +217,34 @@ dlopen smoke and MA77 gate PASS, staged id `/opt/scls/lib/libcoinhsl.dylib`.
 implementation each audited by Codex (gpt-5.6-terra, high) and Grok (grok-4.7, xhigh).
 Not adopted: newline-in-member-name handling; extra fixtures for absolute and
 internal hardlinks.
+
+## Follow-up 2026-10-03: registry entry and uninstall manifest for a global install
+
+**Decision (Christian):** "giving it a registry entry is OK so that it can be uninstalled and
+./scls list shows it." Not approved, and unchanged: linking Ipopt against HSL at build time
+(`recipes/ipopt.yaml` keeps `--without-hsl`), any HSL recipe, spec or build-order slot.
+**AIs:** Claude Fable 5.1 (macOS dev host); Codex gpt-5.6-terra and Grok 4.7, plan round (`high`)
+and diff round (`xhigh`), `tmp/ai_exchange/plan_hsl_registry.md`. All four: approve with changes.
+**Verification:** `registry_entry()` run against the installed macOS `PROVENANCE.txt` and
+`build-info.yaml`: version `2024.05.15`, dependencies `[metis, openblas, gcc]`, empty flags.
+Scratch uninstall test with `files/hsl.txt` against a fake global install: exactly the HSL
+files removed; `--uninstall metis` refused while `hsl` lists it. **Not run:** a real
+`./scls install hsl` + uninstall (the staged build was consumed; needs the tarballs), Linux.
+
+- `scripts/build_libhsl.py`: a **global** install writes `share/scls/registry/hsl.yaml` into the
+  staged tree before the publish loop. Hand-written, never via `write_registry_entry` (which
+  would see `libhsl` in `lib/` and record `-L`/`-rpath`): `cflags`/`ldflags` are empty so nothing
+  links HSL through the registry. `dependencies` = stack packages the library's `needed:` record
+  resolves to and that have a registry entry (metis; openblas or lapack; gcc); external MKL is
+  not listed. A local install gets no entry, and a stale one left in the staging directory by a
+  failed global attempt is removed first.
+- `files/hsl.txt` (new, path names only): both platforms' library names, `libhsl.*` before
+  `libcoinhsl.*`, licences, provenance, acceptance record. No recipe exists, so no builder
+  reads it; it is the file list for `python/unix_builder.py --uninstall -p hsl -f <flavor>`.
+- Limits, documented in `doc/HSL_BUILD.md`: the dependency list is enforced only by
+  `unix_builder.py --uninstall`; `dnf`/`apt-get remove` of metis ignores it. `python/scls.py
+  remove hsl` on RPM/DEB hosts would try the package manager and is not the route.
+- The HSL installed on the Mac before this change has no entry until the next global
+  `./scls build hsl && ./scls install hsl`.
+- Pre-existing, untouched (Codex): `extra_packages: [hsl]` in `flavor.conf` would put a
+  dangling `Requires` into the flavor meta-package.

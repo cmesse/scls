@@ -101,6 +101,17 @@ subdirectory), because it is the only flavor on this platform. The Linux
 flavors use a per-flavor prefix (`/opt/scls/gcc`, `/opt/scls/mkl`, and so
 on) because several flavors coexist on the same host.
 
+The prefix does not have to be writable by the build user. `./scls install
+<package>` checks the files it is about to write; if `/opt/scls` (or a
+directory under it) is root-owned, the copy into the prefix, the dylib
+install-name fix and the registry entry run through `sudo`, and you are
+asked for your password. Building and staging stay unprivileged, so nothing
+root-owned lands in `work/`. `./scls build all` asks once and keeps the sudo
+timestamp warm. `python/unix_builder.py --uninstall -p <package> -f macos`
+escalates the same way. Uninstall removes files and symlinks only and never
+deletes a directory recursively (directories go once they are empty); it
+keeps the registry entry when a file could not be removed, so it can be retried.
+
 After activation, the installed `scls` command on `PATH` exposes a few
 runtime queries: `scls help` lists them (`scls flavor`, `scls list`,
 `scls info <package>`, `scls env`, `scls prefix`, `scls license`,

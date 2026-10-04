@@ -28,6 +28,8 @@ from build_common import (
     should_build_package,
     check_package_installed,
     write_registry_entry,
+    paths_need_sudo, publish_needs_sudo, run_sudo,
+    sudo_publish_tree, sudo_write_registry_entry,
     add_rpath_for_libdirs,
     get_package_dependencies,
     get_subpackages_for_flavor,
@@ -94,6 +96,9 @@ class UnixBuilder:
 
         # Setup paths - mirror rpmbuild structure
         self.prefix = Path(self.flavor['prefix'])
+        # ['sudo'] once install() finds the live prefix unwritable; the later
+        # prefix writers (final_post, install_name_tool, registry) read it.
+        self._sudo: List[str] = []
         self.install_prefix = None
         self.project_root = Path(__file__).parent.parent  # Go up from python/ to project root
         self.rpmbuild = self.project_root / "work"
@@ -925,25 +930,38 @@ class UnixBuilder:
             # Track installed files
             self.installed_files = []
 
-            for src_path in src_prefix.rglob('*'):
-                rel_path = src_path.relative_to(src_prefix)
-                dest_path = self.prefix / rel_path
+            # A prefix this user cannot write (e.g. root-owned /opt/scls) is
+            # published with sudo, command by command; a writable one keeps
+            # the in-process copy below. Checked per destination, before
+            # anything is written, so a prefix with a root-owned subtree does
+            # not fail halfway through the copy.
+            registry_file = self.prefix / "share" / "scls" / "registry" / f"{self.recipe['name']}.yaml"
+            self._sudo = []
+            if publish_needs_sudo(src_prefix, self.prefix, [registry_file]):
+                self._sudo = ['sudo']
+                print(f"{self.prefix} is not writable by the current user; installing with sudo")
+                self.installed_files = sudo_publish_tree(
+                    src_prefix, self.prefix, also_dirs=[registry_file.parent])
+            else:
+                for src_path in src_prefix.rglob('*'):
+                    rel_path = src_path.relative_to(src_prefix)
+                    dest_path = self.prefix / rel_path
 
-                # Create parent directory if needed
-                dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    # Create parent directory if needed
+                    dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-                if src_path.is_symlink():
-                    # Preserve symlink topology (e.g. libfoo.so -> libfoo.so.1)
-                    # instead of flattening to a copy of the target
-                    link_target = os.readlink(src_path)
-                    if dest_path.exists() or dest_path.is_symlink():
-                        dest_path.unlink()
-                    dest_path.symlink_to(link_target)
-                    self.installed_files.append(dest_path)
-                elif src_path.is_file():
-                    # Regular file — copy preserving metadata
-                    shutil.copy2(src_path, dest_path)
-                    self.installed_files.append(dest_path)
+                    if src_path.is_symlink():
+                        # Preserve symlink topology (e.g. libfoo.so -> libfoo.so.1)
+                        # instead of flattening to a copy of the target
+                        link_target = os.readlink(src_path)
+                        if dest_path.exists() or dest_path.is_symlink():
+                            dest_path.unlink()
+                        dest_path.symlink_to(link_target)
+                        self.installed_files.append(dest_path)
+                    elif src_path.is_file():
+                        # Regular file — copy preserving metadata
+                        shutil.copy2(src_path, dest_path)
+                        self.installed_files.append(dest_path)
 
             print(f"Installed {len(self.installed_files)} files")
         else:
@@ -961,7 +979,10 @@ class UnixBuilder:
         self.generate_rpm_file_list()
 
         # Write registry entry for this package
-        write_registry_entry(self.prefix, self.recipe, self.flavor_name)
+        if self._sudo:
+            sudo_write_registry_entry(self.prefix, self.recipe, self.flavor_name)
+        else:
+            write_registry_entry(self.prefix, self.recipe, self.flavor_name)
 
         # Add registry file to installed files list so it gets included in PKG
         registry_file = self.prefix / "share" / "scls" / "registry" / f"{self.recipe['name']}.yaml"
@@ -1222,6 +1243,23 @@ class UnixBuilder:
         # rendered file contents always carry the real install prefix.
         install_root = self._generated_install_root()
 
+        # Live prefix this user cannot write (or create): render into a
+        # temporary tree and publish it with sudo afterwards. Only for a
+        # direct install — a staging root (DebBuilder) is never escalated.
+        live_root = install_root
+        sudo_stage: Optional[Path] = None
+        self._sudo = []
+        if install_root == self.prefix and self._generated_needs_sudo(install_root):
+            self._sudo = ['sudo']
+            print(f"{self.prefix} is not writable by the current user; installing with sudo")
+            # Under work_dir, so a failed render leaves nothing in the system
+            # temp dir; the next build wipes it.
+            sudo_stage = self.work_dir / "generated-stage"
+            if sudo_stage.exists():
+                shutil.rmtree(sudo_stage)
+            sudo_stage.mkdir(parents=True)
+            install_root = sudo_stage
+
         # Setup Jinja2 environment
         templates_dir = self.project_root / "templates"
         jinja_env = Environment(
@@ -1299,6 +1337,10 @@ class UnixBuilder:
             self.installed_files.append(full_dest)
             print(f"  Installed: {full_dest}")
 
+        if sudo_stage is not None:
+            self._publish_generated_with_sudo(sudo_stage, live_root)
+            return
+
         # On Linux, lib is a symlink to lib64 (Linux From Scratch convention)
         # macOS uses lib directly with no lib64 split
         import platform
@@ -1328,6 +1370,52 @@ class UnixBuilder:
             self.installed_files.append(registry_file)
 
         # Save installed files list for PKG creation
+        self.work_dir.mkdir(parents=True, exist_ok=True)
+        file_list_path = self.work_dir / "installed_files.txt"
+        with open(file_list_path, 'w') as f:
+            for file in self.installed_files:
+                f.write(f"{file}\n")
+
+    def _generated_needs_sudo(self, install_root: Path) -> bool:
+        """True if install_generated() cannot write its files into install_root."""
+        install_cfg = self.recipe.get('install', {})
+        dests = [install_root / t['dest'] for t in install_cfg.get('templates', [])]
+        dests += [install_root / f['dest'] for f in install_cfg.get('files', [])]
+        dests.append(install_root / "share" / "scls" / "registry" / f"{self.recipe['name']}.yaml")
+        if platform.system() == 'Linux':
+            dests.append(install_root / 'lib')
+        return paths_need_sudo(dests)
+
+    def _publish_generated_with_sudo(self, stage: Path, live_root: Path) -> None:
+        """Tail of install_generated() for an unwritable live prefix.
+
+        `stage` holds the rendered files with their final modes; publish it,
+        then repeat the in-process tail (Linux lib -> lib64, registry entry,
+        installed_files.txt) against `live_root` with sudo.
+        """
+        # Keep the recipe's order for the file list, as the in-process path does.
+        staged_order = [live_root / Path(f).relative_to(stage) for f in self.installed_files]
+        registry_dir = live_root / "share" / "scls" / "registry"
+        try:
+            sudo_publish_tree(stage, live_root, also_dirs=[registry_dir, live_root / 'lib64'])
+        finally:
+            shutil.rmtree(stage, ignore_errors=True)
+        self.installed_files = staged_order
+
+        if platform.system() == 'Linux':
+            lib64_dir = live_root / 'lib64'
+            lib_link = live_root / 'lib'
+            run_sudo(['install', '-d', '-m', '0755', '--', str(lib64_dir)], "create lib64")
+            if not lib_link.exists():
+                run_sudo(['ln', '-sfn', '--', 'lib64', str(lib_link)], "create lib -> lib64")
+                print(f"  Created symlink: lib -> lib64")
+
+        print(f"\nInstalled {len(self.installed_files)} files")
+
+        registry_file = sudo_write_registry_entry(
+            live_root, self.recipe, self.flavor_name, install_prefix=self.prefix)
+        self.installed_files.append(registry_file)
+
         self.work_dir.mkdir(parents=True, exist_ok=True)
         file_list_path = self.work_dir / "installed_files.txt"
         with open(file_list_path, 'w') as f:
@@ -1770,6 +1858,18 @@ class UnixBuilder:
 
         return context
 
+    def _final_post_argv(self, cmd: str) -> List[str]:
+        """argv for a final-post command, which writes into the live prefix.
+
+        Under sudo the command runs as `sudo /bin/sh -c`: sudo resets the
+        environment, and the build PATH is deliberately not forwarded into a
+        root shell. A hook that needs more than the system PATH has to use
+        absolute paths.
+        """
+        if self._sudo:
+            return [*self._sudo, '/bin/sh', '-c', cmd]
+        return ['sh', '-c', cmd]
+
     def run_final_post_install_commands(self):
         """Run final post-install commands after files are in their final location"""
         if 'install' not in self.recipe:
@@ -1786,7 +1886,7 @@ class UnixBuilder:
                 # Then apply install-specific replacements
                 cmd = cmd.replace('%{prefix}', str(self.prefix))
                 cmd = cmd.replace('%{install_prefix}', str(self.prefix))
-                run_command(['sh', '-c', cmd], self.work_dir, env, "final-post-install")
+                run_command(self._final_post_argv(cmd), self.work_dir, env, "final-post-install")
 
         # Run flavor-specific final post commands
         if 'flavor_final_post' in self.recipe['install'] and flavor_name in self.recipe['install']['flavor_final_post']:
@@ -1796,7 +1896,7 @@ class UnixBuilder:
                 # Then apply install-specific replacements
                 cmd = cmd.replace('%{prefix}', str(self.prefix))
                 cmd = cmd.replace('%{install_prefix}', str(self.prefix))
-                run_command(['sh', '-c', cmd], self.work_dir, env, "flavor-final-post-install")
+                run_command(self._final_post_argv(cmd), self.work_dir, env, "flavor-final-post-install")
 
     def _local_macos_install_name(self, install_name: str, lib_dir: Path) -> Optional[str]:
         """Return the absolute prefix path for local Mach-O dylib names."""
@@ -1846,7 +1946,7 @@ class UnixBuilder:
     def _run_install_name_tool(self, args: List[str], dylib: Path, old: str, new: str) -> None:
         try:
             subprocess.run(
-                ['install_name_tool'] + args + [str(dylib)],
+                [*self._sudo, 'install_name_tool'] + args + [str(dylib)],
                 check=True,
                 text=True,
                 capture_output=True,

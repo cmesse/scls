@@ -536,6 +536,54 @@ def ask_choice(prompt: str, choices: list, flag_value, flag_names: str) -> str:
         print(f"  please answer one of: {', '.join(choices)}")
 
 
+# Stack package that provides a library libcoinhsl needs, by file-name stem.
+NEEDED_PROVIDERS = (
+    ('libmetis', 'metis'), ('libopenblas', 'openblas'),
+    ('libblas', 'lapack'), ('liblapack', 'lapack'),
+    ('libgomp', 'gcc'), ('libgfortran', 'gcc'), ('libgcc_s', 'gcc'), ('libquadmath', 'gcc'),
+)
+
+
+def registry_entry(cache: Path, info: str, stack: Path) -> str:
+    """Registry YAML for a global install (same keys as build_common.write_registry_entry).
+
+    Hand-written on purpose: write_registry_entry would see libhsl in lib/ and record
+    -L/-rpath link flags. cflags/ldflags stay empty so nothing links HSL through the
+    registry. dependencies lists the stack packages the library resolves against (from
+    the `needed:` record), so `unix_builder.py --uninstall` of one of them refuses while
+    HSL is installed. An external MKL has no stack package and is not listed.
+    """
+    doc = cache / 'share' / 'doc' / 'hsl'
+    version = 'unknown'
+    m = re.search(r"^base:\s+coinhsl-(\S+)", (doc / 'PROVENANCE.txt').read_text(), re.M) \
+        if (doc / 'PROVENANCE.txt').exists() else None
+    if m:
+        version = m.group(1)
+    else:
+        for lic in sorted((doc / 'LICENCES').glob('LICENCE.coinhsl-*')):
+            version = lic.name[len('LICENCE.coinhsl-'):]
+    deps = []
+    needed = info.split('\nneeded:\n', 1)[-1].split('\nlicence_acceptance:\n')[0]
+    for name, path in re.findall(r"^  (\S+): (\S+)$", needed, re.M):
+        if not is_within(Path(path), stack):
+            continue
+        for stem, pkg in NEEDED_PROVIDERS:
+            if (name.startswith(stem) and pkg not in deps
+                    and (stack / 'share' / 'scls' / 'registry' / f'{pkg}.yaml').exists()):
+                deps.append(pkg)
+    return (
+        "name: hsl\n"
+        f"version: {json.dumps(version)}\n"
+        "license: Proprietary (STFC HSL licence); licensee-built, not redistributable\n"
+        "summary: HSL linear solvers for Ipopt, private build loaded at runtime (hsllib)\n"
+        "dependencies:\n" + ''.join(f"- {d}\n" for d in deps) +
+        "cflags: ''\n"
+        "ldflags: ''\n"
+        "features:\n  fortran: true\n  openmp: true\n  mpi: false\n  math: true\n"
+        "has_pc_file: false\n"
+    )
+
+
 def cmd_install(args) -> None:
     flavor_name, flavor, stack, is_macos = common_flavor(args)
     cache = build_cache_dir(flavor_name)
@@ -555,7 +603,7 @@ def cmd_install(args) -> None:
     print("  local   ~/.local/scls-hsl/<flavor>, owner-only (0700/0600). Ipopt needs")
     print("          `hsllib <full path>` in ipopt.opt or via the API.")
     print(f"  global  the stack prefix {stack}, readable by every user of this machine,")
-    print("          owned by no package, installed with sudo. Ipopt finds it with no option.")
+    print("          owned by no RPM/DEB package, installed with sudo. Ipopt finds it with no option.")
     flag = 'local' if args.local else ('global' if args.glob else None)
     itype = ask_choice("Install type", ['local', 'global'], flag, '--local or --global')
     prefix = stack if itype == 'global' else Path.home() / '.local' / 'scls-hsl' / flavor_name
@@ -632,6 +680,17 @@ def cmd_install(args) -> None:
     # Recorded only now, and replacing any record a failed earlier attempt left.
     info_file.write_text(info.split('\nlicence_acceptance:\n')[0].rstrip('\n') + "\nlicence_acceptance:\n" +
                          ''.join(f"  {k}: {json.dumps(v)}\n" for k, v in acceptance.items()))
+    # Global install: a registry entry, so `./scls list` shows it and
+    # `unix_builder.py --uninstall -p hsl` (file list: files/hsl.txt) removes it.
+    # A local record of this install, not a package: still no recipe, spec or
+    # build-order slot. Written before the directory walk below so the same loop
+    # publishes it. A local install is outside the stack prefix and gets none.
+    # The cache survives a failed attempt, so drop what an earlier global one left.
+    shutil.rmtree(cache / 'share' / 'scls', ignore_errors=True)
+    if itype == 'global':
+        registry = cache / 'share' / 'scls' / 'registry'
+        registry.mkdir(parents=True)
+        (registry / 'hsl.yaml').write_text(registry_entry(cache, info, stack))
     parent = prefix
     while not parent.exists():
         parent = parent.parent
@@ -653,6 +712,8 @@ def cmd_install(args) -> None:
     print(f"\nInstalled {prefix / 'lib' / libname} (+ {alias_name} symlink); build dir removed.")
     print(f"Licences, provenance and the acceptance record: {prefix / 'share'}")
     if itype == 'global':
+        print("Listed by `./scls list` as hsl. To remove it, from the SCLS checkout:")
+        print(f"  python python/unix_builder.py --uninstall -p hsl -f {flavor_name}")
         print("Ipopt finds it through libipopt's RUNPATH; no hsllib option is needed. In ipopt.opt:")
         print("  linear_solver ma97")
     else:

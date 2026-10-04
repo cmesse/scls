@@ -1371,8 +1371,235 @@ def parse_pc_file(pc_file: Path, prefix: Path) -> Tuple[Optional[str], Optional[
         return None, None
 
 
+# =============================================================================
+# Privileged publish (unwritable prefix)
+# =============================================================================
+#
+# A direct (non-RPM/DEB) install or uninstall into a prefix the invoking user
+# cannot write — e.g. a root-owned /opt/scls on macOS — escalates with sudo.
+# Only individual commands (install, ln, rm, rmdir) run as root, the same
+# model as scripts/build_libhsl.py: the Python process is never re-executed
+# under sudo, so nothing root-owned lands in work/ or __pycache__. A writable
+# prefix never reaches any of this and keeps the in-process code path.
+# See devlog/dl20261003_unix_install_sudo.md.
+
+_SUDO_CHUNK = 200  # operands per sudo command; far below ARG_MAX on macOS and Linux
+
+
+def _nearest_existing(path: Path) -> Path:
+    """Return `path` or its nearest ancestor that exists (lexists)."""
+    p = Path(path)
+    while not os.path.lexists(p) and p.parent != p:
+        p = p.parent
+    return p
+
+
+def _dir_writable(path) -> bool:
+    return os.access(path, os.W_OK | os.X_OK)
+
+
+def _chunks(items: List, size: int = _SUDO_CHUNK):
+    for i in range(0, len(items), size):
+        yield items[i:i + size]
+
+
+def run_sudo(args: List[str], what: str) -> None:
+    """Run one command under sudo with inherited stdio.
+
+    Not routed through run_command: its stdout pipe would hide a password
+    prompt that sudo could not place on /dev/tty.
+    """
+    cmd = ['sudo'] + [str(a) for a in args]
+    try:
+        result = subprocess.run(cmd)
+    except FileNotFoundError as e:
+        raise BuildError(f"{what}: sudo not found") from e
+    if result.returncode != 0:
+        shown = ' '.join(cmd[:6]) + (' ...' if len(cmd) > 6 else '')
+        raise BuildError(
+            f"{what} failed with return code {result.returncode}\n"
+            f"Command: {shown}\n"
+            "The prefix may be partially updated if earlier sudo commands succeeded."
+        )
+
+
+def paths_need_sudo(dest_paths: List[Path]) -> bool:
+    """True if creating/replacing any of `dest_paths` needs privilege.
+
+    A destination needs privilege when it exists as a regular file that is not
+    writable (it would be opened for writing), or when the directory that has
+    to hold it — its parent, or the nearest existing ancestor if the parent is
+    still missing — is not writable. Missing paths are never passed to
+    os.access() themselves: that is False for every file of a fresh install.
+    """
+    if os.geteuid() == 0:
+        return False
+    dir_ok: Dict[str, bool] = {}
+    for dest in dest_paths:
+        dest = Path(dest)
+        if os.path.lexists(dest):
+            if (not os.path.islink(dest) and os.path.isfile(dest)
+                    and not os.access(dest, os.W_OK)):
+                return True
+            holder = dest.parent
+        else:
+            holder = _nearest_existing(dest.parent)
+        key = str(holder)
+        if key not in dir_ok:
+            dir_ok[key] = _dir_writable(holder)
+        if not dir_ok[key]:
+            return True
+    return False
+
+
+def publish_needs_sudo(src_root: Path, dest_root: Path, extra: List[Path] = ()) -> bool:
+    """paths_need_sudo() for a staged tree published to `dest_root`, plus `extra`."""
+    dests = [dest_root / src.relative_to(src_root)
+             for src in src_root.rglob('*')
+             if src.is_symlink() or src.is_file()]
+    return paths_need_sudo(dests + list(extra))
+
+
+def prefix_needs_sudo(prefix: Path) -> bool:
+    """Coarse whole-prefix check for `scls build all`'s sudo keepalive.
+
+    True if the prefix (or, when it does not exist yet, its nearest existing
+    ancestor) or any real directory below it is not writable. Conservative on
+    purpose: it only decides whether to keep a sudo timestamp warm; the
+    per-install decision is publish_needs_sudo().
+    """
+    if os.geteuid() == 0:
+        return False
+    prefix = Path(prefix)
+    anchor = _nearest_existing(prefix)
+    if anchor != prefix or not os.path.isdir(prefix):
+        return not _dir_writable(anchor)
+    if not _dir_writable(prefix):
+        return True
+    for dirpath, dirnames, _ in os.walk(str(prefix)):
+        for name in dirnames:
+            d = os.path.join(dirpath, name)
+            if not os.path.islink(d) and not _dir_writable(d):
+                return True
+    return False
+
+
+def sudo_publish_tree(src_root: Path, dest_root: Path,
+                      also_dirs: List[Path] = ()) -> List[Path]:
+    """Copy a staged tree into `dest_root` with sudo; return the installed paths.
+
+    Mirrors the in-process copy loop of UnixBuilder.install(): symlinks are
+    recreated, regular files are copied with mode and mtime, anything else
+    (fifos, devices, empty directories) is skipped. Files end up owned by
+    root, like the rest of a root-owned prefix; setuid/setgid bits are
+    dropped for that reason.
+
+    Everything is checked before the first sudo command, so a refused layout
+    changes nothing: no destination may be an existing directory, and every
+    directory written into (plus `also_dirs`, e.g. the registry directory a
+    later step needs) must be, or be creatable below, a real directory that
+    resolves inside `dest_root`. A symlink such as lib -> lib64 passes; one
+    that leads out of the prefix is refused rather than followed as root.
+    """
+    import stat as stat_mod
+
+    src_root = Path(src_root)
+    dest_root = Path(dest_root)
+    root_real = os.path.realpath(dest_root)
+
+    def check_dir(directory: Path) -> bool:
+        """Validate `directory` as a write target; True if it has to be created."""
+        anchor = _nearest_existing(directory)
+        if not os.path.isdir(anchor):
+            raise BuildError(
+                f"Cannot install into {directory}: {anchor} exists and is not a directory")
+        anchor_real = os.path.realpath(anchor)
+        inside = anchor_real == root_real or anchor_real.startswith(root_real + os.sep)
+        above = root_real.startswith(anchor_real.rstrip(os.sep) + os.sep)  # prefix not created yet
+        if not (inside or above):
+            raise BuildError(
+                f"Cannot install into {directory}: {anchor} resolves to {anchor_real}, "
+                f"outside {dest_root}")
+        return anchor != directory
+
+    for directory in also_dirs:
+        check_dir(Path(directory))
+    links: List[Tuple[str, Path]] = []
+    groups: Dict[Tuple[str, str], List[str]] = {}
+    missing_dirs: List[Path] = []
+    seen_dirs = set()
+    installed: List[Path] = []
+
+    for src in src_root.rglob('*'):
+        is_link = src.is_symlink()
+        if not is_link and not src.is_file():
+            continue
+        dest = dest_root / src.relative_to(src_root)
+
+        if os.path.isdir(dest) and not os.path.islink(dest):
+            raise BuildError(
+                f"Cannot install {src}: destination {dest} is an existing directory")
+        parent = dest.parent
+        if str(parent) not in seen_dirs:
+            seen_dirs.add(str(parent))
+            if check_dir(parent):
+                missing_dirs.append(parent)
+
+        if is_link:
+            links.append((os.readlink(src), dest))
+        else:
+            mode = f"{stat_mod.S_IMODE(src.stat().st_mode) & 0o777:04o}"
+            groups.setdefault((str(parent), mode), []).append(os.path.abspath(src))
+        installed.append(dest)
+
+    # `install -d` creates missing intermediate directories as well.
+    missing_dirs.sort(key=lambda d: len(d.parts))
+    for chunk in _chunks([str(d) for d in missing_dirs]):
+        run_sudo(['install', '-d', '-m', '0755', '--'] + chunk, "create directories")
+    # -p keeps the mtime, as shutil.copy2 does. (BSD install's -p also skips
+    # the copy when the destination is already identical; same end state.)
+    for (parent, mode), sources in groups.items():
+        for chunk in _chunks(sources):
+            run_sudo(['install', '-p', '-m', mode, '--'] + chunk + [parent],
+                     "install files")
+    for target, dest in links:
+        run_sudo(['ln', '-sfn', '--', target, str(dest)], "install symlink")
+
+    return installed
+
+
+def sudo_write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None,
+                              install_prefix: Path = None) -> Path:
+    """write_registry_entry() for an unwritable prefix; returns the registry file.
+
+    The entry is computed against the live `prefix` (same .pc and lib/ lookups)
+    but written to a temporary root, then installed with sudo. Unlike the
+    in-process writer, a missing result is an error rather than a printed
+    warning: without the entry the package counts as not installed.
+    """
+    import tempfile
+
+    name = recipe.get('name', 'unknown')
+    registry_dir = Path(prefix) / "share" / "scls" / "registry"
+    tmp_root = Path(tempfile.mkdtemp(prefix='scls-registry-'))
+    try:
+        write_registry_entry(prefix, recipe, flavor_name,
+                             install_prefix=install_prefix, output_root=tmp_root)
+        tmp_file = tmp_root / "share" / "scls" / "registry" / f"{name}.yaml"
+        if not tmp_file.is_file():
+            raise BuildError(f"Registry entry for {name} was not generated")
+        run_sudo(['install', '-d', '-m', '0755', '--', str(registry_dir)],
+                 "create registry directory")
+        run_sudo(['install', '-m', '0644', '--', str(tmp_file), str(registry_dir)],
+                 "install registry entry")
+    finally:
+        shutil.rmtree(tmp_root, ignore_errors=True)
+    return registry_dir / f"{name}.yaml"
+
+
 def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None,
-                         install_prefix: Path = None) -> None:
+                         install_prefix: Path = None,
+                         output_root: Path = None) -> None:
     """
     Write a registry entry for an installed package.
 
@@ -1393,6 +1620,9 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None,
                         cflags/ldflags. Defaults to `prefix`. Pass the clean
                         install prefix here for staged builds so destdir paths
                         do not leak into the recorded flags.
+        output_root: Write the registry file under this root instead of
+                     `prefix` (reads still use `prefix`). Used by
+                     sudo_write_registry_entry() for an unwritable prefix.
     """
     # Extract essential info first - these should never fail
     package_name = recipe.get('name', 'unknown')
@@ -1402,7 +1632,7 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None,
         install_prefix = prefix
 
     # Create registry directory
-    registry_dir = prefix / "share" / "scls" / "registry"
+    registry_dir = (output_root if output_root is not None else prefix) / "share" / "scls" / "registry"
     try:
         registry_dir.mkdir(parents=True, exist_ok=True)
     except Exception as e:
@@ -1787,17 +2017,41 @@ def uninstall_package(
                     print(f"  Keeping '{dep}': still required by {', '.join(dep_reverse_deps)}")
 
     uninstalled = []
+    all_ok = True
     for pkg in packages_to_uninstall:
         success = _uninstall_single_package(prefix, pkg, dry_run)
         if success:
             uninstalled.append(pkg)
+        else:
+            # The failed package is still installed (its registry entry is
+            # kept), so do not go on to remove what it depends on.
+            all_ok = False
+            break
 
-    return True, uninstalled
+    return all_ok, uninstalled
 
 
 def _uninstall_single_package(prefix: Path, package_name: str, dry_run: bool = False) -> bool:
     """
     Uninstall a single package (internal function).
+
+    The file list is files/<package>.txt (get_package_files). Removal runs
+    in-process, or with `sudo rm` when the prefix is not writable by the
+    current user (e.g. a root-owned /opt/scls); the rules are the same:
+
+      - Only files and symlinks are removed. A manifest line that names a
+        directory is never removed recursively: share/man/man1 is listed by
+        many packages and holds all of their pages. Directories go away
+        through the empty-directory cleanup once nothing is left in them.
+      - Every existing target's parent must resolve (symlinks followed) to
+        the prefix or below it; otherwise nothing is removed and the
+        uninstall fails. get_package_files() passes non-%{prefix} manifest
+        lines through verbatim.
+      - A missing files/<package>.txt fails the uninstall: removing only the
+        registry entry would leave every installed file with nothing
+        recording it.
+      - The registry entry goes last, and only if every file was removed, so
+        a failed uninstall can be retried.
 
     Args:
         prefix: The installation prefix
@@ -1807,53 +2061,160 @@ def _uninstall_single_package(prefix: Path, package_name: str, dry_run: bool = F
     Returns:
         True if successful
     """
-    import shutil
+    tag = '[DRY RUN] ' if dry_run else ''
+    print(f"\n{tag}Uninstalling {package_name}...")
 
-    print(f"\n{'[DRY RUN] ' if dry_run else ''}Uninstalling {package_name}...")
+    manifest = Path("files") / f"{package_name}.txt"
+    if not manifest.exists():
+        print(f"  ERROR: {manifest} not found (run from the SCLS checkout); nothing removed")
+        return False
 
-    # Get list of files to remove
     files = get_package_files(prefix, package_name)
+    registry_file = prefix / "share" / "scls" / "registry" / f"{package_name}.yaml"
+    use_sudo = _uninstall_needs_sudo(files, registry_file)
+    how = ' (sudo)' if use_sudo else ''
+    if use_sudo:
+        print(f"  {tag}{prefix} is not writable by the current user; uninstalling with sudo")
 
-    if not files:
-        print(f"  Warning: No file list found for {package_name}")
-        print(f"  Will only remove registry entry")
+    real_prefix = os.path.realpath(str(prefix))
 
-    # Remove files
-    removed_count = 0
+    def contained(path) -> Optional[str]:
+        norm = os.path.normpath(str(path))
+        parent = os.path.realpath(os.path.dirname(norm) or '.')
+        if parent == real_prefix or parent.startswith(real_prefix + os.sep):
+            return os.path.join(parent, os.path.basename(norm))
+        return None
+
+    registry_target = None
+    refused = False
+    if os.path.lexists(registry_file):
+        registry_target = contained(registry_file)
+        if registry_target is None:
+            print(f"  ERROR: refusing to remove {registry_file}: outside {prefix}")
+            refused = True
+
+    leaves: List[str] = []
     for file_path in files:
-        if file_path.exists():
+        if not os.path.lexists(file_path):
+            continue
+        target = contained(file_path)
+        if target is None:
+            print(f"  ERROR: refusing to remove {file_path}: outside {prefix}")
+            refused = True
+            continue
+        if os.path.isdir(file_path) and not os.path.islink(file_path):
             if dry_run:
-                print(f"  Would remove: {file_path}")
-            else:
-                try:
-                    if file_path.is_dir():
-                        shutil.rmtree(file_path)
-                    else:
-                        file_path.unlink()
-                    removed_count += 1
-                except OSError as e:
-                    print(f"  Warning: Could not remove {file_path}: {e}")
+                print(f"  Would keep directory unless left empty: {file_path}")
+            continue
+        # Some manifests list their own registry entry; it is removed last.
+        if target == registry_target or target in leaves:
+            continue
+        leaves.append(target)
 
-    if not dry_run:
-        print(f"  Removed {removed_count} files")
+    if refused:
+        print(f"  Nothing was removed for {package_name}")
+        return False
+
+    if dry_run:
+        for target in leaves:
+            print(f"  Would remove{how}: {target}")
+        if registry_target:
+            print(f"  Would remove registry{how}: {registry_target}")
+        return True
+
+    failed = 0
+    if use_sudo:
+        for chunk in _chunks(leaves):
+            try:
+                run_sudo(['rm', '-f', '--'] + chunk, f"remove files of {package_name}")
+            except BuildError as e:
+                print(f"  ERROR: {e}")
+        failed = sum(1 for target in leaves if os.path.lexists(target))
+    else:
+        for target in leaves:
+            try:
+                os.unlink(target)
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                print(f"  ERROR: could not remove {target}: {e}")
+                failed += 1
+    print(f"  Removed {len(leaves) - failed} files")
 
     # Clean up empty directories
-    if not dry_run:
+    if use_sudo:
+        _cleanup_empty_dirs_sudo(prefix)
+    else:
         _cleanup_empty_dirs(prefix)
 
-    # Remove registry entry
-    registry_file = prefix / "share" / "scls" / "registry" / f"{package_name}.yaml"
-    if registry_file.exists():
-        if dry_run:
-            print(f"  Would remove registry: {registry_file}")
-        else:
-            try:
-                registry_file.unlink()
-                print(f"  Removed registry entry")
-            except OSError as e:
-                print(f"  Warning: Could not remove registry entry: {e}")
+    if failed:
+        print(f"  ERROR: {failed} files could not be removed; registry entry kept, "
+              f"uninstall of {package_name} can be retried")
+        return False
+
+    if registry_target:
+        try:
+            if use_sudo:
+                run_sudo(['rm', '-f', '--', registry_target],
+                         f"remove registry entry of {package_name}")
+            else:
+                try:
+                    os.unlink(registry_target)
+                except FileNotFoundError:
+                    pass
+            print(f"  Removed registry entry")
+        except (BuildError, OSError) as e:
+            print(f"  ERROR: could not remove registry entry: {e}")
+            return False
 
     return True
+
+
+def _uninstall_needs_sudo(files: List[Path], registry_file: Path) -> bool:
+    """True if removing any existing target needs privilege (parent not writable)."""
+    if os.geteuid() == 0:
+        return False
+    dir_ok: Dict[str, bool] = {}
+    for path in list(files) + [registry_file]:
+        if not os.path.lexists(path):
+            continue
+        parent = os.path.dirname(os.path.normpath(str(path))) or '.'
+        if parent not in dir_ok:
+            dir_ok[parent] = _dir_writable(parent)
+        if not dir_ok[parent]:
+            return True
+    return False
+
+
+def _cleanup_empty_dirs_sudo(prefix: Path) -> None:
+    """
+    _cleanup_empty_dirs() for an unwritable prefix.
+
+    The same bottom-up walk (symlinks not followed, prefix and any path
+    containing 'registry' kept), but the directories that are, or become,
+    empty are collected first and then removed deepest-first with
+    `sudo rmdir`. A failed rmdir is not an error, as in the in-process walk.
+    """
+    removable = set()
+    ordered: List[str] = []
+    for dirpath, dirnames, filenames in os.walk(str(prefix), topdown=False):
+        if Path(dirpath) == prefix:
+            continue
+        if 'registry' in dirpath:
+            continue
+        if filenames:
+            continue
+        # dirnames includes symlinks to directories; those are never in
+        # `removable`, so a directory holding one is kept.
+        if all(os.path.join(dirpath, name) in removable for name in dirnames):
+            removable.add(dirpath)
+            ordered.append(dirpath)
+
+    for chunk in _chunks(ordered):
+        try:
+            subprocess.run(['sudo', 'rmdir', '--'] + chunk)
+        except OSError:
+            pass  # no sudo binary; as non-fatal as a failed rmdir
 
 
 def _cleanup_empty_dirs(prefix: Path) -> None:

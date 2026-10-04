@@ -63,7 +63,7 @@ on errors and interrupts, unless `--keep-work`.
 
 1. **Install type** — `local`: `~/.local/scls-hsl/<flavor>`, owner-only (0700/0600); Ipopt
    needs `hsllib <full path>`. `global`: the stack prefix `/opt/scls/<flavor>`, readable by
-   every user of the machine, owned by no package, published with `sudo install` (only the
+   every user of the machine, owned by no RPM/DEB package, published with `sudo install` (only the
    file copies run as root); Ipopt finds it with no option. `--local` / `--global`.
 2. **Licence type** — `academic` (HSL Academic Licence: personal, non-commercial use by you
    alone; the software and its use may not be shared with anyone, including colleagues at
@@ -113,7 +113,38 @@ gain beyond changing Ipopt's default `linear_solver` (set it in `ipopt.opt` inst
 <prefix>/share/doc/hsl/LICENCES/LICENCE.<package>-<version>   one per tarball used
 <prefix>/share/doc/hsl/PROVENANCE.txt   inputs, SHA-256, files replaced by overrides
 <prefix>/share/hsl/build-info.yaml      flavor, compilers, flags, DT_NEEDED, script hashes
+<prefix>/share/scls/registry/hsl.yaml   global install only: registry entry (see below)
 ```
+
+## Listing and removing a global install
+
+A global install writes a registry entry, `share/scls/registry/hsl.yaml`, so `./scls list`
+shows `hsl` next to the stack's packages. The entry is a record of this private install, not a
+package: there is still no recipe, spec, RPM, DEB or PKG, and nothing in the build order. Its
+compile and link flags are empty, so nothing links HSL through the registry. A local install
+(`~/.local/scls-hsl/<flavor>`) lies outside the stack prefix and gets no entry; remove it by
+deleting that directory.
+
+To remove a global install, from the SCLS checkout (the file list is `files/hsl.txt`):
+
+```bash
+python python/unix_builder.py --uninstall -p hsl -f <flavor>
+```
+
+This removes the library, the `libhsl` symlink, the licence copies, the provenance file, the
+acceptance record and the registry entry, using `sudo` when the prefix is not writable. Do not
+add `--with-deps`: that would also try to remove the stack packages it depends on (METIS,
+OpenBLAS or LAPACK, GCC) wherever no other package needs them.
+
+The entry lists the stack packages the library resolves against (`metis`, and where they are
+stack packages, `openblas` or `lapack`, and `gcc`), taken from the `needed:` record. That
+protects them only from `unix_builder.py --uninstall`, which refuses to remove a package
+another entry depends on. On RPM and DEB hosts the package manager does not read the registry:
+`dnf remove` or `apt-get remove` of `scls-<flavor>-metis` will go ahead and leave the private
+library unable to load. Remove HSL first, or rebuild it afterwards.
+
+An install made before the registry entry existed has none; `./scls build hsl` followed by
+a global `./scls install hsl` adds it.
 
 Never share the library, the assembled sources or the tarballs beyond what your own HSL
 licence permits. Only the SCLS scripts are public.

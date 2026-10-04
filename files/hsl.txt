@@ -1,0 +1,7 @@
+%{prefix}/lib/libhsl.so
+%{prefix}/lib/libhsl.dylib
+%{prefix}/lib/libcoinhsl.so
+%{prefix}/lib/libcoinhsl.dylib
+%{prefix}/share/doc/hsl/PROVENANCE.txt
+%{prefix}/share/doc/hsl/LICENCES/*
+%{prefix}/share/hsl/build-info.yaml
