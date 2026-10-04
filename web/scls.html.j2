@@ -259,11 +259,11 @@
     </div>
     <p>First, install the release package for your distribution (choose one):</p>
     <p>Enterprise Linux 9:</p>
-    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el9/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm">https://belfem.lbl.gov/scls/el9/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el9.noarch.rpm</a></code></pre>
+    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el9/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-{{ scls_release_rpm_release }}.el9.noarch.rpm">https://belfem.lbl.gov/scls/el9/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-{{ scls_release_rpm_release }}.el9.noarch.rpm</a></code></pre>
     <p>Enterprise Linux 10:</p>
-    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el10/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el10.noarch.rpm">https://belfem.lbl.gov/scls/el10/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.el10.noarch.rpm</a></code></pre>
+    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/el10/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-{{ scls_release_rpm_release }}.el10.noarch.rpm">https://belfem.lbl.gov/scls/el10/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-{{ scls_release_rpm_release }}.el10.noarch.rpm</a></code></pre>
     <p>Amazon Linux 2023:</p>
-    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/amzn2023/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.amzn2023.noarch.rpm">https://belfem.lbl.gov/scls/amzn2023/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-1.amzn2023.noarch.rpm</a></code></pre>
+    <pre class="command"><code>sudo dnf install <a href="https://belfem.lbl.gov/scls/amzn2023/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-{{ scls_release_rpm_release }}.amzn2023.noarch.rpm">https://belfem.lbl.gov/scls/amzn2023/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-{{ scls_release_rpm_release }}.amzn2023.noarch.rpm</a></code></pre>
     <p>Then install a flavor:</p>
     <pre class="command"><code>sudo dnf install scls-&lt;flavor&gt;</code></pre>
     <p>RPM builds also provide an optional examples meta-package. Install <code>scls-&lt;flavor&gt;-examples</code> if you want the upstream PETSc, SLEPc, and SUNDIALS example sources on disk.</p>
@@ -289,11 +289,11 @@
     </table>
     </div>
     <p>Unlike <code>dnf</code>, <code>apt</code> does not install packages directly from a URL. Download and install the keyring and repository-configuration package for your release first. On Ubuntu 26.04:</p>
-    <pre class="command"><code>wget <a href="https://belfem.lbl.gov/scls/ubuntu/resolute/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb">https://belfem.lbl.gov/scls/ubuntu/resolute/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</a>
-sudo apt install ./scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</code></pre>
+    <pre class="command"><code>wget <a href="https://belfem.lbl.gov/scls/ubuntu/resolute/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-{{ keyring_release['resolute'] }}_all.deb">https://belfem.lbl.gov/scls/ubuntu/resolute/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-{{ keyring_release['resolute'] }}_all.deb</a>
+sudo apt install ./scls-archive-keyring_{{ scls_release_pkg_version }}-{{ keyring_release['resolute'] }}_all.deb</code></pre>
     <p>On Ubuntu 24.04:</p>
-    <pre class="command"><code>wget <a href="https://belfem.lbl.gov/scls/ubuntu/noble/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb">https://belfem.lbl.gov/scls/ubuntu/noble/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</a>
-sudo apt install ./scls-archive-keyring_{{ scls_release_pkg_version }}-1_all.deb</code></pre>
+    <pre class="command"><code>wget <a href="https://belfem.lbl.gov/scls/ubuntu/noble/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-{{ keyring_release['noble'] }}_all.deb">https://belfem.lbl.gov/scls/ubuntu/noble/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-{{ keyring_release['noble'] }}_all.deb</a>
+sudo apt install ./scls-archive-keyring_{{ scls_release_pkg_version }}-{{ keyring_release['noble'] }}_all.deb</code></pre>
     <p>This installs the SCLS public key at <code>/etc/apt/keyrings/scls-archive-keyring.gpg</code> and a deb822-format <code>scls.sources</code> file at <code>/etc/apt/sources.list.d/</code>. If you prefer to configure the repository by hand, install the key at that path and write the equivalent <code>/etc/apt/sources.list.d/scls.sources</code> yourself, for example on Ubuntu 26.04:</p>
     <pre class="command"><code>Types: deb
 URIs: https://belfem.lbl.gov/scls/ubuntu/resolute

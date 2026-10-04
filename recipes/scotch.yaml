@@ -1,6 +1,6 @@
 name: scotch
 version: 7.0.15
-release: 1
+release: 2
 summary: Graph, mesh and hypergraph partitioning library
 homepage: https://www.labri.fr/perso/pelegrin/scotch/
 license: CeCILL-C
@@ -27,11 +27,29 @@ requires:
   all:
     - cmake
     - openmpi
+  # liblzma for scotch's .xz graph-file support. The Apple SDK has zlib and
+  # bzip2 but no lzma.h, so macOS builds xz in-stack (recipes/xz.yaml).
+  # Merged with all: (build_order.normalize_dependencies).
+  macos:
+    - xz
 
+# Compressed graph files (gzip, bzip2, xz) are on everywhere, from the
+# distro libraries on Linux (Christian, 2026-10-03). Declared explicitly
+# because AutoReqProv is off; before 7.0.15-2 they came in only when the
+# build host happened to have the -devel packages.
 rpm_build_requires:
   all:
     - bison
     - flex
+    - zlib-devel
+    - bzip2-devel
+    - xz-devel
+
+rpm_requires:
+  all:
+    - zlib
+    - bzip2-libs
+    - xz-libs
 
 features:
   fortran: true
@@ -50,10 +68,15 @@ configure:
     - "-DBUILD_PTSCOTCH=ON"
     - "-DINSTALL_METIS_HEADERS=OFF"
     - "-DTHREADS=OFF"
-    # Disable compression support (reduces dependencies)
-    - "-DCOMMON_FILE_COMPRESS_BZ2=OFF"
-    - "-DCOMMON_FILE_COMPRESS_GZ=OFF"
-    - "-DCOMMON_FILE_COMPRESS_LZMA=OFF"
+    # Compressed graph-file support, all three formats on every flavor
+    # (Christian, 2026-10-03). The COMMON_FILE_COMPRESS_*=OFF flags these
+    # replace were never read by scotch's CMake, so the result used to depend
+    # on which -devel packages the build host had. find_package() is not
+    # REQUIRED upstream (src/CMakeLists.txt:161-172); configure.post below
+    # turns a missing library into a build failure.
+    - "-DUSE_ZLIB=ON"
+    - "-DUSE_BZ2=ON"
+    - "-DUSE_LZMA=ON"
   # Integer interface: LP64 (32-bit) vs ILP64 (64-bit)
   # Scotch uses INTSIZE cmake option
   lp64_args:
@@ -62,6 +85,11 @@ configure:
     - "-DINTSIZE=64"
   optimization:
     O_level: 2
+  # CMake caches FIND_PACKAGE_MESSAGE_DETAILS_<pkg> only when the package was
+  # found. The RPM spec runs this from build/, unix_builder from the source
+  # root, so look in both.
+  post:
+    - "c=CMakeCache.txt; [ -f \"$c\" ] || c=build/CMakeCache.txt; for p in ZLIB BZip2 LibLZMA; do grep -q \"^FIND_PACKAGE_MESSAGE_DETAILS_$p:\" \"$c\" || { echo \"ERROR: scotch compression library $p not found\" >&2; exit 1; }; done"
 
 build:
   parallel: true

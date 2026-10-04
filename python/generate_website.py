@@ -10,6 +10,7 @@ from pathlib import Path
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 import argparse
+import ast
 
 
 def load_yaml(filepath):
@@ -158,6 +159,16 @@ def split_packages(packages, flavor_names, gpl3_flavor_name='macos'):
     return main, gpl3
 
 
+
+def _module_literal(path: Path, name: str):
+    """Value of a module-level `name = <literal>` assignment in `path`."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == name for t in node.targets):
+            return ast.literal_eval(node.value)
+    raise SystemExit(f"{name} not found in {path}")
+
 def main():
     parser = argparse.ArgumentParser(description='Generate SCLS website from recipes')
     parser.add_argument('--recipes', default='recipes', help='Directory containing recipe YAML files')
@@ -183,6 +194,15 @@ def main():
     # match the artifacts produced by `./scls build scls-release`.
     env_recipe = load_yaml(Path(args.recipes) / 'environment.yaml')
     scls_release_pkg_version = str(env_recipe.get('version', '1'))
+    # The releases are not recipe fields: scls-release's lives in rpm_builder,
+    # the keyring's per Ubuntu codename in deb_builder. Read the literals
+    # rather than import the builders (deb_builder needs Python >= 3.10, and
+    # makeweb runs whatever python3 the host has).
+    python_dir = Path(__file__).resolve().parent
+    scls_release_rpm_release = str(_module_literal(
+        python_dir / 'rpm_builder.py', 'SCLS_RELEASE_RPM_RELEASE'))
+    keyring_release = {k: str(v) for k, v in _module_literal(
+        python_dir / 'deb_builder.py', 'KEYRING_RELEASE_BY_CODENAME').items()}
 
     # Setup Jinja2
     template_dir = Path(args.template).parent
@@ -219,6 +239,8 @@ def main():
         'release_version': args.release_version,
         'release_year': release_year,
         'scls_release_pkg_version': scls_release_pkg_version,
+        'scls_release_rpm_release': scls_release_rpm_release,
+        'keyring_release': keyring_release,
         'generation_date': datetime.now().strftime('%B %d, %Y'),
         'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }

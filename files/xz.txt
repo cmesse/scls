@@ -1,0 +1,7 @@
+%{prefix}/include/lzma.h
+%{prefix}/include/lzma
+%{prefix}/lib/liblzma.dylib
+%{prefix}/lib/liblzma.*.dylib
+%{prefix}/lib/pkgconfig/liblzma.pc
+%{prefix}/share/licenses/xz/COPYING
+%{prefix}/share/licenses/xz/COPYING.0BSD

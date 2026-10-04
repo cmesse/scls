@@ -1,5 +1,6 @@
 name: gperftools
 version: 2.18.1
+release: 2
 summary: Very fast malloc and performance analysis tools
 homepage: https://github.com/gperftools/gperftools
 license: BSD
@@ -45,6 +46,18 @@ configure:
     - "--disable-static"
     - "--enable-shared"
     - "--enable-libunwind"
+  # RPM %build exports LDFLAGS with -L%{prefix}/lib but no include path, so
+  # configure did not find the stack's libunwind.h and silently built
+  # without libunwind (el9/el10/amzn 2.18.1-1; the DEB env finds it through
+  # CPATH). Linux only: macOS has no libunwind recipe. Christian, 2026-10-03.
+  platform_env:
+    linux:
+      CPPFLAGS: "-I%{prefix}/include"
+  # --enable-libunwind falls back silently when the header or -lunwind is
+  # missing. Upstream defines USE_LIBUNWIND in src/config.h only when both
+  # work (configure.ac:275-280); refuse to build without it on Linux.
+  post:
+    - "if [ \"$(uname -s)\" = Linux ] && ! grep -q '^#define USE_LIBUNWIND 1' src/config.h; then echo 'ERROR: gperftools configured without libunwind' >&2; exit 1; fi"
 
 build:
   parallel: true

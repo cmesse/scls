@@ -1,0 +1,64 @@
+name: xz
+version: 5.8.4
+summary: XZ Utils data compression library (liblzma)
+homepage: https://tukaani.org/xz/
+license: 0BSD
+# liblzma only. The Apple SDK ships zlib and bzip2 but no lzma.h, and scotch's
+# .xz graph-file support needs it (Christian, 2026-10-03). Linux flavors,
+# lbl included, use the distro xz-devel/xz-libs instead.
+
+source:
+  url: https://github.com/tukaani-project/xz/releases/download/v%{version}/xz-%{version}.tar.gz
+
+update:
+  # Not pinned; only 5.6.0 and 5.6.1 are banned (the CVE-2024-3094 backdoor).
+  # exclude_pattern is applied by the github_tag strategy only.
+  strategy: github_tag
+  repo: tukaani-project/xz
+  tag_prefix: "v"
+  exclude_pattern: '^5\.6\.[01]$'
+
+include_flavors:
+  - macos
+
+features:
+  fortran: false
+  mpi: false
+  openmp: false
+  math: false
+
+configure:
+  type: autotools
+  # Second line of defence for the ban above, if the version is ever set by hand.
+  pre:
+    - "case \"%{version}\" in 5.6.0|5.6.1) echo 'ERROR: xz %{version} is the backdoored release (CVE-2024-3094)' >&2; exit 1;; esac"
+  # Library only (LFS ch. 6, without the cross-compile flags). The xz tools
+  # would shadow the system's, and the scripts (xzgrep, xzdiff, ...) are
+  # GPLv2+, which doc/LICENSE_POLICY.md keeps out of binary packages.
+  args:
+    - "--disable-static"
+    - "--disable-xz"
+    - "--disable-xzdec"
+    - "--disable-lzmadec"
+    - "--disable-lzmainfo"
+    - "--disable-lzma-links"
+    - "--disable-scripts"
+    - "--disable-doc"
+    - "--disable-nls"
+  optimization:
+    O_level: 2
+
+build:
+  parallel: true
+
+test:
+  commands:
+    - "make check"
+
+install:
+  post:
+    # COPYING states which parts are under which licence; COPYING.0BSD is the
+    # liblzma text. The builders remove liblzma.la themselves.
+    - "mkdir -p %{prefix}/share/licenses/xz"
+    - "install -m 644 COPYING %{prefix}/share/licenses/xz/COPYING"
+    - "install -m 644 COPYING.0BSD %{prefix}/share/licenses/xz/COPYING.0BSD"

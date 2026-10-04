@@ -1368,7 +1368,7 @@ fi
 {chr(10).join(files_list)}
 
 %changelog
-* {datetime.now().strftime('%a %b %d %Y')} SCLS Builder <scls@lbl.gov> - {self.recipe['version']}-1
+* {datetime.now().strftime('%a %b %d %Y')} SCLS Builder <scls@lbl.gov> - {self.recipe['version']}-{self.get_release_string()}
 - Initial package
 """
 
@@ -2589,9 +2589,12 @@ def build_flavor_meta_package(flavor: str, spec_only: bool = False) -> None:
     description = flavor_config.get('description',
                                     f'SCLS {flavor} flavor — complete installation')
 
-    # Use the environment recipe version as the meta-package version
+    # Use the environment recipe version as the meta-package version, and its
+    # meta_release as the release: a published NEVRA is never replaced, so a
+    # change to the meta's Requires within a stack year needs a new release.
     env_recipe = load_recipe('environment')
     version = env_recipe.get('version', '1.0')
+    release = str(env_recipe.get('meta_release', 1))
 
     changelog_date = datetime.now().strftime('%a %b %d %Y')
 
@@ -2601,7 +2604,7 @@ def build_flavor_meta_package(flavor: str, spec_only: bool = False) -> None:
 
 Name:           {scls_name}
 Version:        {version}
-Release:        1%{{?dist}}
+Release:        {release}%{{?dist}}
 Summary:        {description}
 License:        BSD-3-Clause-LBNL
 BuildArch:      noarch
@@ -2629,7 +2632,7 @@ SCLS_EOF
 {prefix}/share/scls/registry/{FLAVOR_META}.yaml
 
 %changelog
-* {changelog_date} SCLS Builder <scls@lbl.gov> - {version}-1
+* {changelog_date} SCLS Builder <scls@lbl.gov> - {version}-{release}
 - Flavor meta-package for {flavor}
 """
 
@@ -2754,6 +2757,9 @@ only if you want the upstream example sources on disk.
 # ---------------------------------------------------------------------------
 
 SCLS_RELEASE = 'scls-release'
+# scls-release's own Release. Its content is unchanged within a stack year;
+# bump this to respin it. python/generate_website.py links this release.
+SCLS_RELEASE_RPM_RELEASE = '1'
 
 
 def _detect_scls_repo_dir() -> str:
@@ -2814,7 +2820,7 @@ def build_scls_release_package(spec_only: bool = False) -> None:
 
     env_recipe = load_recipe('environment')
     version = str(env_recipe.get('version', '1'))
-    release = '1'
+    release = SCLS_RELEASE_RPM_RELEASE
 
     changelog_date = datetime.now().strftime('%a %b %d %Y')
     spec_content = f"""\
@@ -2906,13 +2912,14 @@ def main():
                 # Install the meta-package RPM
                 rpm_base = Path(__file__).parent.parent / 'rpmbuild'
                 scls_name = f"scls-{args.flavor}"
-                rpm_files = sorted(
-                    (rpm_base / "RPMS").rglob(f"{scls_name}*.rpm"),
-                    key=lambda p: p.stat().st_mtime, reverse=True
-                )
+                # `{scls_name}*.rpm` would also match every scls-<flavor>-<pkg>
+                # RPM and every older meta release; take the meta itself (its
+                # version starts with a digit) and only its newest release.
+                rpm_files = list((rpm_base / "RPMS").rglob(f"{scls_name}-[0-9]*.rpm"))
                 if not rpm_files:
                     raise BuildError(f"No built RPMs found for {scls_name}")
-                _dnf_install_rpms(rpm_files, load_flavor(args.flavor))
+                newest, _ = _newest_rpms_by_name(rpm_files)
+                _dnf_install_rpms(newest, load_flavor(args.flavor))
             else:
                 build_flavor_meta_package(args.flavor, spec_only=args.spec_only)
             return

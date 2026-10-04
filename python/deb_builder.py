@@ -1977,10 +1977,12 @@ def build_flavor_meta_package(flavor: str) -> Path:
     depends = [f"scls-{flavor}-{_deb_name(pkg)}" for pkg in packages
                if pkg not in META_EXCLUDED]
 
-    # Version: use the environment recipe's version, matching rpm_builder.
+    # Version and release: the environment recipe's version and meta_release,
+    # matching rpm_builder. A published NEVRA is never replaced, so changing the
+    # meta's Depends within a stack year needs a new meta_release.
     env_recipe = load_recipe('environment')
     version = str(env_recipe.get('version', '1.0'))
-    release = '1'
+    release = str(env_recipe.get('meta_release', 1))
     architecture = 'all'
     description = flavor_config.get(
         'description', f"SCLS {flavor} flavor — complete installation"
@@ -2183,16 +2185,19 @@ def build_scls_release_package() -> Path:
 
 
 def install_flavor_meta_package(flavor: str) -> None:
-    """Install the most-recently-built scls-<flavor> meta .deb via apt-get."""
+    """Install the newest scls-<flavor> meta .deb via apt-get."""
     from build_order import FLAVOR_META  # noqa: F401  (keeps call-site aligned with rpm)
     scls_name = f"scls-{flavor}"
     out_dir = PROJECT_ROOT / 'work' / 'pkgs'
     # Architecture is always 'all' for meta; glob on it explicitly so we
     # don't accidentally pick up a same-named regular package if one ever
     # existed.
+    # Newest by version-release, not mtime (as in DebBuilder.install_deb):
+    # with meta_release bumps, 2026-1 and 2026-2 can both be in work/pkgs.
+    from rpm_builder import _version_sort_key
     candidates = sorted(
         out_dir.glob(f"{scls_name}_*_all.deb"),
-        key=lambda p: p.stat().st_mtime, reverse=True,
+        key=lambda p: _version_sort_key(p.name.split('_')[1]), reverse=True,
     )
     if not candidates:
         raise BuildError(

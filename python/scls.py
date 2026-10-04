@@ -250,9 +250,11 @@ def cmd_build(args, config: Dict) -> int:
 
     # scls-release: format-aware static-config package with no recipe. Same
     # one-off pattern as the flavor meta-package — the builders generate
-    # everything inline. On RPM hosts this produces scls-release-1-1.<dist>;
-    # on Ubuntu the builder emits scls-archive-keyring_1_all.deb (the user
-    # never has to type that name — `scls build scls-release` is enough).
+    # everything inline. On RPM hosts this produces
+    # scls-release-<year>-<SCLS_RELEASE_RPM_RELEASE>.<dist>; on Ubuntu the
+    # builder emits scls-archive-keyring_<year>-<per-codename release>_all.deb
+    # (the user never has to type that name — `scls build scls-release` is
+    # enough).
     if package == 'scls-release':
         if pkg_format == 'rpm':
             return _build_rpm(package, flavor)

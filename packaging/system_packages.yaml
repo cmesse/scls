@@ -51,6 +51,9 @@ ncurses:                  libncurses6
 openssl:                  libssl3
 python3:                  python3
 zlib:                     zlib1g
+# scotch 7.0.15-2 Requires the compression runtimes explicitly (AutoReqProv off).
+bzip2-libs:               libbz2-1.0
+xz-libs:                  liblzma5
 # UCX runtime transports (declared explicitly so the installed package
 # pulls them in; UCX dlopen's transports at runtime and silently falls
 # back to TCP without them).
@@ -63,12 +66,13 @@ libibverbs:               [libibverbs1, libibmad5, libibumad3]
 librdmacm:                librdmacm1
 
 # Development headers
-# bzip2-devel: no recipe declares it. el9 build hosts have it installed, so netcdf
-# (and scotch) link system libbz2; Ubuntu hosts install libbz2-dev as host prep
-# (doc/BUILD_EXECUTION.md 1.1b). Christian, 2026-09-30.
+# bzip2-devel: scotch declares it (7.0.15-2). netcdf still relies on the host
+# package: el9 build hosts have it installed; Ubuntu hosts install libbz2-dev as
+# host prep (doc/BUILD_EXECUTION.md 1.1b). Christian, 2026-09-30.
 bzip2-devel:              libbz2-dev
 # Same treatment for xz and zstd (Christian, 2026-09-30): el9 links liblzma
-# (libunwind minidebuginfo, scotch) and libzstd (netcdf) from host packages.
+# (libunwind minidebuginfo) and libzstd (netcdf) from host packages; scotch
+# declares xz-devel itself since 7.0.15-2.
 xz-devel:                 liblzma-dev
 libzstd-devel:            libzstd-dev
 gmp-devel:                libgmp-dev

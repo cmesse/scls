@@ -8,6 +8,12 @@
   "Restoration Failed" (devlog/dl20261003_spral_recipe.md). `OMP_PROC_BIND`,
   which SPRAL also asks for, is deliberately not set, since it would pin the
   threads of every OpenMP program.
+- New field `meta_release: 2` for the flavor meta-packages (not this
+  package's release). `scls-<flavor>` becomes 2026-2 on RPM and DEB because
+  spral and ipopt join its Requires; 2026-1 is already published and is
+  never replaced. Both builders, `scripts/deb_drop_select.py`, and the
+  website's scls-release/keyring links now read real releases instead of
+  assuming 1 (Christian, 2026-10-03).
 
 ## Version 2026-2 - Sun Sep 13 2026
 - Declare the host toolchain as a runtime dependency. The installed stack

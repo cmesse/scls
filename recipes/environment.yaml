@@ -1,6 +1,13 @@
 name: environment
 version: "2026"
 release: 3
+# Release of the flavor meta-packages scls-<flavor> (rpm_builder, deb_builder,
+# scripts/deb_drop_select.py), separate from `release`, which is this
+# package's own. The meta's version is `version` above. A published NEVRA is
+# never replaced, so any change to the meta's Requires within a stack year
+# needs a bump here. 2: spral and ipopt join the 2026 stack (Christian,
+# 2026-10-03). scls-<flavor>-examples stays at release 1.
+meta_release: 2
 summary: SCLS environment setup, activation scripts, and configuration
 license: BSD-3-Clause
 bootstrap: true

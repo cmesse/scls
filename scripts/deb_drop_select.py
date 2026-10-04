@@ -148,8 +148,8 @@ def main():
 
         # Generated packages have no recipe of their own, but their versions still
         # follow one: environment is version-release of recipes/environment.yaml,
-        # the metas are its version with release 1 (deb_builder hard-codes it), and
-        # the keyring its version with deb_builder's per-codename release.
+        # the metas are its version with its meta_release (default 1), and the
+        # keyring its version with deb_builder's per-codename release.
         # Checked here because they skip the source-package path.
         if generated:
             env = yaml.safe_load((repo / 'recipes' / 'environment.yaml').read_text())
@@ -158,7 +158,7 @@ def main():
             elif name == 'scls-archive-keyring':
                 want = f"{env['version']}-{keyring_release()}"
             else:
-                want = f"{env['version']}-1"
+                want = f"{env['version']}-{env.get('meta_release', 1)}"
             if want != ver:
                 print(f'excluded\t{nva}  reason: installed {ver} does not match expected {want}')
                 continue
