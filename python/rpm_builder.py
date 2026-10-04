@@ -25,6 +25,7 @@ from build_common import (
     get_configure_args, get_cmake_args,
     check_package_installed,
     get_package_dependencies,
+    get_registry_pc_name,
     add_rpath_for_libdirs,
     get_all_registry_entries,
     get_subpackages_for_flavor,
@@ -1685,6 +1686,7 @@ fi
             'subpackages': self.get_subpackages_for_spec(),
             'registry_cflags': registry_cflags,
             'registry_ldflags': registry_ldflags,
+            'registry_pc_name': get_registry_pc_name(self.recipe, self.package),
         }
 
         # Add extra source info as individual variables (e.g., gmp_version, gmp_tarball)

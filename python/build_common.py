@@ -1200,6 +1200,21 @@ def get_package_version(prefix: Path, package_name: str) -> Optional[str]:
     return None
 
 
+def get_registry_pc_name(recipe: Optional[Dict], package_name: str) -> str:
+    """
+    Return the pkg-config module name used for a package's registry flags.
+
+    Defaults to the package name. A recipe sets `registry: pc_name:` when
+    upstream installs its .pc file under another name (xz -> liblzma.pc).
+    The name is passed to pkg-config and written into the RPM %post
+    scriptlet, so it is restricted to plain module-name characters.
+    """
+    pc_name = ((recipe or {}).get('registry') or {}).get('pc_name', package_name)
+    if not isinstance(pc_name, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.+-]*', pc_name):
+        raise ValueError(f"Invalid registry.pc_name for {package_name}: {pc_name!r}")
+    return pc_name
+
+
 def get_package_libs(prefix: Path, package_name: str) -> Optional[str]:
     """
     Get the link flags for a package using pkg-config.
@@ -1671,8 +1686,9 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None,
     has_pc_file = False
 
     try:
-        pc_cflags = get_package_cflags(prefix, package_name)
-        pc_ldflags = get_package_libs(prefix, package_name)
+        pc_name = get_registry_pc_name(recipe, package_name)
+        pc_cflags = get_package_cflags(prefix, pc_name)
+        pc_ldflags = get_package_libs(prefix, pc_name)
 
         # If pkg-config failed, try parsing .pc file directly. The lib ->
         # lib64 symlink (created by the environment package on the live
@@ -1680,7 +1696,7 @@ def write_registry_entry(prefix: Path, recipe: Dict, flavor_name: str = None,
         # buildroots) means lib/pkgconfig/ resolves regardless of which
         # libdir the package's build system targeted.
         pkgconfig_dir = prefix / "lib" / "pkgconfig"
-        pc_file = pkgconfig_dir / f"{package_name}.pc"
+        pc_file = pkgconfig_dir / f"{pc_name}.pc"
 
         if pc_cflags is None and pc_ldflags is None and pc_file.exists():
             pc_cflags, pc_ldflags = parse_pc_file(pc_file, install_prefix)
@@ -1908,11 +1924,49 @@ def get_reverse_dependencies(prefix: Path, package_name: str) -> List[str]:
     for pkg_name, entry in all_entries.items():
         if pkg_name == package_name:
             continue
-        deps = entry.get('dependencies', [])
+        # `or []`: RPM registry files written before 2026-10-03 carry a bare
+        # `dependencies:` key (YAML null) for dependency-free packages.
+        deps = entry.get('dependencies') or []
         if package_name in deps:
             reverse_deps.append(pkg_name)
 
     return sorted(reverse_deps)
+
+
+_MANIFEST_SO_RE = re.compile(r'^(lib[^*?\[\]/]+)\.so(?:\.(\*|[0-9][0-9.]*))?$')
+
+
+def _macos_library_candidates(abs_path: str, prefix_str: str) -> List[Path]:
+    """
+    Map a Linux shared-library manifest path to its macOS names.
+
+    files/<package>.txt is in Linux form (unix_builder.generate_rpm_file_list
+    rewrites .dylib to .so), so on macOS the installed libfoo.dylib and
+    libfoo.1.dylib match no manifest line. Only lines directly under
+    <prefix>/lib are mapped; plugins and modules below it keep .so on macOS:
+
+      libfoo.so      -> libfoo.dylib
+      libfoo.so.1.2  -> libfoo.1.2.dylib
+      libfoo.so.*    -> libfoo.<digits and dots>.dylib
+
+    This is a name mapping, not an ownership check: like every other manifest
+    line, a candidate that exists is treated as this package's file.
+    """
+    directory, base = os.path.split(abs_path)
+    if directory != os.path.join(prefix_str, 'lib'):
+        return []
+    match = _MANIFEST_SO_RE.match(base)
+    if not match:
+        return []
+    stem, version = match.groups()
+    if version is None:
+        return [Path(directory) / f"{stem}.dylib"]
+    if version != '*':
+        return [Path(directory) / f"{stem}.{version}.dylib"]
+    import glob
+    versioned = re.compile(re.escape(stem) + r'\.[0-9][0-9.]*\.dylib')
+    return [Path(p) for p in sorted(glob.glob(os.path.join(glob.escape(directory), f"{stem}.*.dylib")))
+            if versioned.fullmatch(os.path.basename(p))]
 
 
 def get_package_files(prefix: Path, package_name: str) -> List[Path]:
@@ -1920,6 +1974,8 @@ def get_package_files(prefix: Path, package_name: str) -> List[Path]:
     Get the list of installed files for a package.
 
     Reads from files/{package}.txt and converts %{prefix} paths to absolute paths.
+    On macOS, shared-library lines also yield their .dylib names
+    (_macos_library_candidates).
 
     Args:
         prefix: The installation prefix
@@ -1956,6 +2012,9 @@ def get_package_files(prefix: Path, package_name: str) -> List[Path]:
                     files.append(Path(expanded))
             else:
                 files.append(Path(abs_path))
+
+            if sys.platform == 'darwin':
+                files.extend(_macos_library_candidates(abs_path, prefix_str))
 
     return files
 
@@ -2005,7 +2064,7 @@ def uninstall_package(
     if with_dependencies:
         entry = get_registry_entry(prefix, package_name)
         if entry:
-            deps = entry.get('dependencies', [])
+            deps = entry.get('dependencies') or []
             for dep in deps:
                 # Only add if no other package needs it
                 dep_reverse_deps = get_reverse_dependencies(prefix, dep)

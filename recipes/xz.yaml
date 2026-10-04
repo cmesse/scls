@@ -64,7 +64,10 @@ install:
     - "install -m 644 COPYING %{prefix}/share/licenses/xz/COPYING"
     - "install -m 644 COPYING.0BSD %{prefix}/share/licenses/xz/COPYING.0BSD"
 
-# xz installs liblzma.pc, not xz.pc, so give the registry the full flags.
+# xz installs liblzma.pc, not xz.pc: name the module for the registry's
+# pkg-config probe. The explicit flags carry the rpath themselves, because
+# the RPM %post only adds it when the host has pkg-config (lbl may not).
 registry:
+  pc_name: liblzma
   cflags: "-I%{prefix}/include"
-  ldflags: "-L%{prefix}/lib -llzma"
+  ldflags: "-L%{prefix}/lib -Wl,-rpath,%{prefix}/lib -llzma"

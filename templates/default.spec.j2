@@ -367,10 +367,14 @@ name: {{ package_name }}
 version: {{ version }}
 license: {{ license }}
 summary: {{ summary }}
+{% if package_dependencies %}
 dependencies:
 {% for dep in package_dependencies %}
   - {{ dep }}
 {% endfor %}
+{% else %}
+dependencies: []
+{% endif %}
 cflags: {{ registry_cflags }}
 ldflags: {{ registry_ldflags }}
 features:
@@ -410,14 +414,15 @@ find %{buildroot}%{prefix} -mindepth 2 -type d \
 {{ cmd }}
 {% endfor %}
 
+{# The pkg-config module is the package name unless the recipe sets registry.pc_name. #}
 # Update registry with pkg-config flags if .pc file exists. Scope
 # PKG_CONFIG_PATH to the SCLS prefix so we don't pick up host-system .pc
 # files that happen to share a name. lib/pkgconfig resolves through the
 # lib -> lib64 symlink owned by the environment package.
 SCLS_PCPATH="%{prefix}/lib/pkgconfig"
-if PKG_CONFIG_PATH="$SCLS_PCPATH" pkg-config --exists {{ package_name }} 2>/dev/null; then
-    PC_CFLAGS=$(PKG_CONFIG_PATH="$SCLS_PCPATH" pkg-config --cflags {{ package_name }} 2>/dev/null || echo "")
-    PC_LDFLAGS=$(PKG_CONFIG_PATH="$SCLS_PCPATH" pkg-config --libs {{ package_name }} 2>/dev/null || echo "")
+if PKG_CONFIG_PATH="$SCLS_PCPATH" pkg-config --exists {{ registry_pc_name }} 2>/dev/null; then
+    PC_CFLAGS=$(PKG_CONFIG_PATH="$SCLS_PCPATH" pkg-config --cflags {{ registry_pc_name }} 2>/dev/null || echo "")
+    PC_LDFLAGS=$(PKG_CONFIG_PATH="$SCLS_PCPATH" pkg-config --libs {{ registry_pc_name }} 2>/dev/null || echo "")
     # Sanity: if the upstream .pc baked the rpmbuild BUILDROOT path,
     # don't propagate it into the registry — leave the spec-time defaults
     # already written above in place. We only check for BUILDROOT/ here

@@ -561,7 +561,7 @@ def cmd_list(args, config: Dict) -> int:
     for name in sorted(entries.keys()):
         entry = entries[name]
         version = entry.get('version', '?')
-        deps = ', '.join(entry.get('dependencies', [])) or '-'
+        deps = ', '.join(entry.get('dependencies') or []) or '-'
         # Truncate deps if too long
         if len(deps) > 30:
             deps = deps[:27] + '...'
@@ -611,7 +611,7 @@ def cmd_info(args, config: Dict) -> int:
     if entry:
         print(f"\nInstalled:")
         print(f"  Version:      {entry.get('version', 'unknown')}")
-        print(f"  Dependencies: {', '.join(entry.get('dependencies', [])) or 'none'}")
+        print(f"  Dependencies: {', '.join(entry.get('dependencies') or []) or 'none'}")
 
         # Show reverse dependencies
         reverse_deps = get_reverse_dependencies(prefix, package)

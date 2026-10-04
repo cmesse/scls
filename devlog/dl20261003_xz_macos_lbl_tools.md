@@ -56,11 +56,11 @@ against the stack's liblzma is untested.
   minidebuginfo probe sees the prefix `lzma.h` (`%build` exports `PKG_CONFIG_PATH` and `-L`, not
   `CPATH`), by `readelf -d libunwind.so`; scotch's `FindLibLZMA` picking the prefix copy; host gcc
   accepting `-march=x86-64-v3` for the bootstrap build.
-- **macOS uninstall vs `.so` manifests.** `build_common.get_package_files()` reads
+- (fixed, see Follow-up) **macOS uninstall vs `.so` manifests.** `build_common.get_package_files()` reads
   `files/<pkg>.txt` literally, so `liblzma.so*` does not match the dylibs and they stay behind on
   `uninstall`. Same pre-existing shape as `files/gmp.txt`; one manifest cannot serve RPM `%files`
   and macOS. Builder question, not changed here.
-- **RPM registry for xz:** bare `dependencies:` key (null) for a dependency-free bootstrap package
+- (fixed, see Follow-up) **RPM registry for xz:** bare `dependencies:` key (null) for a dependency-free bootstrap package
   (`templates/default.spec.j2`, read by `python/scls.py` with `', '.join`), and no rpath rewrite
   because `%post` probes `pkg-config --exists xz`. Both pre-existing builder behaviour.
 
@@ -69,3 +69,32 @@ against the stack's liblzma is untested.
 - recipes/xz.yaml, files/xz.txt, changelogs/xz.md
 - recipes/libunwind.yaml, changelogs/libunwind.md
 - recipes/scotch.yaml, changelogs/scotch.md
+
+## Follow-up, same day: three builder fixes (Christian approved, 2026-10-03)
+
+The three builder items under Open Questions are fixed. Plan and implementation each had a blind
+Codex + Grok round (`tmp/ai_exchange/plan_registry_uninstall_fixes.md`,
+`impl_registry_uninstall_fixes.md`). No package is recompiled and no release moves.
+
+- **macOS uninstall.** `build_common.get_package_files()` now also yields the macOS names for
+  shared-library manifest lines directly under `<prefix>/lib` (`libfoo.so` → `libfoo.dylib`,
+  `libfoo.so.1.2` → `libfoo.1.2.dylib`, `libfoo.so.*` → `libfoo.<digits>.dylib`). Lines in
+  subdirectories (Open MPI `mca_*.so`, OpenSSL modules) are not mapped. It is a name mapping, not an
+  ownership check. Gate: `unix_builder.py --package gmp --uninstall --dry-run --force` on macOS
+  lists `libgmp.dylib`, `libgmp.10.dylib`, `libgmpxx.dylib`, `libgmpxx.4.dylib`. No real uninstall
+  was run.
+- **Null `dependencies:`.** `templates/default.spec.j2` writes `dependencies: []` for a
+  dependency-free package (cmake on every RPM flavor; binutils and xz on lbl), and the four readers
+  (`python/scls.py` list/info, `build_common.py` reverse dependencies and recursive uninstall) use
+  `entry.get('dependencies') or []`, so registry files already installed stay readable.
+  `scripts/build_libhsl.py:588` still writes the bare key when it finds no dependencies; the
+  readers tolerate it.
+- **`registry.pc_name`.** New optional recipe key, default the package name, validated as a plain
+  module name. Used by the RPM `%post` probe and by `write_registry_entry`. `recipes/xz.yaml` sets
+  `pc_name: liblzma`, and its explicit `ldflags` now carry `-Wl,-rpath,%{prefix}/lib`, because the
+  `%post` rewrite only runs when the host has `pkg-config` (Codex P1). RPM and DEB/unix registry
+  flags are still not guaranteed identical: `%post` replaces recipe flags with pkg-config output,
+  `write_registry_entry` lets recipe flags win.
+- Spec check (`--spec-only`, gcc and lbl): scotch and hdf5 unchanged; cmake and binutils differ by
+  the one `dependencies: []` line; lbl xz also probes `liblzma`.
+- Still open: RPM `%post` on a Linux host; a real macOS uninstall.
