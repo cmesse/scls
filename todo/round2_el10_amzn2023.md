@@ -2,9 +2,9 @@
 
 **Written:** 2026-10-03, from the R9 session, for the R10 and AMZN build hosts.
 **Columns:** R10 debug/gcc/mkl, AMZN gcc/mkl (AMZN has no debug column).
-**Status of the reference host:** R9 debug is in progress. Results, and every problem hit there, are in
-`todo/r9_round2_20261003.md`. Read its Status and Blockers sections before starting, because a fix
-found on R9 may already be committed.
+**Status of the reference host:** R9 finished all three flavors on 2026-10-03, with every package below
+built, installed and checked. Results and the problems hit there are in
+`devlog/dl20261003_r9_round2.md` and `todo/r9_round2_20261003.md`. Nothing is staged yet.
 **Ruling (Christian, 2026-10-03):** round 2 is the final round over all distros and carries the whole
 open list. Upload only after the belfem coordinator's size OK **and** Christian's go-ahead.
 
@@ -22,8 +22,8 @@ open list. Upload only after the belfem coordinator's size OK **and** Christian'
 | libunwind | 1.8.3-3 | no triplet prefix; upstream test programs no longer shipped |
 | openmpi | 5.0.11-2 | `--with-prrte=internal` (campaign row 30) |
 | lapack | 3.12.1-2, **debug only** | `-ffp-contract=off` (campaign row 31) |
-| spral | 2025.09.18-1 (new) | **hold**: macOS fixes may still land; wait for the go |
-| ipopt | 3.14.20-1 (new) | **hold**, same reason |
+| spral | 2025.09.18-1 (new) | SSIDS for Ipopt; released for building 2026-10-03 (macOS done) |
+| ipopt | 3.14.20-1 (new) | links MUMPS and SPRAL; default solver stays mumps |
 
 The builder change behind hwloc and libunwind (D3) applies to every autotools package. The builder
 no longer passes `--target`, and every package fails to build if it installs a `<triplet>-<name>`
@@ -34,12 +34,17 @@ No consumer rebuild is needed: the SONAMEs of libscotch, libhwloc, libunwind and
 
 ## 1. Preflight (once per host)
 
-- [ ] Check out the commit named in R9's tracker (branch `ipopt` until it merges into `devel`). Every
-      R9 fix so far is in `ipopt` at or after `4a9354b`.
+- [ ] `git fetch && git switch ipopt && git pull`. Build from `origin/ipopt` at or after the commit
+      that carries this file (R9 built from `1f16d16` plus this documentation). Do not build from
+      `devel` until `ipopt` is merged there.
 - [ ] meson and ninja on `PATH` for spral: `python3 -m pip install --user meson ninja`, or link them
       from an existing venv into `~/.local/bin`. Do **not** put a venv's whole `bin/` on `PATH`,
       because its `python3` would shadow the system one for every other build.
-- [ ] `sudo -n dnf --version` works without a prompt (`/grant-pkg-sudo`).
+- [ ] Passwordless sudo for the package manager. `sudo -n dnf --version` passing is **not** proof: a
+      cached login answers yes too, and on R9 an install failed mid-chain when the cache lapsed.
+      Check that `/etc/sudoers.d/scls-build` exists (`sudo -n scripts/grant_pkg_sudo.sh --check`);
+      if it doesn't, Christian runs `scripts/grant_pkg_sudo.sh --user <user> --scope all --apply`
+      (`/grant-pkg-sudo`). Without it, keep the login warm with `sudo -n -v` every minute.
 - [ ] The new build dependencies install cleanly: `sudo dnf install zlib-devel bzip2-devel xz-devel`.
       On AL2023, check that these names resolve before starting.
 - [ ] `flavor.conf` is tracked (default `macos`). Set the flavor per section, and run
@@ -49,11 +54,10 @@ No consumer rebuild is needed: the SONAMEs of libscotch, libhwloc, libunwind and
 
 ```bash
 sed -i 's/^flavor: .*/flavor: <F>/' flavor.conf
-for p in environment libunwind gperftools hwloc lapack openmpi scotch; do   # lapack: debug only
+for p in environment libunwind gperftools hwloc lapack openmpi scotch spral ipopt _meta; do
+    [ "$p" = lapack ] && [ "<F>" != debug ] && continue                      # lapack: debug only
     ./scls build $p && ./scls install $p || break
 done
-# spral, ipopt: only after Christian's go
-./scls build _meta && ./scls install _meta                                   # last, after spral + ipopt
 ```
 
 `./scls build next` will **not** rebuild the meta-package if `2026-1` is installed (its registry
@@ -80,13 +84,48 @@ marker already exists), so build `_meta` explicitly. `./scls install _meta` inst
   are in the cache). `readelf -d <prefix>/lib/libscotch.so` NEEDs `libz.so.1`, `libbz2.so.1` and
   `liblzma.so.5`, and `rpm -q --requires scls-<F>-scotch` lists `zlib`, `bzip2-libs` and `xz-libs`.
   belfem compares these two.
-- **spral / ipopt** (after the go): see `todo/spral_recipe.md` "Shipping builds".
+- **spral:** the build log says `Library hwloc found: YES`; `meson test` is 9/9;
+  `readelf -d <prefix>/lib/libspral.so` NEEDs `libmetis` and `libhwloc.so.15` and nothing CUDA.
+- **ipopt:** `%check` passes, including hs071 with `linear_solver spral` ("Optimal Solution Found").
+  On mkl, configure reports MKL Pardiso.
+- **`_meta`:** `rpm -q scls-<F>` shows 2026-2.
+- **After each flavor:** `find <prefix> -name 'x86_64-redhat-linux-*'` returns nothing. Then the
+  multi-core SPRAL run: build `examples/hs071_cpp` from the Ipopt source tree against the installed
+  prefix (`source <prefix>/share/scls/activate`, `pkg-config --cflags --libs ipopt`, plus
+  `-Wl,-rpath,<prefix>/lib` because the `.pc` file carries no rpath), put `linear_solver spral` in
+  `ipopt.opt`, and run with `OMP_NUM_THREADS=<nproc>`. Activate must show `OMP_CANCELLATION=TRUE`
+  and no `OMP_PROC_BIND`.
 - **mkl, after the last package:** `scripts/check_mkl_linkage.sh --flavor mkl --prefix /opt/scls/mkl`
   passes. belfem's verifier now requires every object that NEEDs any `libmkl_*` to directly NEED
   `gf_lp64 + gnu_thread + core + libgomp`, with no second threading layer.
 
+## 3b. HSL script test (once per host, any one flavor; gcc on R9)
+
+Christian puts the licensee's `coinhsl-*.tar.gz` and `hsl_ma77-*.tar.gz` in `/tmp` on the VM. They
+are licensed: never copy them into the repo, a drop or an artifact. Christian's instruction for this
+test (2026-10-03): academic licence, single user, local install, then uninstall. Uninstalling is
+part of the test.
+
+```bash
+sed -i 's/^flavor: .*/flavor: gcc/' flavor.conf
+./scls build hsl --sources /tmp                                      # builds + checks, installs nothing
+./scls install hsl --local --licence academic --accept-licence       # ~/.local/scls-hsl/gcc, 0700/0600
+```
+
+- Build: every gate passes (symbols, no bundled METIS, dependencies resolve to the stack, dlopen
+  smoke test, `MA77 functional gate: PASS`); the log has no "Fortran 2018 deleted feature" lines;
+  the scratch tree under `/tmp/scls-hsl-*` holding HSL source is gone afterwards.
+- Use: with the hs071 binary from §3, `ipopt.opt` containing
+  `hsllib $HOME/.local/scls-hsl/gcc/lib/libhsl.so` and `linear_solver <s>` solves for each of
+  ma27, ma57, ma77, ma86, ma97.
+- Uninstall: `rm -rf ~/.local/scls-hsl/gcc` (a local install has no registry entry), then confirm
+  `find / -xdev -name 'libcoinhsl*' -o -name 'libhsl.*'` finds nothing.
+- Known upstream behaviour, not a failure of the test: with an `hsllib` that cannot be loaded, Ipopt
+  3.14.20 prints "Library loading failure" and then segfaults at exit.
+
 ## 4. Staging (`/stage-drop`, one flavor at a time)
 
+- **Not before Christian says so.** R9 itself has not staged yet (2026-10-03).
 - Column `R10` or `AMZN`. One drop in flight: the next one only after belfem promotes the previous.
 - New NEVRAs only. belfem's published list (2026-10-03): gperftools 2.18.1-1, openmpi 5.0.11-1,
   scotch 7.0.15-1, environment 2026-1/2026-2, `scls-<F>` 2026-1 are published, and spral/ipopt are not.
