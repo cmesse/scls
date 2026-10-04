@@ -558,8 +558,7 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   installed (rows 30–31 are `n/a` / `[x]` for U24). Built from `16c7f78`, spral from `d908cfc`.
   1 recipe fix, approved by Christian: `d908cfc` clears `CPATH` for spral on debug (unix/deb builders).
   mkl spral passed only with `MESON_TESTTHREADS=1` (`ssidst` 295 s against meson's 300 s limit).
-  **Open:** debug spral is installed from the build made before `d908cfc`'s wording amend (same
-  build configuration, earlier changelog text); its same-release rebuild timed out twice on
-  `ssidst` under host load and must be redone before debug is staged.
+  The same-release rebuild of debug spral timed out twice on `ssidst` under host load and passed
+  on the idle host at 15:42 (9/9), so all three flavors hold spral built from `d908cfc`.
   Every check in `todo/round2_el10_amzn2023.md` §3 passes; `check_mkl_linkage.sh` PASS on mkl; HSL
   script test passed on gcc. Not staged. Devlog: `devlog/dl20261004_u24_round2.md`.

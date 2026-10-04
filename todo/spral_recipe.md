@@ -42,8 +42,7 @@ Checks per flavor:
 | EL10 VM (R10) debug, gcc, mkl | [x] | [x] | [x] |
 | AMZN 2023 VM gcc, mkl | [x] | [x] | [x] |
 | lbl (LBL hosts) | [ ] | [ ] | [ ] |
-| U24 .deb gcc, mkl | [x] | [x] | [x] |
-| U24 .deb debug (spral: same-release rebuild open, `devlog/dl20261004_u24_round2.md`) | [x] | [ ] | [x] |
+| U24 .deb (debug, gcc, mkl) | [x] | [x] | [x] |
 | U26 .deb (debug, gcc, mkl) | [ ] | [ ] | [ ] |
 | macOS | [ ] | [ ] | [ ] |
 | intel (source build) | [ ] | [ ] | [ ] |
