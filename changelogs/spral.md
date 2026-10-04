@@ -32,3 +32,12 @@
   The stack's `activate` sets it when SPRAL is installed (environment
   2026-3). `OMP_PROC_BIND=TRUE` is recommended for performance, but it is
   not set globally because it pins every OpenMP program's threads.
+- debug on the unix/deb builders: `CPATH` is cleared for the configure and
+  compile steps (`configure.flavor_env`, 2026-10-04). Those builders put the
+  prefix on `CPATH`, so SPRAL's `cblas.h` probe enabled the CBLAS-gated
+  SSMFE C test, which cannot link against the reference BLAS (`cblas_*` is
+  in libcblas). The test is now skipped on debug, as it already was on RPM
+  builds. `rpm_builder` ignores `flavor_env`, so RPM build steps are unchanged.
+  The release stays 2025.09.18-1 because SPRAL is not published yet
+  (Christian, 2026-10-04); hosts that already built it rebuild at the same
+  release.

@@ -192,6 +192,30 @@ configure:
       - -Dliblapack_path=%{mklroot}/lib
       - -Dlibhwloc_path=%{prefix}/lib
       - -Dlibhwloc_include=%{prefix}/include
+  flavor_env:
+    debug:
+      # The unix/deb builders put <prefix>/include on CPATH
+      # (build_common.setup_environment), so meson's cblas.h probe
+      # (meson.build:99 with the SCLS patch) finds the stack's cblas.h and
+      # defines the CBLAS-gated SSMFE C test ssmfet_c. The BLAS/LAPACK part
+      # of the debug math line is -llapack -lblas, and reference libblas has
+      # no cblas_* symbols (they are in libcblas), so that test fails to link
+      # (U24, 2026-10-04). RPM builds have no prefix CPATH at setup and skip
+      # the test. Clearing CPATH makes the unix/deb builders skip it too.
+      # It is applied by patch_common.apply_configure_environment, which
+      # rpm_builder never calls, so RPM build steps are unchanged.
+      # The override is live for meson setup and meson compile; neither
+      # takes a header from CPATH (hwloc.h comes by -I from
+      # -Dlibhwloc_include above), so a new header dependency on the prefix
+      # must be passed explicitly. ssmfet_c stays out because the probe
+      # result is stored at meson setup; the test step's env is rebuilt with
+      # the prefix CPATH, and `meson test --no-rebuild` rebuilds nothing.
+      # Not -lcblas instead: under -Db_asneeded=false it would add libcblas
+      # to libspral.so's NEEDED on debug only. An empty CPATH adds no
+      # directory (not "."); keep the quotes, a YAML null would become the
+      # string "None". A host with a system-wide cblas.h would defeat this
+      # and need a probe patch. Approved by Christian, 2026-10-04.
+      CPATH: ""
   optimization:
     O_level: 3
 
