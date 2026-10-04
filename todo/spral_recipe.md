@@ -26,7 +26,9 @@ selects), with the pip user bin directory on `PATH`. Per flavor, in order: `envi
 
 Checks per flavor:
 - the spral build log says `Library hwloc found: YES` (upstream's hwloc probe is optional)
-- `meson test` 9/9
+- `meson test` passes with 0 failures: 9/9 on debug, mkl and every RPM build; 10/10 on the OpenBLAS
+  flavors of the unix/deb builders (gcc; macos expected), where the CBLAS-gated `ssmfet_c` is built
+  (`devlog/dl20261004_u24_round2.md`)
 - `readelf -d libspral.so`: prefix RPATH, metis/hwloc/math NEEDED, no CUDA
 - Ipopt `%check` passes, including the hs071 run with `linear_solver spral`
 - MKL flavors: configure reports MKL Pardiso, and
@@ -40,7 +42,9 @@ Checks per flavor:
 | EL10 VM (R10) debug, gcc, mkl | [x] | [x] | [x] |
 | AMZN 2023 VM gcc, mkl | [x] | [x] | [x] |
 | lbl (LBL hosts) | [ ] | [ ] | [ ] |
-| U24 / U26 .deb (debug, gcc, mkl) | [ ] | [ ] | [ ] |
+| U24 .deb gcc, mkl | [x] | [x] | [x] |
+| U24 .deb debug (spral: same-release rebuild open, `devlog/dl20261004_u24_round2.md`) | [x] | [ ] | [x] |
+| U26 .deb (debug, gcc, mkl) | [ ] | [ ] | [ ] |
 | macOS | [ ] | [ ] | [ ] |
 | intel (source build) | [ ] | [ ] | [ ] |
 

@@ -551,3 +551,15 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   `.amzn2023`, built from `bde7be5` (recipe state `21f141e`). Every check in
   `todo/round2_el10_amzn2023.md` §3 passes; `check_mkl_linkage.sh` PASS on mkl; HSL script test
   passed on gcc. Not staged. Devlog: `devlog/dl20261004_amzn_round2.md`.
+
+- 2026-10-04 — **U24 round 2: debug, gcc, mkl built and installed.** environment 2026-3, libunwind
+  1.8.3-3, gperftools 2.18.1-2, hwloc 2.14.0-2, scotch 7.0.15-2, spral 2025.09.18-1, ipopt 3.14.20-1,
+  `scls-<F>` 2026-2 (8 packages per flavor); openmpi 5.0.11-2 and debug lapack 3.12.1-2 were already
+  installed (rows 30–31 are `n/a` / `[x]` for U24). Built from `16c7f78`, spral from `d908cfc`.
+  1 recipe fix, approved by Christian: `d908cfc` clears `CPATH` for spral on debug (unix/deb builders).
+  mkl spral passed only with `MESON_TESTTHREADS=1` (`ssidst` 295 s against meson's 300 s limit).
+  **Open:** debug spral is installed from the build made before `d908cfc`'s wording amend (same
+  build configuration, earlier changelog text); its same-release rebuild timed out twice on
+  `ssidst` under host load and must be redone before debug is staged.
+  Every check in `todo/round2_el10_amzn2023.md` §3 passes; `check_mkl_linkage.sh` PASS on mkl; HSL
+  script test passed on gcc. Not staged. Devlog: `devlog/dl20261004_u24_round2.md`.
