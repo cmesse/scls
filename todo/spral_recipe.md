@@ -43,7 +43,7 @@ Checks per flavor:
 | AMZN 2023 VM gcc, mkl | [x] | [x] | [x] |
 | lbl (LBL hosts) | [ ] | [ ] | [ ] |
 | U24 .deb (debug, gcc, mkl) | [x] | [x] | [x] |
-| U26 .deb (debug, gcc, mkl) | [ ] | [ ] | [ ] |
+| U26 .deb (debug, gcc, mkl) | [x] | [x] | [x] |
 | macOS | [ ] | [ ] | [ ] |
 | intel (source build) | [ ] | [ ] | [ ] |
 

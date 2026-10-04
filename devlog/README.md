@@ -11,6 +11,7 @@ file, it is lost.
 
 ## Entries
 
+- [dl20261004_u26_round2.md](dl20261004_u26_round2.md) — U26 round 2 built and installed on debug/gcc/mkl (GCC 15.2); spral debug `CPATH` fix reproduced, audits for `d908cfc`; release-bump rule (`BUILD_EXECUTION.md` §0.6); HSL script test on gcc
 - [dl20261004_u24_round2.md](dl20261004_u24_round2.md) — U24 round 2 built and installed on debug/gcc/mkl; spral debug `CPATH` fix for the unix/deb builders (`d908cfc`); mkl `ssidst` against meson's 300 s limit; HSL script test on gcc
 - [dl20261004_amzn_round2.md](dl20261004_amzn_round2.md) — AMZN round 2 on gcc/mkl: same nine NEVRAs as R9/R10, every §3 check passes (gperftools pprof skip held with Perl pprof present), MKL linkage PASS, HSL script test on gcc; nothing staged
 - [dl20261004_r10_round2.md](dl20261004_r10_round2.md) — R10 round 2 on debug/gcc/mkl: linking fixes, spral + ipopt, HSL script test; gperftools pprof-dependent checks skipped (`ac_cv_path_PPROF_PATH=`), agreed with R9 and audited

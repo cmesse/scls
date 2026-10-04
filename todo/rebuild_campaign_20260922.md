@@ -562,3 +562,10 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   on the idle host at 15:42 (9/9), so all three flavors hold spral built from `d908cfc`.
   Every check in `todo/round2_el10_amzn2023.md` §3 passes; `check_mkl_linkage.sh` PASS on mkl; HSL
   script test passed on gcc. Not staged. Devlog: `devlog/dl20261004_u24_round2.md`.
+- 2026-10-04 — **U26 round 2: debug, gcc, mkl built and installed.** environment 2026-3, libunwind
+  1.8.3-3, gperftools 2.18.1-2, hwloc 2.14.0-2, scotch 7.0.15-2, spral 2025.09.18-1, ipopt 3.14.20-1,
+  `scls-<F>` 2026-2 (8 packages per flavor); openmpi 5.0.11-2 and debug lapack 3.12.1-2 were already
+  installed. spral, ipopt and the meta-package built from `d908cfc`; spral passed with the default
+  parallel tests on all three flavors (9/9 debug and mkl, 10/10 gcc). Every check in
+  `todo/round2_el10_amzn2023.md` §3 passes; `check_mkl_linkage.sh` PASS on mkl; HSL script test
+  passed on gcc. Not staged. Devlog: `devlog/dl20261004_u26_round2.md`.
