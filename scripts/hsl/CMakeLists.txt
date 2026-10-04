@@ -13,6 +13,7 @@
 #   SCLS_STACK_PREFIX        e.g. /opt/scls/gcc: METIS and math libraries
 #   HSL_MATH_LIBS            the flavor's BLAS/LAPACK link line, as a ;-list
 #   HSL_FORTRAN_EXTRA_FLAGS  e.g. -fallow-argument-mismatch (;-list)
+#   HSL_FIXED_FORM_FLAGS     .f / .F sources only, e.g. -std=legacy (;-list, optional)
 #   HSL_OPENMP_FLAG          -fopenmp / -qopenmp
 #   HSL_EXTRA_LINK_FLAGS     flavor ldflags minus -L/-rpath (;-list, optional)
 #   HSL_INSTALL_RPATH        ;-list baked into the library (stack lib, MKL lib)
@@ -88,6 +89,17 @@ target_compile_options(coinhsl PRIVATE "$<$<COMPILE_LANGUAGE:Fortran>:${HSL_OPEN
 if(HSL_FORTRAN_EXTRA_FLAGS)
   target_compile_options(coinhsl PRIVATE
     "$<$<COMPILE_LANGUAGE:Fortran>:${HSL_FORTRAN_EXTRA_FLAGS}>")
+endif()
+
+# Fixed-form sources only (the F77 routines), chosen by extension so that no HSL
+# file is named here. LAST_EXT and STREQUAL, not a pattern: ".f90" starts with ".f".
+if(HSL_FIXED_FORM_FLAGS)
+  foreach(src IN LISTS HSL_SOURCES)
+    get_filename_component(ext "${src}" LAST_EXT)
+    if(ext STREQUAL ".f" OR ext STREQUAL ".F")
+      set_source_files_properties("${src}" PROPERTIES COMPILE_OPTIONS "${HSL_FIXED_FORM_FLAGS}")
+    endif()
+  endforeach()
 endif()
 
 # SCLS link policy: --no-as-needed, so every library on the flavor line stays

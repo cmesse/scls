@@ -248,3 +248,31 @@ files removed; `--uninstall metis` refused while `hsl` lists it. **Not run:** a 
   `./scls build hsl && ./scls install hsl`.
 - Pre-existing, untouched (Codex): `extra_packages: [hsl]` in `flavor.conf` would put a
   dangling `Requires` into the flavor meta-package.
+
+## Follow-up 2026-10-03: `-std=legacy` for the fixed-form sources
+
+**Decision (Christian):** "I think that -std=legacy would make sense."
+**AIs:** plan round Codex (`medium`, single narrow claim) and Grok (`high`), both approve with
+changes; diff round below. Exchange: `tmp/ai_exchange/plan_hsl_std_legacy.md`.
+
+`./scls build hsl` printed "Fortran 2018 deleted feature" for every arithmetic `IF` and labelled
+`DO` termination in the F77 files. Tested with the stack gfortran 16.1.0 on minimal
+reproductions: `-Wno-deprecated`, `-Wno-obsolescent`, `-Wno-all` leave the warning; `-std=legacy`
+and `-w` remove it.
+
+- `scripts/build_libhsl.py`: `HSL_FIXED_FORM_FLAGS=-std=legacy` when the compiler family is GNU
+  (not for `ifx`); new `fixed_form_fflags:` key in `build-info.yaml`. `fflags:` is unchanged.
+- `scripts/hsl/CMakeLists.txt`: per-source `COMPILE_OPTIONS` for sources whose last extension is
+  exactly `.f` / `.F`. `-fallow-argument-mismatch` stays on the whole target; the `.f90` files do
+  not get `-std=legacy` and still need it.
+
+**Verification:** the real `CMakeLists.txt` configured and built verbose against dummy sources
+(two `.f` reproductions, one `.f90` with the same construct, one `.c`): `-std=legacy` appears on
+the two `.f` compile lines only; warnings 3 -> 1 (the `.f90` one remains, as intended);
+disassembly of both `.f` objects identical with and without the flag. **Not run:** a real
+`./scls build hsl` with the change (needs the tarballs; one build was in progress when it landed).
+Caveat (Grok): on gfortran >= 10 `-std=legacy` also implies `-fallow-invalid-boz`, which can only
+matter for a file that fails to compile today. Whether Coin-HSL's own `meson.build` passes
+`-std=legacy` was not checked and is not claimed.
+Diff round: Codex (`xhigh`) approve, Grok (`xhigh`) approve, no findings; remaining gate is a
+real `./scls build hsl` to confirm every fixed-form unit of the licensee's tree is `.f`/`.F`.
