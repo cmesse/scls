@@ -181,3 +181,39 @@ Academic Licence allows. Findings and what changed:
 
 - `./scls install hsl` on a terminal with sudo (the only path not executed here).
 - `macos` / `intel` runs.
+
+## macOS: first `./scls build hsl` run on a bsdtar host (same day)
+
+`./scls build hsl --sources=./tmp/hsl` on the macOS dev host failed in four places.
+All are fixed.
+
+1. **Fixed.** `assemble_sources.sh` `safe_extract` read the member name from field 6
+   of `tar -tv`. That is the name on GNU tar and the month on bsdtar (name is field 9),
+   so the top-level directory came out as `May` and the unsafe-path check inspected
+   the month column. Names now come from `tar -tzf`. Extract-first-then-inspect was
+   considered and rejected by both auditors: a stripped absolute member `/top/x`
+   passes a one-top-level-dir check, and content is written before validation.
+2. **Fixed.** The hardlink check took the target as `$(NF)`, so `../out side.f` was
+   tested as `side.f`. The verbose line is now split on every ` link to ` and each
+   piece is tested; `LC_ALL=C` pins the marker. Test 12b2 covers it.
+3. **Fixed.** BSD awk rejects `printf ... > d "/.coverage"`; the path is assigned to
+   a variable first.
+4. **Fixed.** `build_libhsl.py` used `prefix` in `cmd_build`, which has not existed
+   there since 51451f0 moved the choice of install location to `./scls install hsl`
+   (`NameError`, macOS only). Decision (Christian): the stack prefix is known at build
+   time for every flavor, so the dylib id is linked in as `<stack>/lib/libcoinhsl.dylib`.
+   A global install publishes the checked file unchanged. A macOS local install
+   (`~/.local/scls-hsl/<flavor>`) has a different path, so `cmd_install` rewrites the
+   id and re-signs ad hoc (`set_macos_dylib_id`): on a copy, renamed over the build-dir
+   file only after `codesign -v` and the id verify, and keyed on the current id so a
+   global install after a failed local one sets it back. The licence-acceptance record
+   is now written after that step and replaces any record from a failed attempt.
+
+Gates: `bash scripts/hsl/tests/test_assemble.sh` on macOS (bsdtar 3.5.3, awk
+20200816): passed 21, failed 0. `./scls build hsl --sources=./tmp/hsl` on macOS (x86_64): exit 0,
+dlopen smoke and MA77 gate PASS, staged id `/opt/scls/lib/libcoinhsl.dylib`.
+`set_macos_dylib_id` exercised on a copy (no-op, to local id, back; dlopen ok).
+`./scls install hsl` itself not run (interactive licence acceptance). GNU tar / Linux run of the test script: pending a Linux host. Review: plan and
+implementation each audited by Codex (gpt-5.6-terra, high) and Grok (grok-4.7, xhigh).
+Not adopted: newline-in-member-name handling; extra fixtures for absolute and
+internal hardlinks.
