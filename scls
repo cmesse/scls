@@ -160,28 +160,34 @@ fi
 
 PACKAGE="$2"
 
+# Prompt for sudo once and keep the credential warm with a background
+# `sudo -v` refresher, so per-package installs never prompt mid-loop.
+start_sudo_keepalive() {
+    echo "Refreshing sudo credentials (required for per-package install)..."
+    if ! sudo -v; then
+        echo "Error: could not acquire sudo credentials." >&2
+        exit 1
+    fi
+    # Background keepalive: refresh every 60s, exit quietly once the
+    # cache can't be refreshed non-interactively (shouldn't happen
+    # while the parent is alive, but belt-and-braces for shell exit).
+    ( while true; do
+          sudo -n -v 2>/dev/null || exit 0
+          sleep 60
+      done ) &
+    KEEPALIVE_PID=$!
+    # Clean up on any exit path: success, build error, Ctrl-C, SIGTERM.
+    # shellcheck disable=SC2064
+    trap "kill $KEEPALIVE_PID 2>/dev/null; wait $KEEPALIVE_PID 2>/dev/null" EXIT INT TERM
+}
+
 # `scls build all` — build+install every package for the active flavor in
 # dependency order. Stops on the first failure. Prompts for sudo once and
 # keeps the credential warm via a background `sudo -v` refresher so the
 # per-install apt-get / dnf call never prompts mid-loop.
 if [ "$1" = "build" ] && [ "$PACKAGE" = "all" ]; then
     if [ "$USE_DEB" = true ] || [ "$USE_RPM" = true ]; then
-        echo "Refreshing sudo credentials (required for per-package install)..."
-        if ! sudo -v; then
-            echo "Error: could not acquire sudo credentials." >&2
-            exit 1
-        fi
-        # Background keepalive: refresh every 60s, exit quietly once the
-        # cache can't be refreshed non-interactively (shouldn't happen
-        # while the parent is alive, but belt-and-braces for shell exit).
-        ( while true; do
-              sudo -n -v 2>/dev/null || exit 0
-              sleep 60
-          done ) &
-        KEEPALIVE_PID=$!
-        # Clean up on any exit path: success, build error, Ctrl-C, SIGTERM.
-        # shellcheck disable=SC2064
-        trap "kill $KEEPALIVE_PID 2>/dev/null; wait $KEEPALIVE_PID 2>/dev/null" EXIT INT TERM
+        start_sudo_keepalive
     fi
 
     # In direct/unix mode there is no local package artifact marker. A plain
@@ -191,6 +197,18 @@ if [ "$1" = "build" ] && [ "$PACKAGE" = "all" ]; then
     # package in the same iteration so the registry becomes the progress
     # marker.
     if [ "$USE_DEB" != true ] && [ "$USE_RPM" != true ]; then
+        # unix_builder publishes with sudo when the prefix is not writable
+        # (e.g. a root-owned /opt/scls on macOS). Same keepalive as the
+        # RPM/DEB path then; a writable prefix never asks for sudo.
+        if $PYTHON -c "
+import sys; sys.path.insert(0, '$SCLS_DIR/python')
+from pathlib import Path
+from build_common import load_flavor, prefix_needs_sudo
+sys.exit(0 if prefix_needs_sudo(Path(load_flavor('$FLAVOR')['prefix'])) else 1)
+"; then
+            start_sudo_keepalive
+        fi
+
         STEPS=0
         while :; do
             PKG=$($PYTHON -c "
