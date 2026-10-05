@@ -498,6 +498,11 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   48/48), hwloc 2.14.0-2, scotch 7.0.15-2, spral 2025.09.18-1, ipopt 3.14.20-1 and `scls-<F>` 2026-2.
   mkl linkage gate PASS; HSL script test done on gcc. Not staged. `devlog/dl20261004_r10_round2.md`.
 
+- 2026-10-04 — **Campaign closed.** Every cell in section A is ticked, rows 30–31 included.
+  Round 2 (spral, ipopt and the RPM-side fixes) is built on all five hosts and not staged; the
+  staging list and everything else still open is in `todo/open_issues_20261004.md`. This file
+  stays as the layout reference for `/update-plan`.
+
 ## Blockers
 
 - **mkl, R9 and R10 — mixed MKL threading layers; mkl drops held (belfem, 2026-09-25).** On both

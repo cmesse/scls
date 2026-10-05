@@ -10,7 +10,7 @@
 
 **Status (2026-10-03):** reviewed (round 1, `tmp/ai_exchange/review_libhsl_plan.md`), decisions D2–D4 taken, **§9 implemented** and gated on gcc + mkl; see `devlog/dl20261003_libhsl_private_build.md`. Implementation review round pending.
 **Branch:** `ipopt`. **Date:** 2026-10-03.
-**Builds on:** `todo/libhsl_build_script.md` §0, where the Coin-HSL-based script is implemented and gated on `gcc` and `mkl`.
+**Builds on:** `libhsl_build_script.md` §0 (removed 2026-10-04, in git history; summary in `devlog/dl20261003_libhsl_private_build.md`), where the Coin-HSL-based script is implemented and gated on `gcc` and `mkl`.
 
 ## 0. Decision (Christian, 2026-10-03, after this plan went to review)
 
@@ -173,7 +173,7 @@ Today only the Coin-HSL `LICENCE` is installed.
 
 - Ipopt recipe, SPRAL work, packaging: untouched.
 - No HSL content goes to auditors, devlogs, changelogs or anything tracked. Only names, versions, symbols and our own code.
-- No change to `.gitignore` beyond what §0 of `libhsl_build_script.md` added.
+- No change to `.gitignore` beyond what §0 of `libhsl_build_script.md` (removed 2026-10-04) added.
 
 ## 7. Gates after implementation
 

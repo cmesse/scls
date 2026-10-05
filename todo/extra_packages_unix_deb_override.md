@@ -1,6 +1,7 @@
 # Bugs — `extra_packages:` ignored by unix/deb builders; NEVER_SHIP misses subpackages
 
-**Found:** 2026-09-30, while planning the HSL work (`todo/hsl_private_recipe.md`). Read-only
+**Found:** 2026-09-30, while planning the HSL work (the packaged-recipe plan, since removed; see
+`devlog/dl20261003_libhsl_private_build.md`). Read-only
 finding. Both items touch `python/` or `scripts/`, so fixing them needs Christian's approval and
 the review gate in `doc/AI_COLLABORATION_PROTOCOL.md`.
 
