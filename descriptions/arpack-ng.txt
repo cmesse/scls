@@ -1,5 +1,5 @@
 ARPACK-NG is a collection of Fortran 77 subroutines designed to solve
-large scale eigenvalue problems.
+large-scale eigenvalue problems.
 
 The package is designed to compute a few eigenvalues and corresponding
 eigenvectors of a general n by n matrix A. It is most appropriate for

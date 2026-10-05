@@ -1,6 +1,6 @@
 name: gmp
 version: 6.3.0
-summary: GNU arbitrary precision library
+summary: GNU arbitrary-precision library
 homepage: https://gmplib.org/
 license: LGPLv3+ or GPLv2+
 # LGPL-3 / GPL-2 — not redistributed as an SCLS package on mainline Linux
