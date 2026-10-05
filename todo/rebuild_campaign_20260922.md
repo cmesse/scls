@@ -570,7 +570,9 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   5.0.11-2 and debug lapack 3.12.1-2 were already published on noble and byte-identical to the
   local .debs, so they are not in the drops. belfem reports verify PASS for all three and el9
   parity with only the 4 accepted gperftools/libunwind objects per flavor as HARD lines. All
-  Ubuntu drops are uploaded before any promotion (Christian); **not promoted yet**.
+  Ubuntu drops are uploaded before any promotion (Christian). **Promoted into noble** (belfem
+  coordinator, 2026-10-05 UTC); apt client check on U24: belfem candidates equal the installed
+  versions and the published .debs are byte-identical to `work/pkgs`.
   Every check in `todo/round2_el10_amzn2023.md` §3 passes; `check_mkl_linkage.sh` PASS on mkl; HSL
   script test passed on gcc. Not staged. Devlog: `devlog/dl20261004_u24_round2.md`.
 - 2026-10-04 — **U26 round 2: debug, gcc, mkl built and installed.** environment 2026-3, libunwind
