@@ -17,8 +17,17 @@ OUTC = -o{{ ' ' }}
 OUTF = -o{{ ' ' }}
 RM = /bin/rm -f
 
-# RPATH option used by examples/Makefile
+# RPATH option. upstream src/Makefile passes it to the links of
+# libmumps_common and lib[sd]mumps, and examples/Makefile to the examples.
+# On MKL flavors it also names the MKL directories: the three libraries NEED
+# libmkl_*, and LIBS (mkl_mpi_linker_flags) carries the prefix rpath only, so
+# without this their RUNPATH had no MKL directory and `ldd -r libdmumps.so`
+# reported libmkl_* as not found (R9 mkl, 2026-10-04; mumps 5.9.1-3).
+{% if math_provider == 'mkl' %}
+RPATH_OPT = -Wl,-rpath,{{ prefix }}/lib -Wl,-rpath,{{ mklroot }}/lib/intel64 -Wl,-rpath,{{ mklroot }}/lib
+{% else %}
 RPATH_OPT = -Wl,-rpath,{{ prefix }}/lib
+{% endif %}
 
 # BLAS library reference used by examples/Makefile
 LIBBLAS =

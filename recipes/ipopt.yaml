@@ -72,6 +72,16 @@ configure:
     # Java bindings are on by default whenever javac is found; the stack
     # ships no language bindings (CLAUDE.md).
     - --disable-java
+  # RPM builds on MKL flavors: add the MKL directories to LDFLAGS. libipopt.so
+  # gets them from --with-lapack-lflags, but libsipopt.so is linked through
+  # libipopt.la, whose dependency_libs keep -L/-l and drop -Wl,-rpath, so its
+  # RUNPATH had the prefix only while it NEEDs libmkl_* (R9 mkl, 2026-10-04).
+  # flavor_pre is read by rpm_builder only. The unix/deb builders already
+  # append %{math_ldflags}, MKL rpath included, to LDFLAGS. The key `mkl` also
+  # matches gcc-mkl-cuda; it does not match `intel` (todo/backlog.md).
+  flavor_pre:
+    mkl:
+      - 'export LDFLAGS="$LDFLAGS -Wl,-rpath,%{mklroot}/lib/intel64 -Wl,-rpath,%{mklroot}/lib"'
   # Index width must match the flavor's BLAS/LAPACK and MUMPS interface.
   # Only lp64 flavors exist today; the ilp64 pairing is recorded, not built.
   lp64_args:

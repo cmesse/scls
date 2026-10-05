@@ -1,6 +1,8 @@
 name: mumps
 version: 5.9.1
-release: 2
+# Release 3: MKL directories added to the RUNPATH of the MUMPS libraries on MKL
+# flavors (templates/mumps/Makefile.inc.j2, RPATH_OPT). 5.9.1-2 is published.
+release: 3
 summary: A MUltifrontal Massively Parallel sparse direct Solver
 homepage: https://mumps-solver.org
 license: CeCILL-C

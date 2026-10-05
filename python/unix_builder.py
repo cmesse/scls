@@ -1848,11 +1848,15 @@ class UnixBuilder:
         math_linalg = math_config.get('linalg', 'reference')
         if math_linalg == 'mkl':
             context['math_provider'] = 'mkl'
+            # MKL root for templates that write their own rpath (the MUMPS
+            # Makefile.inc: RPATH_OPT). Same root %{mklroot} expands to.
+            context['mklroot'] = os.environ.get('MKLROOT', '/opt/intel/oneapi/mkl/latest')
             context['mkl_linker_flags'] = get_mkl_serial_link_line(self.flavor)
             mkl_mpi = get_mkl_mpi_link_line(self.flavor)
             context['mkl_mpi_linker_flags'] = mkl_mpi.replace('%{prefix}', str(self.prefix))
         else:
             context['math_provider'] = 'lapack'
+            context['mklroot'] = ''
             context['mkl_linker_flags'] = ''
             context['mkl_mpi_linker_flags'] = ''
 

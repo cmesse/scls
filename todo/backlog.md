@@ -89,6 +89,15 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
       `d908cfc`). Audit the other recipes with bundled components or `rpm_files_auto: true` (ucx,
       vtk, libunwind, hdf5, petsc), and decide whether the DEB env should set these at all
       (`python/`, six-step gate).
+- [ ] **ipopt, `intel` flavor: `libsipopt.so` still has no MKL directory in its RUNPATH.** The
+      2026-10-04 fix is `configure.flavor_pre` under the key `mkl`, which matches `mkl` and
+      `gcc-mkl-cuda` but not `intel` (`python/build_common.py` `get_flavor_names`). Untested flavor.
+- [ ] **Campaign gates G2 and G3 do not run as written on MKL flavors** (R9 mkl, 2026-10-04,
+      `devlog/dl20261004_r9_math_campaign.md`). G3: fixed in the packages (mumps 5.9.1-3, ipopt
+      3.14.20-1 rebuilt). G2: `LD_BIND_NOW=1 LD_DEBUG=bindings ./g2` segfaults in the loader
+      ("Relink libmkl_gnu_thread.so.3 with /lib64/libm.so.6 for IFUNC symbol sincos") before
+      libpetsc is bound; without `LD_BIND_NOW` the program runs. The next tracker needs a G2 that
+      works with MKL, e.g. `dlsym(RTLD_DEFAULT, ...)` + `dladdr` after `PetscInitialize`.
 
 ## 4. Builders and scripts (`python/`, `scripts/`; approval and the review gate)
 
