@@ -31,7 +31,7 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
       promotion of the previous drop and Christian's go-ahead.
 - [ ] **Website:** regenerate with ipopt and the new versions and deploy, after the campaign is
       published (the table shows recipe versions). The template changes are in the tree
-      (`8a5f7f6`, `0b37bd3`, `84efaca`, and the 2026-10-05 licence wording and build-tools table,
+      (`8a5f7f6`, `0b37bd3`, `84efaca`, and the 2026-10-05 license wording and build-tools table,
       `devlog/dl20261005_license_policy_no_gpl.md`); nothing is deployed.
 - [ ] **Branch names in the workflow.** `/update-plan`, `/update-build`, `/build-stack` and
       `doc/BUILD_EXECUTION.md` §0 and §1.2 name `devel` as the working branch. Decide what replaces
@@ -79,7 +79,7 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
       although `liblapack.so.3` NEEDs `libblas.so.3`. The recipe lists `blas` under the same-name
       `lapack` subpackage, which both builders skip without merging its requires. Re-checked
       2026-10-04 with `--spec-only` (debug): the main package requires only `environment`.
-- [ ] **lapack licence notice (P2):** the binary packages ship no LAPACK LICENSE; `files/lapack.txt`
+- [ ] **lapack license notice (P2):** the binary packages ship no LAPACK LICENSE; `files/lapack.txt`
       has none.
 - [ ] **`files/petsc.txt` and `files/slepc.txt` carry the literal version** in
       `lib/{petsc,slepc}/conf/modules/<pkg>/<version>` and are edited by hand on every bump;
@@ -127,13 +127,13 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
       `work/parity/needed_parity.sh` + `score2.py` into a repo-relative `scripts/` tool and hook it
       into `stage_to_belfem.sh` before READY. Two blind audits. Not started; no parity script is in
       `scripts/`.
-- [ ] **Builder licence warning is keyed on the substring `GPL-3`.** `python/rpm_builder.py:2323-2328`
+- [ ] **Builder license warning is keyed on the substring `GPL-3`.** `python/rpm_builder.py:2323-2328`
       and `python/unix_builder.py:1544-1549` warn "GPL-3 libraries must NOT be distributed" when
       `'GPL-3' in license`: true for LGPL-3 (mpfr, mpc), false for `GPL 2.0`, `GPL-2.0-or-later`
       and gmp's `GPLv2+`, and it also fires for the intended GPL build tools. `deb_builder.py` has
       no counterpart. Align with `doc/LICENSE_POLICY.md` as restated 2026-10-05 (no GPL of any
       version in published binaries). Found by both auditors in the 2026-10-05 plan round.
-- [ ] **No licence gate on what is staged.** The staging selectors hard-code SuiteSparse as
+- [ ] **No license gate on what is staged.** The staging selectors hard-code SuiteSparse as
       never-shippable (`scripts/stage_to_belfem.sh:173`, `scripts/deb_drop_select.py:59`). A new
       GPL recipe enabled for a public flavor would build and could enter a drop;
       `python/generate_website.py` refuses to render in that case, but `./makeweb` is not a
@@ -143,6 +143,10 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
       `sudo -n apt-get --version` / `sudo -n dnf --version` instead, or switch U26 to sudo.ws.
 - [ ] deactivate removes `OMP_CANCELLATION` even if the user changed it after activating. P2,
       accepted for now.
+- [ ] **`scripts/hsl/tests/test_assemble.sh` case "outside hardlink with blank in target
+      refused" fails on R9** (expected failure, got success; 20 other cases pass). Pre-existing:
+      fails identically on `810d9df` before the 2026-10-05 spelling change. Not reproduced on
+      another host yet; probably tar member handling on EL9. (`dl20261005_american_spelling_license`)
 
 ## 5. Workflow and docs
 

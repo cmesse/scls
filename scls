@@ -113,7 +113,7 @@ fi
 # Like every other package, 'build' only builds (it stages the checked library
 # under $TMPDIR/scls-hsl-<uid>/<flavor>, owner-only) and 'install' installs it:
 # it asks for the install type (local = ~/.local/scls-hsl/<flavor>, owner-only;
-# global = the stack prefix, via sudo), the licence type (academic|commercial)
+# global = the stack prefix, via sudo), the license type (academic|commercial)
 # and acceptance, publishes, and removes the staged build. Both are routed here,
 # before the builders, so HSL never gets a recipe, spec or build-order slot.
 # A global install does write a registry entry (a record of that private

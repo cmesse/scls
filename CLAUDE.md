@@ -95,7 +95,7 @@ Commands:
 ./scls order                 # Show the resolved build order for the flavor
 ./scls check-updates         # Run the update checker over all recipes
 ./scls build hsl [--sources DIR]    # Build+check a private libhsl for Ipopt from the licensee's own HSL tarballs; staged in $TMPDIR, no package (doc/HSL_BUILD.md)
-./scls install hsl                  # Install it: asks install type (local|global), licence type (academic|commercial), acceptance; removes the stage
+./scls install hsl                  # Install it: asks install type (local|global), license type (academic|commercial), acceptance; removes the stage
 ```
 
 `./scls install <package>` installs only the newest build of each package name,
@@ -251,7 +251,7 @@ When bumping a version, also update `changelogs/<package>.md`, and re-check `fil
 See [`doc/CAMPAIGN_POLICY.md`](doc/CAMPAIGN_POLICY.md). A rebuild campaign has a fixed scope
 (the tracker), a fixed gate list, and a pilot on one RPM host and one DEB host before the other
 hosts build. A finding blocks the running campaign only if it is a regression against the
-published packages, a broken package, a licence problem, or a build that cannot complete;
+published packages, a broken package, a license problem, or a build that cannot complete;
 everything else is appended to `todo/backlog.md` and reported in the policy's finding format,
 not raised as an open decision. Rebuilds follow the payload: a `%changelog`-only difference does
 not rebuild a host. Nothing is uploaded until every host has passed.

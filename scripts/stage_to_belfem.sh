@@ -171,7 +171,7 @@ nevra() {
 # ship. The manifest travels with packages the publishing host signs, so it is the
 # durable record of why something was withheld and must name the governing reason.
 declare -A NEVER_SHIP_REASON=(
-    [suitesparse]="licence — GPL-2 linkable, not shipped as a binary (doc/LICENSE_POLICY.md); recipe carries include_flavors: [] so it is never built by default"
+    [suitesparse]="license — GPL-2 linkable, not shipped as a binary (doc/LICENSE_POLICY.md); recipe carries include_flavors: [] so it is never built by default"
 )
 
 # never_ship_reason <binary name> <SOURCERPM> — print the reason if the binary, or the
@@ -216,7 +216,7 @@ fi
 
 while read -r n v r a srpm; do
     [ -z "${n:-}" ] && continue
-    # Licence exclusion first: it must hold regardless of whether an artifact or an
+    # License exclusion first: it must hold regardless of whether an artifact or an
     # SRPM exists, so it is checked before anything that could `continue` past it.
     reason=$(never_ship_reason "$n" "${srpm:-}")
     if [ -n "$reason" ]; then
@@ -235,7 +235,7 @@ while read -r n v r a srpm; do
 
     bin_nevra=$(nevra "$f")
     src=$(rpm -qp --qf '%{SOURCERPM}' "$f" 2>/dev/null)
-    # Second licence check, with the artifact's own SOURCERPM: the rpmdb field above
+    # Second license check, with the artifact's own SOURCERPM: the rpmdb field above
     # can be empty or "(none)", and a subpackage must not get past on that.
     reason=$(never_ship_reason "$n" "${src:-}")
     if [ -n "$reason" ]; then

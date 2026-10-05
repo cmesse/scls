@@ -22,7 +22,7 @@ mk_coin() {   # $1 dir
     mkdir -p "$d/common" "$d/hsl_ma77/C"
     printf "project('coinhsl', 'fortran', 'c',\n  version : '2024.05.15')\n" > "$d/meson.build"
     printf '2024-05-15\n   * HSL_MA86 v1.7.3 -> v1.7.4\n   * HSL_MA97 v2.8.0 -> v2.8.1\n2023-11-17\n   * HSL_MA77 v6.3.0 -> v6.4.0\n' > "$d/ChangeLog"
-    echo "dummy coin licence" > "$d/LICENCE"
+    echo "dummy coin license" > "$d/LICENCE"
     printf '%s' "$DEPS_F77" > "$d/common/deps.f"
     printf '%s' "$DEPS_F90" > "$d/common/deps90.f90"
     for p in d s; do
@@ -36,7 +36,7 @@ mk_coin() {   # $1 dir
 mk_ma77() {   # $1 dir, $2 version, $3 variant (good|extra|hdr|dep)
     local d="$1/hsl_ma77-$2"
     mkdir -p "$d/src" "$d/include"
-    echo "dummy standalone licence" > "$d/LICENCE"
+    echo "dummy standalone license" > "$d/LICENCE"
     for p in d s; do
         echo "module hsl_ma77_$p ! NEW body" > "$d/src/hsl_ma77$p.f90"
         echo "module hsl_ma77_${p}_ciface" > "$d/src/hsl_ma77${p}_ciface.f90"
@@ -75,7 +75,7 @@ expect_ok "newer override applied" 'HSL_MA77: 6.4.0 -> 6.5.0' "$s"; tgt="$TGT"
 if [ -n "${tgt:-}" ]; then
     grep -q 'NEW body' "$tgt/src/hsl_ma77/hsl_ma77d.f90" && ok "replacement file in tree" || bad "replacement not copied"
     grep -q 'coin body' "$tgt/originals/hsl_ma77/hsl_ma77d.f90" && ok "original preserved" || bad "original missing"
-    [ -f "$tgt/LICENCES/LICENCE.coinhsl-2024.05.15" ] && [ -f "$tgt/LICENCES/LICENCE.hsl_ma77-6.5.0" ] && ok "both licences" || bad "licences"
+    [ -f "$tgt/LICENCES/LICENCE.coinhsl-2024.05.15" ] && [ -f "$tgt/LICENCES/LICENCE.hsl_ma77-6.5.0" ] && ok "both licenses" || bad "licenses"
     grep -q 'override: HSL_MA77 6.4.0 -> 6.5.0' "$tgt/PROVENANCE.txt" && ok "provenance line" || bad "provenance"
     cmp -s "$tgt/src/common/deps90.f90" <(printf '%s' "$DEPS_F90") && ok "deps never copied" || bad "deps overwritten"
 fi

@@ -174,22 +174,22 @@ the sources and binaries are private.**
     `./scls list` shows it and `unix_builder.py --uninstall -p hsl` can remove it. That entry
     and the tracked `files/hsl.txt` (installed path names only) are a record of that private
     install; they are not a package and contain nothing HSL-derived;
-  - licence type: *academic* (personal, non-commercial, no sharing even within the
+  - license type: *academic* (personal, non-commercial, no sharing even within the
     institution; a global install is refused unless the user confirms being the machine's
     sole user) or *commercial* (an agreement with STFC whose terms the user holds);
-  - acceptance: the licence files from the user's tarballs are shown with SCLS's statement
-    of what the user confirms for that combination; typed `yes` or `--accept-licence`.
+  - acceptance: the license files from the user's tarballs are shown with SCLS's statement
+    of what the user confirms for that combination; typed `yes` or `--accept-license`.
   SCLS grants no rights and distributes nothing; compliance is the licensee's. `LD_LIBRARY_PATH`
   / `DYLD_LIBRARY_PATH` are not an option here or anywhere in SCLS.
 - `.gitignore` blocks HSL tarball, tree and library names anywhere in the repository.
   Nothing HSL-derived may be committed, staged to a repository host, pasted into a
   devlog or audit prompt, or given to another person. Each user needs their own
-  licence and their own build.
+  license and their own build.
 - Linking against the stack's own METIS, BLAS/LAPACK and OpenMP runtime is, in SCLS's
   reading, the platform optimization the Academic Licence allows a licensee; Coin-HSL
   itself ships the adapter for an external METIS. The optional override that takes a
   solver's sources from a newer standalone release the user also holds combines two of
-  the user's distributions in one build; whether that is within their licence is the
+  the user's distributions in one build; whether that is within their license is the
   user's decision (`--no-overrides` builds Coin-HSL as shipped). SCLS states its reading
   and grants nothing; compliance with the personal-use, no-sharing and non-commercial
   terms is the licensee's responsibility.

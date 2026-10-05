@@ -11,7 +11,7 @@ patched/
 tex/
 .claude/ai_exchange_pos.txt
 
-# HSL is proprietary (STFC licence): its sources and anything built from them
+# HSL is proprietary (STFC license): its sources and anything built from them
 # must never be committed, wherever they land in the tree. What is public is
 # SCLS's own build tooling (scripts/build_libhsl.py, scripts/hsl/) and docs.
 # Patterns cover tarballs, unpacked trees and built libraries of every HSL

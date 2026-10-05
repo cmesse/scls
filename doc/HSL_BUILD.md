@@ -1,6 +1,6 @@
 # Building a private libhsl for Ipopt
 
-HSL's linear solvers are proprietary (STFC HSL licence). SCLS ships no HSL source or
+HSL's linear solvers are proprietary (STFC HSL license). SCLS ships no HSL source or
 binary and no package that depends on HSL; see the HSL section of
 [`LICENSE_POLICY.md`](LICENSE_POLICY.md). What SCLS provides is build tooling: you supply
 the tarballs you are licensed to use, SCLS builds one shared library from them against the
@@ -29,7 +29,7 @@ Notes:
   own source files are taken from the newer release, everything else from Coin-HSL. It is
   applied only after the assembler has verified that the two releases agree on every C
   interface, header, and shared dependency unit; anything else stops the build. The original
-  tarballs are never modified. Whether combining releases is within your licence is your call;
+  tarballs are never modified. Whether combining releases is within your license is your call;
   `--no-overrides` builds Coin-HSL exactly as shipped.
 - The build is pinned to Coin-HSL **2024.05.15**. A newer Coin-HSL release stops the build
   until its component versions have been reviewed and added to the pin table in
@@ -62,19 +62,19 @@ on errors and interrupts, unless `--keep-work`.
    needs `hsllib <full path>`. `global`: the stack prefix `/opt/scls/<flavor>`, readable by
    every user of the machine, owned by no RPM/DEB package, published with `sudo install` (only the
    file copies run as root); Ipopt finds it with no option. `--local` / `--global`.
-2. **Licence type** — `academic` (HSL Academic Licence: personal, non-commercial use by you
+2. **License type** — `academic` (HSL Academic Licence: personal, non-commercial use by you
    alone; the software and its use may not be shared with anyone, including colleagues at
    your institution) or `commercial` (an agreement with STFC whose terms you hold).
-   `--licence academic|commercial`. A global install under an academic licence is permitted
+   `--license academic|commercial`. A global install under an academic license is permitted
    only if you are the sole user of the machine; `install` asks you to confirm this
    (`--sole-user`) and is refused otherwise.
-3. **Acceptance** — the licence files from your tarballs are printed (Coin-HSL's own is a
+3. **Acceptance** — the license files from your tarballs are printed (Coin-HSL's own is a
    pointer to the agreement you accepted on the STFC portal), followed by what you confirm for
-   the chosen licence and install type; type `yes` (`--accept-licence`). SCLS grants no rights
+   the chosen license and install type; type `yes` (`--accept-license`). SCLS grants no rights
    and distributes nothing.
 
-Install type, licence type, who accepted, when, from which host, and the checksums of the
-licence texts shown are recorded in `<prefix>/share/hsl/build-info.yaml`. The staged build is
+Install type, license type, who accepted, when, from which host, and the checksums of the
+license texts shown are recorded in `<prefix>/share/hsl/build-info.yaml`. The staged build is
 deleted once the install has succeeded.
 
 With GNU Fortran the fixed-form (`.f`) sources are compiled with `-std=legacy`. Those Fortran 77
@@ -135,7 +135,7 @@ To remove a global install, from the SCLS checkout (the file list is `files/hsl.
 python python/unix_builder.py --uninstall -p hsl -f <flavor>
 ```
 
-This removes the library, the `libhsl` symlink, the licence copies, the provenance file, the
+This removes the library, the `libhsl` symlink, the license copies, the provenance file, the
 acceptance record and the registry entry, using `sudo` when the prefix is not writable. Do not
 add `--with-deps`: that would also try to remove the stack packages it depends on (METIS,
 OpenBLAS or LAPACK, GCC) wherever no other package needs them.
@@ -151,4 +151,4 @@ An install made before the registry entry existed has no entry; `./scls build hs
 a global `./scls install hsl` adds it.
 
 Never share the library, the assembled sources or the tarballs beyond what your own HSL
-licence permits. Only the SCLS scripts are public.
+license permits. Only the SCLS scripts are public.

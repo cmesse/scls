@@ -36,7 +36,7 @@ from pathlib import Path
 
 import yaml
 
-# Same rule as NEVER_SHIP_REASON in stage_to_belfem.sh: licence first, mechanism second.
+# Same rule as NEVER_SHIP_REASON in stage_to_belfem.sh: license first, mechanism second.
 # The ONLY packages that may ship without a source package: SCLS's own generated
 # packaging, with no upstream code (Christian, 2026-09-28; doc/LICENSE_POLICY.md).
 # The list is closed. Anything else without a .dsc stays excluded, and the
@@ -57,7 +57,7 @@ def no_source_names(flavor):
 
 
 NEVER_SHIP_REASON = {
-    'suitesparse': 'licence — GPL-2 linkable, not shipped as a binary (doc/LICENSE_POLICY.md); '
+    'suitesparse': 'license — GPL-2 linkable, not shipped as a binary (doc/LICENSE_POLICY.md); '
                    'recipe carries include_flavors: [] so it is never built by default',
 }
 
@@ -169,7 +169,7 @@ def main():
         short = None if name in ('scls-archive-keyring', f'scls-{flavor}') \
             else name[len(f'scls-{flavor}-'):]
 
-        # Licence exclusion first: it holds whether or not an artifact exists. Our
+        # License exclusion first: it holds whether or not an artifact exists. Our
         # .debs carry no Source: field, so the source name comes from the .dsc that
         # lists this binary, and the recipe's own subpackage list covers the case
         # where that .dsc is gone.

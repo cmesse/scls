@@ -58,7 +58,7 @@ test:
 
 install:
   post:
-    # COPYING states which parts are under which licence; COPYING.0BSD is the
+    # COPYING states which parts are under which license; COPYING.0BSD is the
     # liblzma text. The builders remove liblzma.la themselves.
     - "mkdir -p %{prefix}/share/licenses/xz"
     - "install -m 644 COPYING %{prefix}/share/licenses/xz/COPYING"

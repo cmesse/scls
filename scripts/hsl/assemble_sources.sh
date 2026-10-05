@@ -2,7 +2,7 @@
 # assemble_sources.sh — assemble one HSL source tree for libcoinhsl from a
 # licensee's ORIGINAL HSL tarballs (SCLS, BSD-3-Clause-LBNL).
 #
-# HSL is proprietary (STFC HSL licence). This script is SCLS code and contains no
+# HSL is proprietary (STFC HSL license). This script is SCLS code and contains no
 # HSL source; it only unpacks archives the licensee obtained themselves, into a
 # directory outside the SCLS work tree. Nothing it produces may be shared.
 #

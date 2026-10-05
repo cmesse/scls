@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Build a private libhsl for Ipopt's runtime loader from a licensee's own HSL tarballs.
 
-HSL is proprietary (STFC HSL licence). SCLS never ships, stages, or commits HSL
+HSL is proprietary (STFC HSL license). SCLS never ships, stages, or commits HSL
 source or anything built from it; only these scripts are public. A licensee runs
 this against the original tarballs they obtained themselves:
 
     ./scls build hsl      assemble, build, check; stage under $TMPDIR/scls-hsl-<uid>/<flavor>
-    ./scls install hsl    ask install type (local|global), licence type (academic|commercial)
+    ./scls install hsl    ask install type (local|global), license type (academic|commercial)
                           and acceptance; publish; remove the staged build
 
 and gets a shared library that the stack's unchanged libipopt can dlopen
@@ -530,7 +530,7 @@ def cmd_build(args) -> None:
     cleanup()
     print(f"\nBuilt and checked: {cache / 'lib' / libname}")
     print("Not installed yet. Install with:  ./scls install hsl")
-    print("(asks for install type, licence type and acceptance; the build dir is removed afterwards)")
+    print("(asks for install type, license type and acceptance; the build dir is removed afterwards)")
 
 
 def ask_choice(prompt: str, choices: list, flag_value, flag_names: str) -> str:
@@ -572,7 +572,7 @@ def registry_entry(cache: Path, info: str, stack: Path) -> str:
         for lic in sorted((doc / 'LICENCES').glob('LICENCE.coinhsl-*')):
             version = lic.name[len('LICENCE.coinhsl-'):]
     deps = []
-    needed = info.split('\nneeded:\n', 1)[-1].split('\nlicence_acceptance:\n')[0]
+    needed = info.split('\nneeded:\n', 1)[-1].split('\nlicense_acceptance:\n')[0]
     for name, path in re.findall(r"^  (\S+): (\S+)$", needed, re.M):
         if not is_within(Path(path), stack):
             continue
@@ -583,7 +583,7 @@ def registry_entry(cache: Path, info: str, stack: Path) -> str:
     return (
         "name: hsl\n"
         f"version: {json.dumps(version)}\n"
-        "license: Proprietary (STFC HSL licence); licensee-built, not redistributable\n"
+        "license: Proprietary (STFC HSL license); licensee-built, not redistributable\n"
         "summary: HSL linear solvers for Ipopt, private build loaded at runtime (hsllib)\n"
         "dependencies:\n" + ''.join(f"- {d}\n" for d in deps) +
         "cflags: ''\n"
@@ -619,29 +619,29 @@ def cmd_install(args) -> None:
     if itype == 'local' and is_within(prefix, REPO):
         die(f"{prefix} is inside the SCLS work tree")
 
-    # --- 2. licence type -------------------------------------------------------------
-    print("\nLicence type:")
+    # --- 2. license type -------------------------------------------------------------
+    print("\nLicense type:")
     print("  academic    HSL Academic Licence: personal, non-commercial use by you alone; the")
     print("              software and its use may not be shared with anyone, including colleagues")
     print("              at your own institution.")
     print("  commercial  a commercial / site agreement with STFC whose terms you hold.")
-    ltype = ask_choice("Licence type", ['academic', 'commercial'], args.licence,
-                       '--licence academic|commercial')
+    ltype = ask_choice("License type", ['academic', 'commercial'], args.license,
+                       '--license academic|commercial')
     single_user = None
     if itype == 'global' and ltype == 'academic':
-        print("\nAn academic licence does NOT permit a global install on a machine that other people")
-        print("use: every user of " + str(stack) + " could run the library, which the licence forbids.")
+        print("\nAn academic license does NOT permit a global install on a machine that other people")
+        print("use: every user of " + str(stack) + " could run the library, which the license forbids.")
         print("It is permissible only if you are the sole user of this machine.")
         ans = ask_choice("Are you the sole user of this machine", ['yes', 'no'],
                          'yes' if args.sole_user else None, '--sole-user')
         if ans != 'yes':
-            die("global install not permitted under an academic licence on a shared machine; "
+            die("global install not permitted under an academic license on a shared machine; "
                 "choose a local install")
         single_user = True
 
     # --- 3. acceptance ---------------------------------------------------------------
     print("\n" + "=" * 78)
-    print("These are the licence files shipped in the HSL tarballs you supplied:\n")
+    print("These are the license files shipped in the HSL tarballs you supplied:\n")
     for lic in lic_files:
         print(f"----- {lic.name} -----")
         print(lic.read_text(errors='replace').rstrip())
@@ -656,22 +656,22 @@ def cmd_install(args) -> None:
     else:
         print("By accepting you confirm that you have read your commercial/site agreement with STFC")
         print(f"and that it covers use of this library at {prefix} by everyone who can use it.")
-    if args.accept_licence:
-        how = '--accept-licence'
-        print("Accepted via --accept-licence.")
+    if args.accept_license:
+        how = '--accept-license'
+        print("Accepted via --accept-license.")
     elif sys.stdin.isatty():
         if input("Type 'yes' to accept and install, anything else to abort: ").strip() != 'yes':
-            die("licence not accepted; nothing installed")
+            die("license not accepted; nothing installed")
         how = 'interactive'
     else:
-        die("acceptance needs a terminal or --accept-licence")
+        die("acceptance needs a terminal or --accept-license")
     acceptance = {
-        'install_type': itype, 'licence_type': ltype,
+        'install_type': itype, 'license_type': ltype,
         **({'sole_user_confirmed': True} if single_user else {}),
         'accepted_by': os.environ.get('USER') or str(os.getuid()),
         'uid': os.getuid(), 'host': socket.gethostname(), 'how': how,
         'when': datetime.now().astimezone().isoformat(timespec='seconds'),
-        'licence_texts_sha256': {l.name: hashlib.sha256(l.read_bytes()).hexdigest() for l in lic_files},
+        'license_texts_sha256': {l.name: hashlib.sha256(l.read_bytes()).hexdigest() for l in lic_files},
     }
 
     # --- 4. publish ------------------------------------------------------------------
@@ -687,7 +687,7 @@ def cmd_install(args) -> None:
     if is_macos:
         set_macos_dylib_id(cache / 'lib' / libname, prefix / 'lib' / libname)
     # Recorded only now, and replacing any record a failed earlier attempt left.
-    info_file.write_text(info.split('\nlicence_acceptance:\n')[0].rstrip('\n') + "\nlicence_acceptance:\n" +
+    info_file.write_text(info.split('\nlicense_acceptance:\n')[0].rstrip('\n') + "\nlicense_acceptance:\n" +
                          ''.join(f"  {k}: {json.dumps(v)}\n" for k, v in acceptance.items()))
     # Global install: a registry entry, so `./scls list` shows it and
     # `unix_builder.py --uninstall -p hsl` (file list: files/hsl.txt) removes it.
@@ -719,7 +719,7 @@ def cmd_install(args) -> None:
 
     shutil.rmtree(cache)   # the build dir is gone once the install succeeded
     print(f"\nInstalled {prefix / 'lib' / libname} (+ {alias_name} symlink); build dir removed.")
-    print(f"Licences, provenance and the acceptance record: {prefix / 'share'}")
+    print(f"Licenses, provenance and the acceptance record: {prefix / 'share'}")
     if itype == 'global':
         print("Listed by `./scls list` as hsl. To remove it, from the SCLS checkout:")
         print(f"  python python/unix_builder.py --uninstall -p hsl -f {flavor_name}")
@@ -747,17 +747,18 @@ def main() -> None:
     b.add_argument('--no-overrides', action='store_true',
                    help='build Coin-HSL as shipped, without standalone overrides')
     b.add_argument('--jobs', type=int, default=os.cpu_count() or 1)
-    i = sub.add_parser('install', help='install the staged build; asks install type, licence type, acceptance')
+    i = sub.add_parser('install', help='install the staged build; asks install type, license type, acceptance')
     for sp in (b, i):   # --flavor is accepted before or after the subcommand
         sp.add_argument('--flavor', default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     g = i.add_mutually_exclusive_group()
     g.add_argument('--local', action='store_true', help='install type: ~/.local/scls-hsl/<flavor>, owner-only')
     g.add_argument('--global', dest='glob', action='store_true', help='install type: the stack prefix, for all users')
-    i.add_argument('--licence', choices=['academic', 'commercial'], default=None, help='licence type')
+    i.add_argument('--license', '--licence', dest='license', choices=['academic', 'commercial'], default=None,
+                   help='license type (both spellings accepted)')
     i.add_argument('--sole-user', action='store_true',
-                   help='with --global and --licence academic: confirm you are the sole user of this machine')
-    i.add_argument('--accept-licence', action='store_true',
-                   help='non-interactive acceptance: you confirm you have read your HSL licence agreement '
+                   help='with --global and --license academic: confirm you are the sole user of this machine')
+    i.add_argument('--accept-license', '--accept-licence', dest='accept_license', action='store_true',
+                   help='non-interactive acceptance: you confirm you have read your HSL license agreement '
                         'and that the chosen install is within its terms')
     args = ap.parse_args()
     if args.cmd == 'build':
