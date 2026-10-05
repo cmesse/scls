@@ -27,7 +27,7 @@ The license policy therefore optimizes for:
 
 ### Published Binaries
 
-Every package in a published binary flavor (`gcc`, `mkl`, `debug`: the RPM and DEB
+Every package in a published binary flavor (`gcc`, `mkl` and `debug`, the RPM and DEB
 repositories) carries a license compatible with SCLS's own `BSD-3-Clause-LBNL`
 distribution. That means one of:
 
@@ -144,7 +144,7 @@ vendor-provided RPMs rather than copying vendor libraries into SCLS packages.
 
 ### Proprietary Libraries Built by the Licensee (HSL)
 
-Some solvers Ipopt can use are proprietary and licensed to an individual, not to a
+Some solvers that Ipopt can use are proprietary and licensed to an individual, not to a
 site. The HSL linear solvers (MA27, MA57, HSL_MA77, HSL_MA86, HSL_MA97, HSL_MC68, MC19; see
 [`HSL_BUILD.md`](HSL_BUILD.md) for which tarballs a licensee provides and how to build)
 are the standing case: the HSL Academic Licence grants *personal* use, forbids sharing
@@ -165,7 +165,7 @@ the sources and binaries are private.**
   `LICENCE` under `LICENCES/`, and records inputs and checksums in `PROVENANCE.txt`.
   HSL *sources* never enter the work tree or the stack prefix.
 - `./scls build hsl` only builds and checks; the result is staged owner-only under the
-  system temp dir. `./scls install hsl` installs it after three explicit answers, recorded
+  system temporary directory. `./scls install hsl` installs it after three explicit answers, recorded
   in `share/hsl/build-info.yaml`, and then deletes the staged build:
   - install type: *local* (`~/.local/scls-hsl/<flavor>`, owner-only, Ipopt needs
     `hsllib <full path>`) or *global* (`/opt/scls/<flavor>`, readable by every user, owned
@@ -186,7 +186,7 @@ the sources and binaries are private.**
   devlog or audit prompt, or given to another person. Each user needs their own
   licence and their own build.
 - Linking against the stack's own METIS, BLAS/LAPACK and OpenMP runtime is, in SCLS's
-  reading, the platform optimisation the Academic Licence allows a licensee; Coin-HSL
+  reading, the platform optimization the Academic Licence allows a licensee; Coin-HSL
   itself ships the adapter for an external METIS. The optional override that takes a
   solver's sources from a newer standalone release the user also holds combines two of
   the user's distributions in one build; whether that is within their licence is the
@@ -206,7 +206,7 @@ For macOS distribution, SCLS may provide binary package contents together with
 the original upstream source tarballs and SCLS build recipes on the same DMG.
 This keeps source access coupled to the distributed binary artifact.
 
-For Debian/Ubuntu distribution the same rule holds with Debian source packages:
+For Debian/Ubuntu distribution, the same rule holds with Debian source packages:
 each shipped `.deb` comes with its `.dsc`, `.orig.tar.*` and `.debian.tar.*`.
 The one exception is a closed list of packages that SCLS generates itself and
 that contain no upstream code: `scls-archive-keyring` (APT key and sources
@@ -218,7 +218,7 @@ under `no_source:` with this exact reason:
 
 `SCLS-generated packaging, no upstream source; source in the SCLS repository`
 
-One that is already published is listed under `already_published:` as usual. Any
+A package that is already published is listed under `already_published:` as usual. Any
 other binary without a source package is not shipped, and the list grows only by
 explicit decision (Christian, 2026-09-28).
 

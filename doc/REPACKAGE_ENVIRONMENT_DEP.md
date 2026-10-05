@@ -5,7 +5,7 @@
 `scls-<flavor>-environment` owns the `lib -> lib64` symlink under each
 flavor's prefix. Until the dependency change shipped in this branch
 (`Requires(pre): scls-<flavor>-environment` on every other package /
-`Pre-Depends:` on the deb side), dnf or dpkg could schedule environment
+`Pre-Depends:` on the DEB side), dnf or dpkg could schedule environment
 last in a transaction. Any other scls-* package then created
 `%{prefix}/lib/` as a real directory before environment got a chance to
 lay down the symlink, and environment failed with:
@@ -16,13 +16,13 @@ error: unpacking of archive failed on file /opt/scls/<flavor>/lib;...:
 error: scls-<flavor>-environment-...noarch: install failed
 ```
 
-The dependency change applies to **future builds**. To avoid a full ~1
-week stack rebuild, `tools/repackage_add_environment_dep.py` rewrites the
+The dependency change applies to **future builds**. To avoid a full one-week
+stack rebuild, `tools/repackage_add_environment_dep.py` rewrites the
 metadata of already-built `.rpm` / `.deb` artifacts in place: payload and
 scriptlets are preserved, only the dependency list and Release/Version are
 bumped.
 
-This document is the per-VM playbook. Runs on each build host (el10, el9,
+This document is the per-VM playbook. Run it on each build host (el10, el9,
 amzn2023, and any deb host); the consumer-host instructions at the end
 apply to every machine that already has scls-* installed.
 
@@ -37,7 +37,7 @@ git pull
 ```
 
 This brings in:
-- `python/rpm_builder.py` and `python/deb_builder.py` — auto-inject the env dep on new builds
+- `python/rpm_builder.py` and `python/deb_builder.py` — auto-inject the environment dependency on new builds
 - `templates/default.spec.j2` and `templates/default.control.j2` — render `Requires(pre):` / `Pre-Depends:` lines
 - `tools/repackage_add_environment_dep.py` — the repackager itself
 
@@ -52,13 +52,13 @@ external tool the script needs.
 | RHEL 9 / Rocky 9  / AlmaLinux 9   | `sudo dnf install -y epel-release && sudo dnf install -y rpmrebuild` |
 | Amazon Linux 2023 | `sudo dnf install -y rpmrebuild` *(EPEL not needed — rpmrebuild is in the default Amazon Linux repos. If `dnf info rpmrebuild` reports "No matching packages", enable EPEL: `sudo dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm`)* |
 
-For deb hosts, `dpkg-deb` is already present; no extra install needed.
+For DEB hosts, `dpkg-deb` is already present; no extra installation is needed.
 
 ### 3. Run the repackager
 
 ```sh
 # RPM hosts (preferred — patched files have identical names to originals
-# so they replace the un-patched RPMs in place when copied to the repo):
+# so they replace the unpatched RPMs in place when copied to the repo):
 python tools/repackage_add_environment_dep.py rpm \
     --input  rpmbuild/RPMS \
     --output patched/RPMS \
@@ -71,7 +71,7 @@ python tools/repackage_add_environment_dep.py deb \
     --version-suffix ''
 ```
 
-If you'd rather keep patched and un-patched copies side-by-side (e.g. for
+If you'd rather keep patched and unpatched copies side-by-side (e.g. for
 A/B testing or to roll back without re-extracting from rpmbuild/RPMS),
 omit the suffix flag — the script defaults to `.scls2` / `+scls2` so the
 patched artifacts get distinct names. With distinct names, dnf treats the
@@ -79,8 +79,8 @@ patched RPM as a newer version; with identical names, it's a same-NEVRA
 replacement and consumer hosts must run `dnf clean metadata` before the
 new metadata is fetched.
 
-Expected runtime: about 10s per RPM (rpmbuild reconstructs the cpio
-payload). For ~130 RPMs this is ~20 min. The script is single-threaded.
+Expected runtime: about 10 seconds per RPM (rpmbuild reconstructs the cpio
+payload). For about 130 RPMs this is about 20 minutes. The script is single-threaded.
 
 What you'll see:
 ```
@@ -113,7 +113,7 @@ rpm -qp --queryformat '%{NAME}-%{VERSION}-%{RELEASE}\n' \
 
 ### 5. Publish the patched RPMs
 
-Drop the patched RPMs (and the existing un-patched env RPMs) into the
+Drop the patched RPMs (and the existing unpatched environment RPMs) into the
 distro's repo directory, then regenerate metadata:
 
 ```sh

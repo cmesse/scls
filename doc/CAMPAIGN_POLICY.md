@@ -1,7 +1,7 @@
 # SCLS Campaign Policy — scope, blockers, gates, rebuilds, publishing
 
 **Adopted:** 2026-10-04 (Christian), after the 2026-09-22 campaign and its round 2 took two weeks
-instead of two days. The review of the devlogs from 2026-09-04 to 2026-10-04 is summarised in §10.
+instead of two days. The review of the devlogs from 2026-09-04 to 2026-10-04 is summarized in §10.
 
 A *campaign* is one run of `/update-plan` → `/update-build` → `/stage-drop` over a fixed package
 list on a fixed set of hosts. This file says what may change while a campaign is running and what
@@ -32,7 +32,7 @@ A finding blocks the current campaign only if it is one of these:
 |---|---|
 | **B1 regression** | The campaign's own change makes a package worse than the published one. |
 | **B2 broken** | Wrong numerical result, crash, or a package that cannot be installed or loaded. |
-| **B3 licence** | Something ships that `doc/LICENSE_POLICY.md` forbids, or a required notice or source is missing from a package this campaign publishes for the first time. |
+| **B3 license** | Something ships that `doc/LICENSE_POLICY.md` forbids, or a required notice or source is missing from a package this campaign publishes for the first time. |
 | **B4 cannot build** | The build or install fails and `doc/BUILD_EXECUTION.md` §3 (classes M, P, D) or `/build-fix-jury` cannot resolve it without a build-configuration change. |
 
 Everything else goes to the backlog (§3), however cheap the fix looks. In particular these do
@@ -117,14 +117,14 @@ Before the campaign, not during it:
 
 This amends `doc/BUILD_EXECUTION.md` §0.6.
 
-When a recipe changes after a host has built the package, that host and flavor rebuild only if
+When a recipe changes after a host has built the package, the package is rebuilt for that host and flavor only if
 the change alters what the build does there:
 
 1. Generate the spec (RPM) or the build commands (DEB/unix) before and after the change, for that
    flavor.
 2. If the only difference is `%changelog` text or comments, the host does **not** rebuild. The
    tracker cell gets the note `kept: changelog-only (<commit>)`.
-3. Otherwise it rebuilds, at the same release while the version-release is unpublished and with
+3. Otherwise the package is rebuilt, at the same release while the version-release is unpublished and with
    `release:` +1 once it is published (§0.6 as before).
 
 A change that only affects one builder (a `configure.flavor_env` that `rpm_builder` never reads,
@@ -157,9 +157,9 @@ by Christian. They are not left to the first full rebuild to settle.
 ## 9. PETSc sets the versions of its dependencies
 
 Adopted 2026-10-04 (Christian): "we always take the latest PETSc version and bump its
-dependencies to that, regardless what the latest version is."
+dependencies to that, regardless of what the latest version is."
 
-- **PETSc is taken at its latest release.** slepc follows it.
+- **PETSc is taken at its latest release.** SLEPc follows it.
 - **A package that PETSc can download itself is held at the version PETSc pins**, read from
   `config/BuildSystem/config/packages/<Package>.py` (`self.version`, `self.gitcommit`) in the
   PETSc tarball the campaign builds. A newer upstream release of such a package is not a
@@ -170,7 +170,7 @@ dependencies to that, regardless what the latest version is."
   records why SCLS differs (`-DSCOTCH_METIS_PREFIX=ON` came in this way).
 - `/update-plan` compares every recipe that `recipes/petsc.yaml` passes to PETSc's configure
   against PETSc's pins and prints the table before the candidates.
-- A patch that was refreshed for a version PETSc does not pin yet is kept under
+- A patch that was refreshed for a version that PETSc does not yet pin is kept under
   `patches/<pkg>/archive/` with a README line, so the work is not repeated.
 
 Deviations from PETSc 3.26.0's pins, ruled on by Christian on 2026-10-04:
@@ -201,6 +201,6 @@ From the devlogs of 2026-09-04 to 2026-10-04:
 | Publishing per host | noble debug and gcc were published, then relinked | §7 |
 | Audit gate skipped | the MKL threading change and the openmpi PRRTE fix went in without an audit | §8 |
 
-Two causes are engineering, not policy, and are in the backlog: the RPM and unix/deb builders set
+Two causes are engineering, not policy, and are in the backlog: the RPM and Unix/DEB builders set
 up different build environments (`CPATH`, `LIBRARY_PATH`, argument expansion, `--as-needed`,
 `flavor_pre/post`), and builds depend on undeclared host state.

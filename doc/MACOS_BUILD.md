@@ -6,27 +6,27 @@ the build flow, and what to do when the GCC bootstrap fails.
 
 ## Status
 
-- **Intel Macs:** the currently developed and tested platform.
-- **Apple Silicon:** the `aarch64-apple-darwin` GCC branch (Iain Sandoe's,
+- **Intel Macs:** the platform on which SCLS is currently developed and tested.
+- **Apple Silicon:** the `aarch64-apple-darwin` GCC branch (Iain Sandoe's branch,
   as vendored by Homebrew) ships in `patches/gcc/` and is applied only on
-  arm64 hosts. First bootstrap verified on 2026-09-10 on an M2 Pro (macOS
+  arm64 hosts. The first bootstrap was verified on 2026-09-10 on an M2 Pro (macOS
   25.2, Darwin 25.2.0, Homebrew `gcc-15` as `bootstrap_compilers`): the
   three-stage GCC 16.2.0 build completed in about 1 h 50 m at `-j12`, the
   install names of all runtime dylibs are absolute, `codesign -v` is silent
   after `install_name_tool`, Fortran/C++/OpenMP hello-worlds run, and
   `-march=native` is safe. The bootstrap group (21 packages, up to
-  `testsweeper`), `gklib` and `openmpi` installed with the fixes recorded in
+  `testsweeper`), `gklib` and `openmpi` were installed with the fixes recorded in
   `devlog/dl20260910_apple_silicon_report_fixes.md`. The rest of the build
   order from `openmpi` onward — ScaLAPACK/MUMPS/SCOTCH, the
   SLATE/ButterflyPACK/STRUMPACK stack, PETSc, VTK, and the MUMPS
   install-name normaliser — was then built and tested on Apple Silicon
   during ASC 2026 (per Christian, confirmed 2026-10-01), so the full stack
   is supported on arm64. The `hw.cpufamily` detector's `apple-m1` fallback for M4/M5
-  hosts has not been exercised either.
+  hosts has not been exercised.
   Rosetta is not a supported path — a Rosetta shell reports `x86_64`, so the
   patch is skipped and an Intel toolchain is configured.
 
-macOS support (Intel and Apple Silicon) is no longer beta. A first build still means reading build logs when something goes wrong.
+macOS support (Intel and Apple Silicon) is no longer beta. A first build still requires reading build logs when something goes wrong.
 
 ## Prerequisites
 
@@ -58,7 +58,7 @@ macOS support (Intel and Apple Silicon) is no longer beta. A first build still m
   how linker and sysroot settings work, and knowing what to do when a build
   log points at an SDK or path issue.
 
-- **Disk and time.** Budget a few tens of GB of disk (stack plus build
+- **Disk and time.** Budget a few tens of GB of disk space (stack plus build
   artifacts) and several hours of wall-clock for the first full build. The
   `macos` flavor is the largest because it also builds its own GCC for
   Fortran support.
@@ -109,11 +109,11 @@ asked for your password. Building and staging stay unprivileged, so nothing
 root-owned lands in `work/`. `./scls build all` asks once and keeps the sudo
 timestamp warm. `python/unix_builder.py --uninstall -p <package> -f macos`
 escalates the same way. Uninstall removes files and symlinks only and never
-deletes a directory recursively (directories go once they are empty); it
-keeps the registry entry when a file could not be removed, so it can be retried.
+deletes a directory recursively (directories are removed once they are empty); it
+keeps the registry entry when a file could not be removed, so the uninstall can be retried.
 
 After activation, the installed `scls` command on `PATH` exposes a few
-runtime queries: `scls help` lists them (`scls flavor`, `scls list`,
+runtime commands: `scls help` lists them (`scls flavor`, `scls list`,
 `scls info <package>`, `scls env`, `scls prefix`, `scls license`,
 `scls deactivate`). This is distinct from the repo-local `./scls` wrapper
 used during the build, which handles `build`, `install`, `spec`, `list`,
@@ -164,7 +164,7 @@ Pick one of the two routes below.
 
 ### Route 1 — Use Homebrew GCC directly
 
-Quickest path to a working stack. The resulting stack depends on Homebrew
+This is the quickest path to a working stack. The resulting stack depends on Homebrew
 being installed on the host.
 
 Edit `flavors/macos.yaml`. On **Intel Macs**:
@@ -192,7 +192,7 @@ On **Apple Silicon**, use `/opt/homebrew/bin/gcc-16`, `g++-16`, and
 
 ### Route 2 — Use Homebrew GCC only to bootstrap SCLS's own GCC
 
-Slower, but produces a completely independent build environment. The
+This route is slower but produces a completely independent build environment. The
 resulting stack does not depend on Homebrew at runtime.
 
 Edit `flavors/macos.yaml`. On **Intel Macs**:

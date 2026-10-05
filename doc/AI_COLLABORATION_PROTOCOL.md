@@ -16,7 +16,7 @@ If guidance conflicts across collaboration docs, apply this order:
 3. `CODEX.md` (pointer file — directs auditors to `CLAUDE.md`)
 4. `README.md` (project philosophy and user-facing model)
 
-Policy documents — `doc/LICENSE_POLICY.md`, `doc/MKL_ABI_POLICY.md`, `doc/MACOS_BUILD.md` — are authoritative within their own subject and override general guidance there.
+Policy documents — `doc/LICENSE_POLICY.md`, `doc/MKL_ABI_POLICY.md`, `doc/MACOS_BUILD.md` — are authoritative within their own subjects and override general guidance there.
 
 ---
 
@@ -54,9 +54,9 @@ Collaboration artifacts are organized by their **reader**, and lifetime follows 
 - **AI-only artifacts** — read only by AIs (the exchange). Ephemeral, machine-parseable, disposable. No human ever navigates them, so they can be garbage-collected aggressively.
 - **AI+human artifacts** — read by both AIs and humans (`./devlog/` session logs, `changelogs/<package>.md`, `doc/*.md`, `./todo/` planning files). Curated for a human skimming for decisions.
 
-An artifact is ephemeral **iff no human ever needs to return to it**. The boundary between the tiers is a **distillation** step, not a copy: at thread/session close the signal is *lifted* from the AI-only scratch into the durable record before the scratch is swept. That distillation is what makes aggressive GC of the AI-only tier safe.
+An artifact is ephemeral **if and only if no human ever needs to return to it**. The boundary between the tiers is a **distillation** step, not a copy: at thread/session close the signal is *lifted* from the AI-only scratch into the durable record before the scratch is swept. That distillation is what makes aggressive GC of the AI-only tier safe.
 
-**Format follows audience.** AI-only files stay machine-parseable — keep the `# AI`, `## Audit`, and `Confidence:` markers so the receiving model can orient — but need no human-prose polish. AI+human files are curated and distilled for a human reader.
+**Format follows audience.** AI-only files stay machine-parseable — keep the `# AI`, `## Audit`, and `Confidence:` markers so the receiving model can orient itself — but need no human-prose polish. AI+human files are curated and distilled for a human reader.
 
 ### What is tracked in git, and what is not
 
@@ -112,7 +112,7 @@ Summary of outcome. What to do next.
 **Rules:**
 - Always start with `# AI_NAME YYYY-MM-DD HH:MM:SS TZ`
 - One topic per file (`./tmp/ai_exchange/<slug>.md`); start a **new file** for a new topic
-- No archiving and no size threshold — these files are ephemeral. Distil the conclusion into the devlog (§6) before the file becomes GC-eligible (see §10).
+- No archiving and no size threshold — these files are ephemeral. Distill the conclusion into the devlog (§6) before the file becomes GC-eligible (see §10).
 
 ---
 
@@ -145,7 +145,7 @@ the 1.16 one]
 
 **Why this matters:** when Claude says "I'm ~70% sure the manifest is unaffected," the auditor can spend its budget on that specific claim instead of re-reading the whole recipe.
 
-**A note on the dev host.** The primary development host for SCLS is macOS (see §11). Many claims about RPM behaviour therefore *cannot* be executed here. Confidence must reflect that: "the spec generates correctly" is verifiable on macOS; "the RPM installs cleanly" is not, and must be stated as medium-or-below pending a Linux build host.
+**A note on the dev host.** The primary development host for SCLS is macOS (see §11). Many claims about RPM behavior therefore *cannot* be executed here. Confidence must reflect that: "the spec generates correctly" is verifiable on macOS; "the RPM installs cleanly" is not, and must be stated as medium-or-below pending a Linux build host.
 
 ---
 
@@ -169,7 +169,7 @@ Before signing off on a Claude finding, the auditor addresses **only the relevan
 
 ## 5. Upstream-First Rule (Conditional)
 
-SCLS has no literature routing. Its analogue is the **upstream source of truth**: the actual tarball in `work/`, the upstream `configure --help`, `CMakeLists.txt`, `INSTALL`, release notes, and license files.
+SCLS has no literature routing. Its analog is the **upstream source of truth**: the actual tarball in `work/`, the upstream `configure --help`, `CMakeLists.txt`, `INSTALL`, release notes, and license files.
 
 Upstream verification is **mandatory** when the task involves:
 - Adding, removing, or changing a configure/cmake flag
@@ -181,7 +181,7 @@ Upstream verification is **mandatory** when the task involves:
 Upstream verification is **not required** for:
 - Localized style fixes, typos, formatting
 - Changes internal to the Python builders that do not alter emitted build commands
-- Documentation edits that do not assert upstream behaviour
+- Documentation edits that do not assert upstream behavior
 
 **When upstream is consulted, cite it concretely:** `upstream <package> <version>, <path>:<line>` for a file in the extracted tarball, or the release-notes URL. "The docs say" without a locatable source is not a citation, and the auditor should reject it as such.
 
@@ -263,7 +263,7 @@ Brief description of findings and outcomes.
 - **Investigation and review = read-only by default.**
 - Writing to `./tmp/ai_exchange/` (AI-only exchange), `./todo/`, and `./devlog/` is always allowed.
 - **Edits to `recipes/`, `flavors/`, `files/`, `patches/`, and `python/` only after the user explicitly says editing is approved.**
-- Never invoke a real build (`./scls build`, `rpmbuild`, `dpkg-deb`) as part of an *investigation*. Builds are long, they write into `work/` and `rpmbuild/`, and on a shared host they are not free. Spec generation (`--spec-only`) and build-order resolution are read-only-ish and always fine.
+- Never invoke a real build (`./scls build`, `rpmbuild`, `dpkg-deb`) as part of an *investigation*. Builds are long, they write into `work/` and `rpmbuild/`, and on a shared host they are not free. Spec generation (`--spec-only`) and build-order resolution are effectively read-only and always fine.
 
 ---
 
@@ -369,7 +369,7 @@ so the unattended post-commit hook cannot be retuned by whatever shell happened 
 2. **Call the script** with a focused audit prompt referencing specific files/lines, and with the
    depth from §9.1 set explicitly.
 3. **Read the response** from stdout (or from the delta hook on the next prompt).
-4. **Write a resolution entry** (`# CLAUDE … ## Resolution`) summarising what was confirmed, refuted, or left open.
+4. **Write a resolution entry** (`# CLAUDE … ## Resolution`) summarizing what was confirmed, refuted, or left open.
 
 ### Three-AI round
 
@@ -422,7 +422,7 @@ Strongest first:
 6. **Upstream documentation consistency** — the claim matches release notes or upstream docs not independently checked against the source
 7. **AI reviewer agreement** — concurring independent audits
 
-Lower levels support, never replace, higher ones. Reviewer agreement is the weakest tier: three concurring audits do not lift a claim past level 5. Packaging-policy and licensing questions are adjudicated by Christian regardless of level.
+Lower levels support, but never replace, higher ones. Reviewer agreement is the weakest tier: three concurring audits do not lift a claim past level 5. Packaging-policy and licensing questions are adjudicated by Christian regardless of level.
 
 ### The macOS dev-host ceiling
 

@@ -61,7 +61,7 @@ mechanism to detect a break. That is exactly the failure mode documented for
 MKL, except self-inflicted and on every commit bump rather than every major
 release.
 
-Upstream defaulting `SHARED` to `OFF` is taken as the developers' own judgement
+Upstream defaulting `SHARED` to `OFF` is taken as the developers' own judgment
 about the stability of that interface, and we follow it.
 
 ## What shared would and would not buy

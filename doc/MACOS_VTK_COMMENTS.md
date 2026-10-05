@@ -37,7 +37,7 @@ The macOS VTK build must use the Sequential SMP backend:
 -DVTK_SMP_ENABLE_STDTHREAD=OFF
 ```
 
-`STDThread` is not safe in this hybrid AppleClang + SCLS `libstdc++` build.
+`STDThread` is not safe in this hybrid Apple Clang + SCLS `libstdc++` build.
 It links after adding `-femulated-tls`, but crashes at runtime in VTK's
 `vtkSMPThreadPool` while completing `std::future` jobs through
 `std::call_once`.

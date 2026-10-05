@@ -34,7 +34,7 @@ is simply refusing to bind a `NEEDED libmkl_*.so.2` entry to a file whose
 SONAME is `.so.3`, which is exactly what SONAME versioning is designed to
 do.
 
-The RPM had installed cleanly because the only MKL-related runtime deps
+The RPM had installed cleanly because the only MKL-related runtime dependencies
 SCLS emits are unversioned: `Requires: intel-oneapi-mkl,
 intel-oneapi-mkl-devel` (see `python/rpm_builder.py:1615`), and
 `AutoReqProv: no` is set on every package and subpackage in the SPEC
@@ -48,7 +48,7 @@ instead.
 
 ### Linking against `libmkl_core.so` (the unversioned symlink) instead of `libmkl_core.so.3`
 
-Intuitively it looks like this should produce a version-less `DT_NEEDED`
+Intuitively it looks like this should produce a versionless `DT_NEEDED`
 and therefore future-proof against a future `.so.4` bump. It does not. The
 linker reads the SONAME out of the resolved library's ELF header and
 writes *that string* into the consumer's `DT_NEEDED`, regardless of which
@@ -60,7 +60,7 @@ long as the linked library has a versioned SONAME, which Intel's does.
 
 ### `patchelf --replace-needed libmkl_core.so.3 libmkl_core.so`
 
-Strips the version and pairs with a compat symlink at the rpath
+This strips the version and pairs it with a compatibility symlink in the rpath
 directory. This silently binds the consumer to whatever MKL major is
 installed at runtime, which is exactly what SONAME versioning exists to
 prevent. When Intel changes ABI in a non-obvious way (struct size,
@@ -197,7 +197,7 @@ may link `libmkl_rt`.** The layer is a property of the flavor — `math.threadin
 
 Mixing layers is not a tidiness issue. `libmkl_sequential` and `libmkl_gnu_thread` export the same
 symbols; when both are in a process image the winner is decided by load order, so the same binary
-can get different BLAS behaviour depending on which library the loader reached first. Intel
+can get different BLAS behavior depending on which library the loader reached first. Intel
 supports exactly one threading layer per process. `libmkl_rt` is the same problem in a different
 form: it is the single-dynamic-library interface and resolves its layer at *runtime* from
 `MKL_THREADING_LAYER`, while the layered libraries bind at *link* time, so a binary carrying both
@@ -205,7 +205,7 @@ is asking two mechanisms to answer one question.
 
 ### How it was violated, and why nothing caught it
 
-Until 2026-09-25 `libscalapack.so` linked `libmkl_sequential` while the flavor's other 256 MKL
+Until 2026-09-25 `libscalapack.so` linked `libmkl_sequential` while the flavor's 256 other MKL
 references linked `libmkl_gnu_thread`. `ldd libpetsc.so.3.25.5` loaded both. The cause was in
 `python/math_common.py:get_math_link_line`, which gated the threading layer on the *recipe's*
 `features.openmp` in addition to the flavor's declaration, while the sibling path
@@ -234,7 +234,7 @@ from the flavor file (following `inherits:`) and asserts over real `DT_NEEDED`:
 
 It names the carrying library, because the failure mode is one outlier among hundreds.
 `scripts/stage_to_belfem.sh` runs it during `--build`, **before `READY` is written**, so a
-violating drop cannot be uploaded rather than merely warned about.
+violating drop is blocked rather than merely warned about.
 
 ### Known trade-off
 
@@ -258,7 +258,7 @@ that links an OpenMP imported target (`OpenMP::OpenMP_CXX`) links with *no
 OpenMP runtime at all* and fails on undefined `GOMP_*` symbols. The value is
 not forwarded into the try-compile project, but its presence drops the
 imported target's runtime from the probe link, and nothing replaces it.
-Measured with cmake 4.3.2 against upstream STRUMPACK's own probe source:
+Measured with CMake 4.3.2 against upstream STRUMPACK's own probe source:
 
 | `CMAKE_CXX_STANDARD_LIBRARIES` | probe | probe link line |
 |---|---|---|
@@ -322,8 +322,8 @@ change a compiler-capability probe.
 - `python/math_common.py:get_mkl_serial_link_line` /
   `get_mkl_mpi_link_line` — canonical MKL link lines. Already emit
   unversioned `-l` names; this is correct but, per above, does *not* make
-  the consumer's `DT_NEEDED` version-less.
-- `python/rpm_builder.py:get_intel_oneapi_setup` — MKL build-time env
+  the consumer's `DT_NEEDED` versionless.
+- `python/rpm_builder.py:get_intel_oneapi_setup` — MKL build-time environment
   (`MKLROOT`, `LD_LIBRARY_PATH`, `LIBRARY_PATH`, `CPATH`).
 - `python/build_common.py:get_cmake_args` — emits
   `CMAKE_<LANG>_STANDARD_LIBRARIES`; see the `-lgomp` hazard above.

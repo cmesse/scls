@@ -47,7 +47,7 @@ recipes and writes the tracker. Nothing in this file ever changes a package vers
    changed and that the release was kept. First applied to gperftools 2.18.1-2 and
    spral 2025.09.18-1 (`devlog/dl20261003_r9_round2.md`, round 2).
 7. **`doc/CAMPAIGN_POLICY.md` decides what belongs in the running campaign.** Scope is fixed with
-   the tracker. A finding blocks only as class B1–B4 (regression, broken, licence, cannot build);
+   the tracker. A finding blocks only as class B1–B4 (regression, broken, license, cannot build);
    everything else is appended to `todo/backlog.md` in the same session and reported in the
    policy's finding format. Gates added mid-campaign report only. Nothing is uploaded until every
    host has passed.
@@ -73,14 +73,14 @@ tracker column:
 Anything else: stop and report. The `scls` wrapper's own RPM/DEB detection must agree — if
 `./scls list` reports a format you did not expect, trust the wrapper and stop.
 
-**1.1a Ubuntu hosts: link without `--as-needed`.** Ubuntu's gcc injects `--as-needed` through
+**1.1a Ubuntu hosts: link without `--as-needed`.** Ubuntu's GCC injects `--as-needed` through
 its built-in `*link` spec, so every object keeps only the NEEDED entries it references directly.
 el9 does not, and the publishing host checks each object's NEEDED against el9's. `-Wl,--no-as-needed`
 in LDFLAGS cannot undo this for libtool packages, because libtool places `-Wl` flags after the
 libraries. Instead, give gcc a specs file without the injected flag, once per host and again
 after **any** gcc package update. The specs directory is keyed by major version only, so a
 same-major update would otherwise keep a stale copy of the old specs, and the guard below would
-not notice (it tests only the as-needed behaviour):
+not notice (it tests only the as-needed behavior):
 
 ```bash
 gcc -dumpspecs | sed 's/%{!fsanitize=\*:--as-needed}//g' > /tmp/gcc-specs
@@ -104,7 +104,7 @@ drop the feature (Christian, 2026-09-30).
 **1.1c Meson and Ninja, from pip on every host.** Meson-built recipes (today `spral`) need
 `meson` (>= 0.63.0) and `ninja` on `PATH`. They are installed with pip, not dnf/apt/Homebrew, so
 every host and flavor builds with the same tools (Christian, 2026-10-03):
-`python3 -m pip install --user meson ninja`, with the interpreter `flavor.conf` selects, and the
+`python3 -m pip install --user meson ninja`, with the interpreter that `flavor.conf` selects, and the
 pip user bin directory (`~/.local/bin` on Linux) on `PATH`. They are deliberately *not*
 `rpm_build_requires`; the builders check `PATH` before a meson build.
 
@@ -176,7 +176,7 @@ for p in $(python python/build_order.py recipes --flavor $F --names-only 2>/dev/
 done
 ```
 
-(`dpkg-query -W -f='${Version}'` on `U24`/`U26`, querying `scls-$F-${p//_/-}` — deb names map `_` to `-`.)
+(`dpkg-query -W -f='${Version}'` on `U24`/`U26`, querying `scls-$F-${p//_/-}` — DEB names map `_` to `-`.)
 
 Report the result. Then **subtract the packages the entry point is going to build anyway**.
 Anything left is a package that is stale on this host and that **nothing in this run will fix**.
@@ -184,12 +184,12 @@ Stop and ask before building: it is not covered by the campaign, so building aro
 compiling the rest of the stack against a version the recipes abandoned.
 
 This check is cheap — it is `rpm -q` and a YAML parse per package — and it is **not** the same as
-the §2 fallback that computes a target set when no tracker exists. That fallback is about *what
+the entry point's §2 fallback (`/update-build`, *Target set*) that computes a target set when no tracker exists. That fallback is about *what
 to build*; this is about *what the build is standing on*. Run it even when a tracker exists,
 especially then: a tracker is a statement about the packages it lists and says nothing about the
 ones it omits.
 
-> Added 2026-09-23. On the R9 run of the 2026-09-22 campaign, four packages
+> Added 2026-09-23. During the R9 run of the 2026-09-22 campaign, four packages
 > (`environment` 2026-1→2, `libunwind` 1.8.3-1→2, `nlopt` 2.10.1→2.11.0, `hwloc` 2.13.0→2.14.0)
 > had been built, uploaded and published months earlier but never installed on the build host.
 > None was in the campaign, so `/update-build` never looked at them. They surfaced only because
@@ -375,7 +375,7 @@ a stop, but a connection reset on a tarball fetch may be retried once.)
 
 ## 5. Cleanup — after the last flavor completes
 
-In this order. Steps 1 and 3 are routine; steps 2 and 4 are destructive and confirmed each time.
+In this order. Steps 1 and 3 are routine; steps 2 and 4 are destructive and are confirmed each time.
 
 1. **Superseded artifacts.** `./scls install` already prunes what it supersedes per package.
    Catch the rest — other flavors, builds that were never installed:
