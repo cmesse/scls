@@ -124,7 +124,7 @@ run and again after the gcc promotion; the old file is kept as `published-amzn20
 |---|---|---|---|---|---|
 | AMZN-gcc-20261005T0954Z | 31 | 202975269 | `41de47fa…e33c` | `2faf7e1` | uploaded, verified and promoted (belfem) |
 | AMZN-mkl-20261005T1024Z | 31 | 202899916 | `d19795f9…3742` | `8fa3495` | uploaded, verified and promoted (belfem) |
-| AMZN-gcc-20261005T1033Z (ipopt, `replace_published: 2`) | 2 | 2927173 | `c05c24ce…8363` | `9f96ed6` | uploaded and verified by belfem (manifest accepted as written; file list and Requires equal to the published RPM, `%changelog` carries the 2026-10-04 entry); promotion pending |
+| AMZN-gcc-20261005T1033Z (ipopt, `replace_published: 2`) | 2 | 2927173 | `c05c24ce…8363` | `9f96ed6` | uploaded and verified by belfem (manifest accepted as written; file list and Requires equal to the published RPM, `%changelog` carries the 2026-10-04 entry) and promoted: the published RPM and SRPM are the rebuild, the old builds are in belfem's attic |
 
 Both 31-file payloads are the table in the hosts file §4 and nothing else. `excluded: 0` on every
 run. belfem's note on the first gcc drop: `scls-gcc-examples` 2026-1 under `already_published:`
