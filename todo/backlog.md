@@ -98,6 +98,14 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
       ("Relink libmkl_gnu_thread.so.3 with /lib64/libm.so.6 for IFUNC symbol sincos") before
       libpetsc is bound; without `LD_BIND_NOW` the program runs. The next tracker needs a G2 that
       works with MKL, e.g. `dlsym(RTLD_DEFAULT, ...)` + `dladdr` after `PetscInitialize`.
+- [ ] **`scls-<F>-examples` 2026-1 is regenerated whenever the flavor meta-package is built.** The
+      round-2 meta build (2026-10-03) left new `scls-{debug,gcc,mkl}-examples-2026-1` RPMs and
+      SRPMs in the R9 output tree that are not byte-identical to the ones published on
+      2026-08-19 (belfem, R9-mkl-20261005T0551Z: noarch header differs with identical payload,
+      src payload differs). On mkl, Requires and file list equal the installed 2026-08-19
+      package. They are never in a payload (same NEVRA as published), so nothing shipped. Either
+      the examples meta gets its own release like `meta_release`, or the meta build stops
+      rewriting it.
 
 ## 4. Builders and scripts (`python/`, `scripts/`; approval and the review gate)
 
