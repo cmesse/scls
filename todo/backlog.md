@@ -99,6 +99,9 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
       ("Relink libmkl_gnu_thread.so.3 with /lib64/libm.so.6 for IFUNC symbol sincos") before
       libpetsc is bound; without `LD_BIND_NOW` the program runs. The next tracker needs a G2 that
       works with MKL, e.g. `dlsym(RTLD_DEFAULT, ...)` + `dladdr` after `PetscInitialize`.
+      EL10 mkl, 2026-10-05: G2 runs as written and passes (`LD_BIND_NOW=1 ./g2` exits 0; Rocky
+      10.2, GCC 14), so the segfault is specific to EL9 so far
+      (`devlog/dl20261005_el10_math_campaign.md`).
 - [ ] **`scls-<F>-examples` 2026-1 is regenerated whenever the flavor meta-package is built.** The
       round-2 meta build (2026-10-03) left new `scls-{debug,gcc,mkl}-examples-2026-1` RPMs and
       SRPMs in the R9 output tree that are not byte-identical to the ones published on
