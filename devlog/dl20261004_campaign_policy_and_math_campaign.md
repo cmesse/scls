@@ -81,6 +81,30 @@ under it is `todo/rebuild_campaign_20261004.md`.
   prefix, sundials 7.9.0-2. `petsc-baijmkl-decls.patch` context refreshed for 3.26.0.
   `patches/scotch/archive/scotch-shared-7.0.16.patch` kept for the day PETSc pins 7.0.16.
 
+## Follow-up, same day: `extra_packages:` on unix/deb, and NEVER_SHIP for subpackages
+
+Christian: "Go ahead and fix them now." Both were found on 2026-09-30 and had been deferred.
+Exchange: `tmp/ai_exchange/plan_extra_packages_never_ship.md`, `impl_extra_packages_never_ship.md`.
+
+- **B1.** `build_common.require_buildable()` is the one gate for rpm_builder, unix_builder and,
+  through it, deb_builder. A recipe excluded by its own flavor lists builds when `flavor.conf`
+  lists it under `extra_packages:`; until now only rpm_builder honoured that.
+  `UnixBuilder.check_dependencies` now requires a dependency that is itself only opted in.
+- **B2.** `scripts/stage_to_belfem.sh` reads `%{SOURCERPM}` from the rpmdb and excludes a binary
+  when its own name or its source package's is a NEVER_SHIP recipe. `scripts/deb_drop_select.py`
+  does the same from the `.dsc` `Binary:` map and from the recipe's `subpackages:` list.
+- **Plan round** (Codex gpt-5.6-terra/high, Grok grok-4.7/high, blind): both refuted the first DEB
+  design (`${source:Package}` from dpkg-query): SCLS .debs carry no `Source:` field
+  (`templates/default.control.j2`), so it would have returned the binary's own name. Both also
+  pointed out that `build next`/`all`/`order` still ignore `extra_packages:` (backlog).
+- **Gates on the dev host:** `UnixBuilder('zlib'|'suitesparse', 'macos')` raises without the
+  opt-in and constructs with it; `metis` unchanged. `--spec-only` for all 58 recipes × gcc, mkl,
+  debug: specs and output identical before and after. `never_ship_reason` (bash, extracted from
+  the script): 12 cases. `deb_drop_select.never_ship_table`/`never_ship_reason`: 10 cases.
+- **Not run:** `rpm -qa` on a real rpmdb, `dpkg-query`, the full staging script, a DebBuilder
+  build. The implementation audit round was dispatched and had not reported when this was
+  committed, on Christian's instruction to commit and push.
+
 ## Open
 
 Blockers: none. Everything deferred is in `todo/backlog.md`. Open by execution only, on the pilot

@@ -92,22 +92,14 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
 
 ## 4. Builders and scripts (`python/`, `scripts/`; approval and the review gate)
 
-- [ ] **`extra_packages:` works for RPM builds only (B1; found 2026-09-30).** A recipe excluded by
-      its own `include_flavors:` / `exclude_flavors:` (e.g. `include_flavors: []` on suitesparse or
-      zlib) can be opted in on RHEL-family hosts, but on Ubuntu and macOS the build aborts with
-      `Package <pkg> not built for <flavor>`. `rpm_builder.py` checks `read_extra_packages(flavor)`
-      before raising; `unix_builder.py` (around line 91) raises unconditionally, and `DebBuilder`
-      inherits that. The meta-package builders read `extra_packages` on both paths, so on a .deb
-      host the meta would depend on a package the builder refuses to build. `CLAUDE.md` describes
-      the override as general. Fix sketch: one helper in `build_common.py` that all three builders
-      call. Radius: only packages listed in `extra_packages:` on a non-RPM host; no spec or .deb
-      output changes for any other recipe. Confirm first on a .deb host with `zlib`.
-- [ ] **`NEVER_SHIP` matches the binary short name only (B2; latent).** `NEVER_SHIP_REASON` in
-      `scripts/stage_to_belfem.sh` and `scripts/deb_drop_select.py` is keyed on the binary package
-      name with `scls-<flavor>-` stripped, so a subpackage of an excluded recipe
-      (`suitesparse-devel`) would miss the table and be staged. No exposure today: suitesparse has
-      no subpackages. Fix sketch: also check the source package name (`SOURCERPM` on RPM, the
-      `.dsc` `Source:` field on DEB).
+- [ ] **`build next`, `build all` and `order` ignore `extra_packages:`** on every builder:
+      `build_order.py` does not read it, so an opted-in package builds only when named
+      (`./scls build <pkg>`). Left open when the explicit-build path was fixed on 2026-10-04.
+- [ ] **`stage_to_belfem.sh` globs `scls-<F>-*`,** which for `gcc` also matches
+      `scls-gcc-mkl-cuda-*`. Pre-existing; found by Grok on 2026-10-04.
+- [ ] **Verify the 2026-10-04 staging change on real package databases:** one
+      `stage_to_belfem.sh --build` on an RPM host (`%{SOURCERPM}` in the `rpm -qa` query) and one
+      on a DEB host. On the dev host it was tested with the function extracted and with fixtures.
 - [ ] **unix/deb ignore `configure.flavor_pre` / `configure.flavor_post`** for every configure
       type; rpm_builder runs them. Live case: openmpi's gcc-mkl-cuda CUDA-support check never runs
       on .deb hosts.
