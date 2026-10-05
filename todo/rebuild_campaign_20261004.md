@@ -411,8 +411,9 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   pass on mkl) and G3 pass on all three under GCC 15.2. Standing gates pass. Drops, each 35 files
   with `replace_published: 2` (ipopt) and `excluded: 0`: `U26-debug-20261005T1527Z` (141054466
   bytes) uploaded, verified and promoted by belfem; `U26-gcc-20261005T1633Z` (119544150 bytes) and
-  `U26-mkl-20261005T1634Z` (119542324 bytes) uploaded on belfem's size OK, arrival result and
-  promotion pending. Details: `devlog/dl20261005_u26_math_campaign.md`.
+  `U26-mkl-20261005T1634Z` (119542324 bytes) uploaded on belfem's size OK, verified and promoted;
+  resolute is complete for this campaign. Client check on U26 with the repo-installed packages:
+  G1, G2 and G3 pass on all three flavors. Details: `devlog/dl20261005_u26_math_campaign.md`.
 
 ## Blockers
 

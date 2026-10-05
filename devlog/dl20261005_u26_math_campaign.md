@@ -82,8 +82,17 @@ sundials-examples, and ipopt amd64 + source), `excluded: 0`, `no_source: 0`,
   library does not export `ParMETIS_V3_PartKway`, `libpetsc` 3.26 NEEDs `libparmetis`, `libhwloc`
   SONAME `.so.15`; the rebuilt ipopt differs from the published .deb in the container only) and
   promoted into resolute.
-- gcc and mkl: uploaded; arrival result and promotion are belfem's and were pending when this was
-  written.
+- gcc and mkl: verified by belfem (digests match, 35/35 files, el9 parity 97/97 with HARD 0 on
+  each; mkl: all 84 MKL objects carry `gf_lp64` + `gnu_thread` + `core` + `libgomp` directly, one
+  layer; the rebuilt ipopt differs from the published .deb in the container only on both) and
+  promoted. belfem reports resolute complete for this campaign: 132 binary packages.
+- **Client check on U26 after the last promotion:** `apt-get update`, then `apt-get install
+  --reinstall` of the 33 campaign packages (11 per flavor), all fetched from the signed resolute
+  repo, rc 0; installed = candidate for every one. With the repo-installed packages, per flavor:
+  `ldd` on `libpetsc.so`, `libslepc.so`, `libipopt.so`, `libdmumps.so`, `libscotch.so`,
+  `libhwloc.so` and `libsundials_core.so` reports nothing missing; `libpetsc.so.3.26` NEEDs
+  `libparmetis`; `libhwloc.so.15`; and G1, G2 (builds and runs a PETSc program) and G3 (`mpirun`,
+  hs071 with mumps and with spral) pass again on debug, gcc and mkl.
 
 ## 5. Build times and the shared host
 
@@ -97,5 +106,4 @@ Backlog entry: `todo/backlog.md` §7.
 
 ## Open
 
-No blocker. Pending at belfem: arrival result and promotion of the gcc and mkl drops, then the apt
-client check on U26.
+No blocker. Nothing is pending for U26 in this campaign.
