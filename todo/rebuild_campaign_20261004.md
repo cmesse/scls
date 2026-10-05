@@ -163,6 +163,11 @@ macOS, no `rpmbuild` — evidence level is static inspection plus `--spec-only`.
   177-178`); with it the C names become `SCOTCH_*` and the Fortran names `scotchf*`/`SCOTCHF*`
   (`library_parmetis.h:77-110`). The tests link those targets and inherit the definition. No file
   name changes, so `files/scotch.txt` is unedited.
+- hwloc 2.14.0 against 2.15.0, both tarballs: `libhwloc_so_version` is `25:3:10` and `25:4:10`
+  (same `current - age` = 15, revision only). The installed public headers (`hwloc.h`,
+  `hwloc/*.h`) differ in comments and in one line of an inline helper (`hwloc/helper.h`: a local
+  variable gains `__hwloc_attribute_unused`). No declaration is removed or changed. Exported
+  symbols were not compared; that needs a build.
 - PETSc 3.26.0's own package pins (`config/BuildSystem/config/packages/*.py`): scotch 7.0.15 with
   `-DSCOTCH_METIS_PREFIX:BOOL=ON`, superlu_dist 9.2.1 (minimum 6.3.0), mumps 5.9.1, strumpack 8.0.0,
   scalapack 2.2.3, hwloc 2.15.0, cmake 4.4.3, hdf5 2.2.0. After this campaign only hdf5 (1.14.6)
