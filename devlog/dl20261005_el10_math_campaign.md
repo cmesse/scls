@@ -136,9 +136,26 @@ Standing gates on all three flavors: drift sweep empty, `scls-<F>` 2026-2, `chec
 pass. `work/publish/published-el10.txt` (258 NEVRAs) is identical to belfem's public el10
 repodata fetched for this step, so it was not regenerated.
 
+Replacement drops, staged with `--replace` and the reason "rebuild at the unchanged release so
+%changelog matches mkl (Christian 2026-10-05)". The select-only run gave the same payload first.
+
+| Drop | Files | Bytes | sha256(SHA256SUMS) | git_head | already_published | replace_published | State |
+|---|---|---|---|---|---|---|---|
+| R10-debug-20261005T1112Z | 2 | 2933201 | `ee31c8b0…ab01` | `b9f201b` | 84 | 2 | uploaded, script exit 0 |
+| R10-gcc-20261005T1112Z | 2 | 2932700 | `dc0a8378…f89f` | `b9f201b` | 81 | 2 | uploaded, script exit 0 |
+
+`excluded: 0` and linkage PASS on both. `origin/ipopt` was at `b9f201b` before the uploads.
+Christian's approval, in this session: "drops authorized, commit and push authorized". No belfem
+session was reachable from this host, so the size OK did not arrive over the relay; asked,
+Christian chose to upload both drops at once and confirmed the size OK himself. The report to
+belfem (the table above and the digests of this section) has not been sent from here; arrival
+result and promotion are pending.
+
 ## Open
 
 - Blocker: none on EL10.
+- The two ipopt replacement drops of §6 are uploaded; belfem's verification and promotion are
+  pending, and belfem has not had the report from this session.
 - All three R10 drops are promoted; belfem reports el10 complete for this campaign (258 RPMs).
   A select run on each flavor against the regenerated published list gives an empty payload.
 - Backlog: one note added to the existing entry on gate G2 (`todo/backlog.md`): it runs as

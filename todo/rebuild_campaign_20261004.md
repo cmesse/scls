@@ -366,8 +366,14 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   `SHA256HEADER` differs from the published build on both, `PAYLOADDIGEST` is the same. G3 passes
   on both. G2 with the text of `11e38af`: PASS on debug, gcc and mkl with both parts (the loader
   survives `LD_BIND_NOW` on EL10). Drift sweep empty, `scls-<F>` 2026-2, linkage pass on all three
-  flavors. Details: `devlog/dl20261005_el10_math_campaign.md` §6. Not done: the two R10
-  replacement drops (staging, then upload on Christian's go-ahead per drop).
+  flavors. Details: `devlog/dl20261005_el10_math_campaign.md` §6.
+- 2026-10-05 — R10 replacement drops, staged at `b9f201b` with `--replace`:
+  `R10-debug-20261005T1112Z` (2 files, 2933201 bytes) and `R10-gcc-20261005T1112Z` (2 files,
+  2932700 bytes), `replace_published: 2` and `excluded: 0` on each. Uploaded on Christian's
+  approval in the R10 session ("drops authorized"; both at once, with his confirmation of the
+  size OK, since no belfem session was reachable from this host); script exit 0 on both.
+  Not done: the report to belfem, arrival result and promotion of both drops; U24, U26
+  (rows 1–8), and the Ubuntu ipopt replacement.
 
 ## Blockers
 
