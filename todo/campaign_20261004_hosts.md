@@ -102,7 +102,8 @@ readelf -d $P/libpetsc.so | grep NEEDED | grep -n -i 'metis\|scotch'
 
 Then the five-line program of gate G2 in the tracker, against the installed petsc 3.25.5. Record
 which library each `ParMETIS_V3_*` symbol of `libpetsc.so` binds to. On the macOS install,
-`PartKway` and `Mesh2Dual` bind to Scotch's library.
+`PartKway` and `Mesh2Dual` bind to Scotch's library
+(`devlog/dl20261004_campaign_policy_and_math_campaign.md`).
 
 ## 3. Build the campaign (pilot hosts now; the others after release)
 

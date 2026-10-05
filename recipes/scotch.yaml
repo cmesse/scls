@@ -91,7 +91,8 @@ configure:
     # and ParMETIS_V3_Mesh2Dual to Scotch's emulation (measured on the macOS
     # install, 2026-10-04). The emulation library itself has to stay:
     # PETSc's PT-Scotch check links it and its partitioner calls
-    # SCOTCH_ParMETIS_V3_NodeND. Christian, 2026-10-04; todo/scotch_metis_prefix.md.
+    # SCOTCH_ParMETIS_V3_NodeND. Christian, 2026-10-04;
+    # devlog/dl20261004_campaign_policy_and_math_campaign.md.
     - "-DSCOTCH_METIS_PREFIX=ON"
     - "-DBUILD_PTSCOTCH=ON"
     - "-DINSTALL_METIS_HEADERS=OFF"

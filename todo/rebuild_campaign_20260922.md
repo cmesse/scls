@@ -4,7 +4,8 @@
 **Branch:** `devel` (nothing on `main`)
 **Purpose:** upstream bumps for ten packages plus the rebuild they force, after an unexplained
 `-DBUILD_LIBSCOTCHMETIS` flip was found in `recipes/scotch.yaml` (95da949, 2026-04-01). That
-option is **unchanged** in this campaign; the open question lives in `todo/scotch_metis_prefix.md`.
+option is **unchanged** in this campaign; the question was settled on 2026-10-04
+(`devlog/dl20261004_campaign_policy_and_math_campaign.md`).
 **Scope:** 25 packages, one row each, one cell per (distro, flavor) build. Public binary flavors
 only (`gcc`, `mkl`, `debug`); nothing that ships only as a source build (`lbl`, `macos`, `intel`)
 is listed. Derived from `python/build_order.py` for the three flavors plus a reverse-dependency

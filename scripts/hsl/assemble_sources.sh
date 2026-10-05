@@ -13,7 +13,7 @@
 #   <target-dir>/LICENCES/    LICENCE.<package>-<version> of every tarball used
 #   <target-dir>/PROVENANCE.txt
 #
-# Policy (todo/libhsl_source_selection.md §9):
+# Policy (design record: devlog/dl20261003_libhsl_private_build.md):
 #   * Coin-HSL is the base. Its release must be pinned below; an unknown release
 #     stops, because the override table is only valid for a reviewed base.
 #   * A standalone package replaces Coin-HSL's copy only if its version is

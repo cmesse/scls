@@ -11,13 +11,8 @@ round 2 and the campaign in one drop per flavor: §1 and `todo/campaign_20261004
 Last full re-check against the tree: 2026-10-04 (macOS dev host). §9 was carried over from devlog
 "Open" sections and has **not** been re-checked.
 
-Separate files that carry their own analysis:
-- `todo/scotch_metis_prefix.md` — Scotch's METIS/ParMETIS compatibility libraries
-- `todo/extra_packages_unix_deb_override.md` — bugs B1 and B2
-- `todo/libhsl_source_selection.md` — HSL policy §9, cited by `scripts/build_libhsl.py` and
-  `scripts/hsl/assemble_sources.sh`
-- `todo/rebuild_campaign_20260922.md` — closed campaign, kept as the layout reference for
-  `/update-plan` and because 16 changelogs and `/stage-drop` cite it
+`todo/rebuild_campaign_20260922.md` is a closed campaign, kept as the layout reference for
+`/update-plan` and because 16 changelogs and `/stage-drop` cite it.
 
 ---
 
@@ -52,14 +47,6 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
       PETSc moves.
 - [ ] **hdf5 is a major version behind PETSc's pin** (1.14.6 against 2.2.0; `max_major: 1`).
       Christian, 2026-10-04: not this round. netcdf and exodus depend on it.
-- [ ] **Scotch's ParMETIS emulation shadows the real ParMETIS in PETSc.** Scotch is built without
-      `SCOTCH_METIS_PREFIX`, so `libptscotchparmetisv3` exports unprefixed `ParMETIS_V3_*`. On the
-      macOS install (scotch 7.0.11, petsc 3.25.0) `libpetsc` binds `ParMETIS_V3_PartKway` and
-      `ParMETIS_V3_Mesh2Dual` to Scotch's library, not to `libparmetis`. PETSc's own Scotch build
-      sets `-DSCOTCH_METIS_PREFIX=ON`. The library cannot simply be switched off: PETSc links it
-      and calls `SCOTCH_ParMETIS_V3_NodeND`. Linux binding unmeasured (read-only check in
-      `todo/campaign_20261004_hosts.md`). Analysis and radius: `todo/scotch_metis_prefix.md`.
-      **Decided 2026-10-04:** `-DSCOTCH_METIS_PREFIX=ON`, in `todo/rebuild_campaign_20261004.md`.
 - [ ] **Compression dependencies outside scotch (optional).** netcdf (bzip2, zstd) and libunwind
       (xz, on every Linux flavor but `lbl`) link host libraries that no recipe declares; the
       `-devel` packages are host prep (`doc/BUILD_EXECUTION.md` §1.1b). Declaring them is a metadata
@@ -105,8 +92,22 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
 
 ## 4. Builders and scripts (`python/`, `scripts/`; approval and the review gate)
 
-- [ ] **`extra_packages:` is ignored by unix_builder and deb_builder (B1)**, and `NEVER_SHIP`
-      matches the binary short name only (B2). `todo/extra_packages_unix_deb_override.md`.
+- [ ] **`extra_packages:` works for RPM builds only (B1; found 2026-09-30).** A recipe excluded by
+      its own `include_flavors:` / `exclude_flavors:` (e.g. `include_flavors: []` on suitesparse or
+      zlib) can be opted in on RHEL-family hosts, but on Ubuntu and macOS the build aborts with
+      `Package <pkg> not built for <flavor>`. `rpm_builder.py` checks `read_extra_packages(flavor)`
+      before raising; `unix_builder.py` (around line 91) raises unconditionally, and `DebBuilder`
+      inherits that. The meta-package builders read `extra_packages` on both paths, so on a .deb
+      host the meta would depend on a package the builder refuses to build. `CLAUDE.md` describes
+      the override as general. Fix sketch: one helper in `build_common.py` that all three builders
+      call. Radius: only packages listed in `extra_packages:` on a non-RPM host; no spec or .deb
+      output changes for any other recipe. Confirm first on a .deb host with `zlib`.
+- [ ] **`NEVER_SHIP` matches the binary short name only (B2; latent).** `NEVER_SHIP_REASON` in
+      `scripts/stage_to_belfem.sh` and `scripts/deb_drop_select.py` is keyed on the binary package
+      name with `scls-<flavor>-` stripped, so a subpackage of an excluded recipe
+      (`suitesparse-devel`) would miss the table and be staged. No exposure today: suitesparse has
+      no subpackages. Fix sketch: also check the source package name (`SOURCERPM` on RPM, the
+      `.dsc` `Source:` field on DEB).
 - [ ] **unix/deb ignore `configure.flavor_pre` / `configure.flavor_post`** for every configure
       type; rpm_builder runs them. Live case: openmpi's gcc-mkl-cuda CUDA-support check never runs
       on .deb hosts.

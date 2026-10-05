@@ -11,6 +11,8 @@ file, it is lost.
 
 ## Entries
 
+- [dl20261004_campaign_policy_and_math_campaign.md](dl20261004_campaign_policy_and_math_campaign.md) — devlog review for procedure gaps, new campaign policy, PETSc 3.26 math campaign, and the measurement that Scotch's ParMETIS emulation shadowed the real ParMETIS in PETSc (`SCOTCH_METIS_PREFIX`)
+
 - [dl20261004_u26_round2.md](dl20261004_u26_round2.md) — U26 round 2 built and installed on debug/gcc/mkl (GCC 15.2); spral debug `CPATH` fix reproduced, audits for `d908cfc`; release-bump rule (`BUILD_EXECUTION.md` §0.6); HSL script test on gcc
 - [dl20261004_u24_round2.md](dl20261004_u24_round2.md) — U24 round 2 built and installed on debug/gcc/mkl; spral debug `CPATH` fix for the unix/deb builders (`d908cfc`); mkl `ssidst` against meson's 300 s limit; HSL script test on gcc
 - [dl20261004_amzn_round2.md](dl20261004_amzn_round2.md) — AMZN round 2 on gcc/mkl: same nine NEVRAs as R9/R10, every §3 check passes (gperftools pprof skip held with Perl pprof present), MKL linkage PASS, HSL script test on gcc; nothing staged

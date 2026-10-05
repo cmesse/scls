@@ -14,7 +14,7 @@ and gets a shared library that the stack's unchanged libipopt can dlopen
 
 Tarballs to provide, and usage: doc/HSL_BUILD.md.
 
-Pipeline (todo/libhsl_source_selection.md §9):
+Pipeline (design record: devlog/dl20261003_libhsl_private_build.md):
   1. scripts/hsl/assemble_sources.sh: Coin-HSL base + verified standalone overrides
      (today HSL_MA77 6.5.0) into one tree outside the work tree, with LICENCES/ and
      PROVENANCE.txt.
