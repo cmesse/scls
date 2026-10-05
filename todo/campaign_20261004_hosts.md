@@ -22,8 +22,8 @@ recipe commit by hash.
 
 | Phase | R9 | U24 | R10 | AMZN | U26 |
 |---|---|---|---|---|---|
-| §1 sync | [ ] | [ ] | [ ] | [ ] | [ ] |
-| §2 state before the campaign | [ ] | [ ] | [ ] | [ ] | [ ] |
+| §1 sync | [x] | [ ] | [ ] | [ ] | [ ] |
+| §2 state before the campaign | [x] | [ ] | [ ] | [ ] | [ ] |
 | §3 build the campaign, gates G1–G3 | [ ] | [ ] | [ ] | [ ] | [ ] |
 | §4 standing gates, stage with `--build` | [ ] | [ ] | [ ] | [ ] | [ ] |
 | released for fan-out (Christian, commit hash) | pilot | pilot | [ ] | [ ] | [ ] |
@@ -82,7 +82,7 @@ AMZN built from (`21f141e`).
 
 | spral at `d908cfc` | R9 dbg | R9 gcc | R9 mkl | R10 dbg | R10 gcc | R10 mkl | AMZN gcc | AMZN mkl |
 |---|---|---|---|---|---|---|---|---|
-| spec diff checked; kept or rebuilt | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| spec diff checked; kept or rebuilt | kept: changelog-only (d908cfc) | kept: changelog-only (d908cfc) | kept: changelog-only (d908cfc) | [ ] | [ ] | [ ] | [ ] | [ ] |
 
 ### 2b. Drift sweep and linkage (every host, every flavor; read-only)
 
