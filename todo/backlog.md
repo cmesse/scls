@@ -95,6 +95,10 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
 - [ ] **`build next`, `build all` and `order` ignore `extra_packages:`** on every builder:
       `build_order.py` does not read it, so an opted-in package builds only when named
       (`./scls build <pkg>`). Left open when the explicit-build path was fixed on 2026-10-04.
+      Consequence on unix/deb: with `extra_packages: [gcc]`, every package that lists `gcc` as a
+      dependency now requires the prefix gcc, `build next` never schedules it, and
+      `DebBuilder._flavor_builds_own_gcc` still injects the system compilers. Build gcc by name
+      first, or teach `build_order.py` and that helper the opt-in (Grok, implementation audit).
 - [ ] **`stage_to_belfem.sh` globs `scls-<F>-*`,** which for `gcc` also matches
       `scls-gcc-mkl-cuda-*`. Pre-existing; found by Grok on 2026-10-04.
 - [ ] **Verify the 2026-10-04 staging change on real package databases:** one

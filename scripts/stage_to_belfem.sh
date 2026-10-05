@@ -224,6 +224,13 @@ while read -r n v r a srpm; do
 
     bin_nevra=$(nevra "$f")
     src=$(rpm -qp --qf '%{SOURCERPM}' "$f" 2>/dev/null)
+    # Second licence check, with the artifact's own SOURCERPM: the rpmdb field above
+    # can be empty or "(none)", and a subpackage must not get past on that.
+    reason=$(never_ship_reason "$n" "${src:-}")
+    if [ -n "$reason" ]; then
+        EXCLUDED+=("$bin_nevra  reason: $reason")
+        continue
+    fi
     srcpath="$REPO/rpmbuild/SRPMS/$src"
 
     if is_published "$bin_nevra"; then

@@ -71,9 +71,15 @@ def never_ship_table(recipes_dir):
         table[recipe.replace('_', '-')] = reason
         rfile = Path(recipes_dir) / f'{recipe}.yaml'
         if rfile.is_file():
+            # Recipes write subpackages either as a mapping keyed by name (lapack)
+            # or as a list of {'name': ...} entries (petsc, slepc, sundials);
+            # build_common.get_subpackages_for_flavor accepts both.
             subs = (yaml.safe_load(rfile.read_text()) or {}).get('subpackages') or {}
-            for sub in subs:
-                table[str(sub).replace('_', '-')] = reason
+            names = subs if isinstance(subs, dict) else \
+                [s.get('name') for s in subs if isinstance(s, dict)]
+            for sub in names:
+                if sub:
+                    table[str(sub).replace('_', '-')] = reason
     return table
 
 

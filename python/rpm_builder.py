@@ -21,7 +21,6 @@ from build_common import (
     BuildError, load_recipe, load_flavor, load_description,
     TRIPLET_PROGRAM_ERE, TRIPLET_PROGRAM_DIRS,
     get_optimization_flags, download_source, detect_source_directory,
-    should_build_package,
     get_configure_args, get_cmake_args,
     check_package_installed,
     get_package_dependencies,

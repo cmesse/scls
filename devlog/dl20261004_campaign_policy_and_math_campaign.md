@@ -102,8 +102,15 @@ Exchange: `tmp/ai_exchange/plan_extra_packages_never_ship.md`, `impl_extra_packa
   debug: specs and output identical before and after. `never_ship_reason` (bash, extracted from
   the script): 12 cases. `deb_drop_select.never_ship_table`/`never_ship_reason`: 10 cases.
 - **Not run:** `rpm -qa` on a real rpmdb, `dpkg-query`, the full staging script, a DebBuilder
-  build. The implementation audit round was dispatched and had not reported when this was
-  committed, on Christian's instruction to commit and push.
+  build. The implementation audit round had not reported when `57c7621` was committed and
+  pushed, on Christian's instruction.
+- **Implementation round** (same auditors, blind): no P0, no P1. Four P2, three fixed in the
+  follow-up commit: `never_ship_table` read only mapping-form `subpackages:` and missed the list
+  form that petsc, slepc and sundials use (the fixture in the first test was a mapping, so it
+  passed); an unused import in rpm_builder; a subpackage whose rpmdb `SOURCERPM` is empty or
+  `(none)` was not excluded, so the loop now checks again with the artifact's own `SOURCERPM`.
+  The fourth is in the backlog: with `extra_packages: [gcc]` on unix/deb, `build next` cannot
+  schedule the gcc that `check_dependencies` now requires.
 
 ## Open
 
