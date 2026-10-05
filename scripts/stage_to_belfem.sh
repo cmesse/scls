@@ -57,8 +57,10 @@ while [ $# -gt 0 ]; do
         --column) COLUMN="$2"; shift 2 ;;
         --stage)  STAGE="$2";  shift 2 ;;
         --drop)   USE_DROP="$2"; shift 2 ;;
-        # Same-version replacement of published .debs (contract v1.2 override;
+        # Same-version replacement of published packages (contract v1.2 override;
         # Christian's explicit approval per occasion). FILE lists binary names.
+        # .debs since 2026-10-04; RPMs since 2026-10-05 (belfem: same
+        # replace_published: section, replaced files are part of the payload).
         --replace)        REPLACE_FILE="$2"; shift 2 ;;
         --replace-reason) REPLACE_REASON="$2"; shift 2 ;;
         --build)  DO_BUILD=1;  shift ;;
@@ -203,6 +205,15 @@ never_ship_reason() {
     return 0
 }
 
+# Binary package names whose PUBLISHED NEVRA is to be replaced at the same version.
+declare -A REPLACE_NAME=() REPLACE_SEEN=()
+if [ -n "$REPLACE_FILE" ]; then
+    while read -r l; do
+        l="${l%%#*}"; l="${l//[[:space:]]/}"
+        [ -n "$l" ] && REPLACE_NAME[$l]=1
+    done < "$REPLACE_FILE"
+fi
+
 while read -r n v r a srpm; do
     [ -z "${n:-}" ] && continue
     # Licence exclusion first: it must hold regardless of whether an artifact or an
@@ -233,7 +244,15 @@ while read -r n v r a srpm; do
     fi
     srcpath="$REPO/rpmbuild/SRPMS/$src"
 
-    if is_published "$bin_nevra"; then
+    replacing=0
+    if is_published "$bin_nevra" && [ -n "${REPLACE_NAME[$n]:-}" ] \
+            && [ -n "$src" ] && [ -f "$srcpath" ]; then
+        # Named in --replace: ship the bytes and declare the replacement. belfem
+        # refuses a published NEVRA in the payload that is not declared here, and
+        # one whose SHA256HEADER/PAYLOADDIGEST equal the published copy.
+        replacing=1; REPLACE_SEEN[$n]=1
+        PAYLOAD_BIN+=("$f"); REPLACED+=("$bin_nevra  reason: $REPLACE_REASON")
+    elif is_published "$bin_nevra"; then
         # Already in the repo. Report it with digests so the publishing host can
         # confirm this builder is byte-identical, but never ship the bytes.
         d=$(rpm -qp --qf '%{SHA256HEADER} %{PAYLOADDIGEST}' "$f" 2>/dev/null)
@@ -252,7 +271,11 @@ while read -r n v r a srpm; do
     # sources), and shipping a duplicate SRPM would be refused and waste space.
     if [ -n "$src" ] && [ -f "$srcpath" ]; then
         src_nevra=$(nevra "$srcpath" "src")
-        if is_published "$src_nevra"; then
+        if is_published "$src_nevra" && [ "$replacing" -eq 1 ]; then
+            case " ${PAYLOAD_SRC[*]:-} " in *" $srcpath "*) ;;
+                *) PAYLOAD_SRC+=("$srcpath")
+                   REPLACED+=("$src_nevra  reason: $REPLACE_REASON") ;; esac
+        elif is_published "$src_nevra"; then
             d=$(rpm -qp --qf '%{SHA256HEADER} %{PAYLOADDIGEST}' "$srcpath" 2>/dev/null)
             case " ${ALREADY[*]:-} " in *"$src_nevra "*) ;;
                 *) ALREADY+=("$src_nevra  SHA256HEADER=${d% *} PAYLOADDIGEST=${d#* }") ;; esac
@@ -262,6 +285,13 @@ while read -r n v r a srpm; do
         fi
     fi
 done < <(rpm -qa --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH} %{SOURCERPM}\n' "scls-$FLAVOR-*" "scls-$FLAVOR" 2>/dev/null | sort -u)
+
+# A --replace name that selected nothing is a typo or a package that is not
+# published at this NEVRA: stop, rather than stage a drop without it.
+for l in "${!REPLACE_NAME[@]}"; do
+    [ -n "${REPLACE_SEEN[$l]:-}" ] || {
+        echo "error: --replace names $l, which is not an installed, published package with an SRPM" >&2; exit 2; }
+done
 
 # Drop anything whose installed NEVRA no longer matches its recipe.
 declare -a KEEP=()
@@ -335,7 +365,7 @@ echo "total_bytes:       $TOTAL"
 echo "excluded:          ${#EXCLUDED[@]}"
 echo "already_published: ${#ALREADY[@]}"
 [ "$DISTRO" = ubuntu ] && echo "no_source:         ${#NO_SOURCE[@]}"
-[ "$DISTRO" = ubuntu ] && echo "replace_published: ${#REPLACED[@]}"
+echo "replace_published: ${#REPLACED[@]}"
 echo
 if [ "$DO_BUILD" -eq 0 ] && [ "$DO_UPLOAD" -eq 0 ]; then
     echo "(selection only — pass --build to stage)"; exit 0

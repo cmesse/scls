@@ -175,6 +175,36 @@ After the merge, on EL9:
 - `scls-debug-examples` and `scls-gcc-examples` are not installed on this host, so the script
   never sees them; `scls-mkl-examples` 2026-1 is listed as already published.
 
+## 7. 2026-10-05: ipopt rebuilt on debug and gcc at the unchanged release; G2 with the new text
+
+Instruction: `todo/el9_el10_ipopt_rebuild_20261005.md` (written on the AMZN host for Christian).
+Branch head at the start: `aa0e051`. No recipe, manifest, patch or `python/` change on this host.
+
+- The first run was cut off when the session ended: the debug build had finished, the gcc build
+  had not. After the restart debug was installed from that build and gcc was rebuilt from scratch.
+- `scls-debug-ipopt-3.14.20-1`: SHA256HEADER / PAYLOADDIGEST before `985fb6a0…5d06` / `72c690c5…2a5f`,
+  after `75e8f14c…84b9` / `2d0c9309…70c5`. `scls-gcc-ipopt-3.14.20-1`: before `abf2c439…e0d2` /
+  `a61ba535…974a`, after `bdff5d3b…4177` / `6ef73ee4…da5f`. belfem confirmed the "before" values
+  equal the published copies. Both changelogs now start with the 2026-10-04 entry.
+- G3 passes on debug and gcc after the rebuild (hs071 with mumps and spral).
+- G2 as rewritten in `11e38af`, pasted from the tracker with `/tmp` replaced by a scratch
+  directory: debug `G2 PASS`, gcc `G2 PASS`, mkl one `G2 note: no loader log ... exits 139` line
+  and `G2 PASS`. This replaces the hand-made substitute evidence of §3 for mkl.
+- Standing gates after the last install: drift sweep empty, `scls-<F>` 2026-2 installed,
+  `check_mkl_linkage.sh` pass on debug, gcc, mkl.
+- Published list regenerated from belfem's el9 repodata (revision 1791196494, 258 NEVRAs); the
+  previous one is kept as `published-el9.txt.20261004`.
+- Drops, staged with `--replace` and uploaded at `1ec98aa`, each with the binary and the source
+  NEVRA under `replace_published:` and nothing else in the payload:
+
+| Drop | Files | Bytes | sha256(SHA256SUMS) | State |
+|---|---|---|---|---|
+| R9-debug-20261005T1053Z | 2 | 2927943 | `ce09cd73…4ff7` | size approved by belfem; uploaded, exit 0; arrival result and promotion pending |
+| R9-gcc-20261005T1053Z | 2 | 2927434 | `c5a0355e…ea21` | size approved by belfem; uploaded, exit 0; arrival result and promotion pending |
+
+  Christian's go for these two drops, in this session: "Upload both". An earlier "yes, go ahead"
+  that arrived during staging was not taken as the upload approval.
+
 ## Open
 
 - Blockers: none on R9.

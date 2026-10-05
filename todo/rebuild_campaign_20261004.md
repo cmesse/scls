@@ -35,14 +35,14 @@ recipe, rebuilt because that dependency changed its SONAME.
 
 | # | G | Package | why | R9 DBG | R9 GCC | R9 MKL | R10 DBG | R10 GCC | R10 MKL | AMZN GCC | AMZN MKL | U24 DBG | U24 GCC | U24 MKL | U26 DBG | U26 GCC | U26 MKL |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 2 | hwloc 2.14.0-2 → 2.15.0-1 | up (PETSc pin) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 2 | 6 | scotch 7.0.15-2 → -3 | opt (`-DSCOTCH_METIS_PREFIX=ON`) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 3 | 8 | armadillo 15.6.0 → 15.6.1 | up | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 4 | 10 | petsc 3.25.5 → 3.26.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 5 | 11 | slepc 3.25.2 → 3.26.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 6 | 11 | sundials 7.9.0-1 → -2 | casc (petsc) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 7 | — | mumps 5.9.1-2 → -3 | fix (MKL RUNPATH; added 2026-10-04) | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | kept: build unchanged | kept: build unchanged | [x] | kept: build unchanged | kept: build unchanged | [x] | kept: build unchanged | [ ] | kept: build unchanged | kept: build unchanged | [ ] | kept: build unchanged | kept: build unchanged | [ ] |
+| 1 | 2 | hwloc 2.14.0-2 → 2.15.0-1 | up (PETSc pin) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 2 | 6 | scotch 7.0.15-2 → -3 | opt (`-DSCOTCH_METIS_PREFIX=ON`) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 3 | 8 | armadillo 15.6.0 → 15.6.1 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 4 | 10 | petsc 3.25.5 → 3.26.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 5 | 11 | slepc 3.25.2 → 3.26.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 6 | 11 | sundials 7.9.0-1 → -2 | casc (petsc) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 7 | — | mumps 5.9.1-2 → -3 | fix (MKL RUNPATH; added 2026-10-04) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | kept: build unchanged | kept: build unchanged | [x] | [x] (rebuilt 2026-10-05, same release) | [x] | kept: build unchanged | kept: build unchanged | [ ] | kept: build unchanged | kept: build unchanged | [ ] |
 
 6 packages × 14 cells = **84 builds**. petsc is the longest.
 
@@ -102,27 +102,59 @@ Set `P=/opt/scls/<F>` first.
   [ $rc -eq 0 ] && echo "G1 PASS"; ( exit $rc )
   ```
 
-- **G2 — PETSc's ParMETIS calls reach ParMETIS.** After petsc installs:
+- **G2 — PETSc's ParMETIS calls reach ParMETIS.** After petsc installs. Rewritten 2026-10-05
+  (Christian; found on R9 mkl, again on AMZN mkl): as first written the gate rested on
+  `LD_BIND_NOW=1 LD_DEBUG=bindings` alone, and on MKL flavors of EL9 and Amazon Linux 2023 the
+  loader dies there before `libpetsc.so` is bound (`libmkl_gnu_thread.so.3` imports `ceil`,
+  `sincos`, `log` and `sqrt` without NEEDing `libm`; glibc 2.34 prints "Relink ... for IFUNC
+  symbol" and the program exits 139). The gate now has two parts. (a) runs on every flavor: the
+  test program looks up every ParMETIS symbol `libpetsc.so` imports in the global scope after
+  `PetscInitialize` (`dlsym(RTLD_DEFAULT)` + `dladdr`) and the gate checks the library. (b) is
+  the loader's binding log as before; it is checked wherever it exists and skipped with a
+  printed note only when `LD_BIND_NOW` kills the program before libpetsc is bound. Checked on
+  AMZN: passes on gcc with (a) and (b), on mkl with (a); fails on both when a preloaded library
+  defines `ParMETIS_V3_PartKway`. Remove the two-space indent when pasting.
 
   ```bash
-  cat > /tmp/g2.c <<'EOF'
+  cat > /tmp/g2.c <<'EOC'
+  #define _GNU_SOURCE
+  #include <dlfcn.h>
+  #include <stdio.h>
   #include <petscsys.h>
-  int main(int c, char **v){ PetscInitialize(&c,&v,NULL,NULL); return PetscFinalize(); }
-  EOF
+  int main(int c, char **v){
+    PetscInitialize(&c,&v,NULL,NULL);
+    for (int i = 1; i < c; i++) { Dl_info d; void *p = dlsym(RTLD_DEFAULT, v[i]);
+      printf("lookup %s %s\n", v[i], (p && dladdr(p,&d)) ? d.dli_fname : "UNRESOLVED"); }
+    return PetscFinalize(); }
+  EOC
   ( source $P/share/scls/activate
-    mpicc /tmp/g2.c -o /tmp/g2 $(pkg-config --cflags --libs PETSc) -Wl,-rpath,$P/lib ) || { echo "G2 FAIL: build"; false; }
-  LD_BIND_NOW=1 LD_DEBUG=bindings /tmp/g2 2>&1 | grep 'binding file .*libpetsc\.so' > /tmp/g2.log
+    mpicc /tmp/g2.c -o /tmp/g2 $(pkg-config --cflags --libs PETSc) -Wl,-rpath,$P/lib -ldl ) || { echo "G2 FAIL: build"; false; }
   rc=0
-  for s in ParMETIS_V3_PartKway ParMETIS_V3_Mesh2Dual; do
-    grep -q "to .*libparmetis\.so.*\`$s'" /tmp/g2.log || { echo "G2 FAIL: $s not bound to libparmetis"; rc=1; }
+  syms=$(nm -D --undefined-only $P/lib/libpetsc.so | awk '{print $NF}' | grep -E '^(SCOTCH_)?(ParMETIS_|PARMETIS_|parmetis_)') || { echo "G2 FAIL: libpetsc.so imports no ParMETIS symbol"; rc=1; }
+  for s in ParMETIS_V3_PartKway ParMETIS_V3_Mesh2Dual SCOTCH_ParMETIS_V3_NodeND; do
+    printf '%s\n' "$syms" | grep -qx "$s" || { echo "G2 FAIL: libpetsc.so does not import $s"; rc=1; }
   done
-  grep -E "\`ParMETIS_" /tmp/g2.log | grep -v 'to .*libparmetis\.so' && { echo "G2 FAIL: a ParMETIS_* symbol binds elsewhere (lines above)"; rc=1; }
-  grep -q "to .*libptscotchparmetisv3\.so.*\`SCOTCH_ParMETIS_V3_NodeND'" /tmp/g2.log || { echo "G2 FAIL: SCOTCH_ParMETIS_V3_NodeND not bound to libptscotchparmetisv3"; rc=1; }
+  # (a) what every flavor can run: the global lookup libpetsc's imports go through
+  /tmp/g2 $syms | grep '^lookup ' > /tmp/g2.lookup; [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "G2 FAIL: /tmp/g2 did not run"; rc=1; }
+  [ "$(wc -l < /tmp/g2.lookup)" -eq "$(printf '%s\n' "$syms" | wc -l)" ] || { echo "G2 FAIL: lookup lines missing"; rc=1; }
+  grep -E '^lookup (ParMETIS_|PARMETIS_|parmetis_)' /tmp/g2.lookup | grep -v '/libparmetis\.so' && { echo "G2 FAIL: a ParMETIS_* symbol resolves outside libparmetis (lines above)"; rc=1; }
+  grep -E '^lookup SCOTCH_' /tmp/g2.lookup | grep -v '/libptscotchparmetisv3\.so' && { echo "G2 FAIL: a SCOTCH_ParMETIS_* symbol resolves outside libptscotchparmetisv3 (lines above)"; rc=1; }
+  # (b) the loader's own binding log, where the loader survives LD_BIND_NOW
+  LD_BIND_NOW=1 LD_DEBUG=bindings /tmp/g2 2>&1 | grep 'binding file .*libpetsc\.so' > /tmp/g2.log; bn=${PIPESTATUS[0]}
+  if [ "$bn" -ne 0 ] && [ ! -s /tmp/g2.log ]; then
+    echo "G2 note: no loader log, LD_BIND_NOW=1 /tmp/g2 exits $bn before libpetsc is bound (MKL: libmkl_gnu_thread imports libm IFUNC symbols without NEEDing libm); result rests on (a)"
+  else
+    for s in ParMETIS_V3_PartKway ParMETIS_V3_Mesh2Dual; do
+      grep -q "to .*libparmetis\.so.*\`$s'" /tmp/g2.log || { echo "G2 FAIL: $s not bound to libparmetis"; rc=1; }
+    done
+    grep -E "\`ParMETIS_" /tmp/g2.log | grep -v 'to .*libparmetis\.so' && { echo "G2 FAIL: a ParMETIS_* symbol binds elsewhere (lines above)"; rc=1; }
+    grep -q "to .*libptscotchparmetisv3\.so.*\`SCOTCH_ParMETIS_V3_NodeND'" /tmp/g2.log || { echo "G2 FAIL: SCOTCH_ParMETIS_V3_NodeND not bound to libptscotchparmetisv3"; rc=1; }
+  fi
   [ $rc -eq 0 ] && echo "G2 PASS"; ( exit $rc )
   ```
 
-  If `libpetsc.so` no longer imports one of the two named symbols in 3.26.0, the first loop fails:
-  report it as a finding with `/tmp/g2.log`; do not edit the gate on the host.
+  If `libpetsc.so` no longer imports one of the three named symbols, the gate fails: report it as
+  a finding with `/tmp/g2.lookup` and `/tmp/g2.log`; do not edit the gate on the host.
 
 - **G3 — the packages that were not rebuilt still load and run.** After hwloc and scotch install
   and before anything else is built. glibc's `ldd -r` exits 0 even with undefined symbols, so the
@@ -295,6 +327,40 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   (31 files, 203057687 bytes, restaged at `2faf7e1` with the digest of the earlier `…0846Z`)
   uploaded, verified and promoted; belfem reports el10 complete. Not done: AMZN, U24,
   U26 (rows 1–8), and the Ubuntu ipopt replacement.
+- 2026-10-05 — AMZN (Amazon Linux 2023), built from `7623f57`/`2faf7e1` (docs-only difference):
+  gcc 7/7, mkl 8/8 built and installed (rows 1–7, and ipopt on mkl). No class M/P/D fix. spral
+  kept as changelog-only (`d908cfc`) on both flavors. Gates: G1 and G3 pass on both (G3 on mkl
+  failed after scotch on the known `libdmumps` lines and passes after mumps 5.9.1-3 and ipopt);
+  G2 passes on gcc and does not run as written on mkl (`LD_BIND_NOW=1` exits 139, as on R9;
+  the `dlsym` + `dladdr` substitute resolves the five `ParMETIS_*` symbols to `libparmetis.so`
+  and `SCOTCH_ParMETIS_V3_NodeND` to `libptscotchparmetisv3.so.7.0`). Standing gates pass.
+  Drops: `AMZN-gcc-20261005T0954Z` (31 files, 202975269 bytes) uploaded, verified and promoted;
+  `AMZN-mkl-20261005T1024Z` (31 files, 202899916 bytes) uploaded, script exit 0, arrival result
+  pending. Scope addition by Christian, 2026-10-05: ipopt
+  3.14.20-1 on gcc is rebuilt at the unchanged release so its `%changelog` matches mkl ("I
+  override this rule for this time. We don't need to bump"), and replaces the published
+  package through `stage_to_belfem.sh --replace` on the RPM path (`b333cf8`); he announced the
+  same for el9 and el10 in the belfem session. Rebuilt and installed on AMZN gcc; G3 passes
+  with it. Not done: the AMZN gcc ipopt replacement drop; U24, U26 (rows 1–8), and the Ubuntu ipopt replacement.
+- 2026-10-05 — gate G2 rewritten (Christian: "This should have been fixed hours ago"), see the
+  gate text. Re-run on AMZN with the new text: gcc PASS with the lookup and the loader log; mkl
+  PASS with the lookup, loader log unavailable (exit 139 under `LD_BIND_NOW`). The G2 results
+  recorded above for R9 mkl ("does not run as written", substitute evidence) and for AMZN mkl
+  are the same lookup the gate now performs. U24 and U26 run the new text.
+- 2026-10-05 — AMZN drops: `AMZN-mkl-20261005T1024Z` verified and promoted. Replacement drop
+  `AMZN-gcc-20261005T1033Z` (ipopt 3.14.20-1 x86_64 and src, `replace_published: 2`, 2927173
+  bytes) uploaded, verified and promoted; it is the first RPM drop staged with `--replace`, and
+  belfem reports amzn2023 complete for this campaign (88 x86_64 + 82 source RPMs). AMZN is complete: gcc 8/8 (row 8 rebuilt by Christian's override), mkl 8/8.
+  Details: `devlog/dl20261005_amzn_math_campaign.md`. Not done: EL9 and EL10 ipopt on debug and
+  gcc and their G2 re-run (`todo/el9_el10_ipopt_rebuild_20261005.md`); U24, U26 (rows 1–8), and
+  the Ubuntu ipopt replacement.
+
+- 2026-10-05 — R9: ipopt 3.14.20-1 rebuilt and installed on debug and gcc at the unchanged release
+  (`todo/el9_el10_ipopt_rebuild_20261005.md`, Christian's override). G3 passes on both. G2 with the
+  text of `11e38af`: PASS on debug and gcc with both parts; on mkl the "no loader log" note and
+  PASS on part (a). Drift sweep empty, linkage pass on all three flavors. Replacement drops
+  `R9-debug-20261005T1053Z` and `R9-gcc-20261005T1053Z` (2 files each, `replace_published: 2`):
+  size approved by belfem, uploaded, script exit 0; arrival result and promotion pending.
 
 ## Blockers
 
