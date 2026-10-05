@@ -579,4 +579,6 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   installed. spral, ipopt and the meta-package built from `d908cfc`; spral passed with the default
   parallel tests on all three flavors (9/9 debug and mkl, 10/10 gcc). Every check in
   `todo/round2_el10_amzn2023.md` §3 passes; `check_mkl_linkage.sh` PASS on mkl; HSL script test
-  passed on gcc. Not staged. Devlog: `devlog/dl20261004_u26_round2.md`.
+  passed on gcc. Devlog: `devlog/dl20261004_u26_round2.md`. Drops `U26-debug-20261005T0110Z`,
+  `U26-gcc-20261005T0121Z`, `U26-mkl-20261005T0123Z` (26 files each) uploaded 2026-10-04 after the
+  coordinator's size OK and go; promotion is belfem's.
