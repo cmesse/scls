@@ -10,6 +10,10 @@ builds six more packages per flavor on every host. The Ubuntu hosts then stage t
 packages; the RPM hosts stage **one** drop per flavor that carries round 2 and this campaign
 together.
 
+**Names.** The hosts are EL9, EL10, AMZN (Amazon Linux 2023), U24 and U26. `R9` and `R10` below are
+the column names of EL9 and EL10 in the tracker and in `stage_to_belfem.sh --column`; they are kept
+because the staging script and belfem's drop names use them.
+
 Cell legend: `[ ]` to do · `[x]` done · `n/a` not applicable · `kept: <reason>` not rebuilt (policy §6).
 
 ---
@@ -167,10 +171,12 @@ head moved after §4, restage first.
 
 ## 6. Host notes
 
-### EL9 (R9) — RPM pilot
+### EL9 (tracker column `R9`) — RPM pilot
 
-**From the dev-host session, 2026-10-04 evening — read this before §1.** No R9 session was
-reachable for a direct message, so it is here. What changed on the branch since R9 last pulled
+**From the dev-host session, 2026-10-04 evening — read this before §1.** The EL9 session (`session_014CkV9f59rDdb9oVz4oXcDE`) could not
+be reached with a direct message from the dev host, so the note is here. The host is **EL9**; `R9`
+is only its column name in the tracker and in `stage_to_belfem.sh --column R9`. What changed on
+the branch since EL9 last pulled
 (`21f141e` recipe state), newest last:
 
 1. **`doc/CAMPAIGN_POLICY.md` is new and in force.** A finding blocks only as B1–B4; everything
@@ -184,7 +190,7 @@ reachable for a direct message, so it is here. What changed on the branch since 
    not a same-release rebuild: 7.0.15-2 was published on noble and resolute this evening.
 3. **Gates G1–G3 in the tracker are scripts that exit non-zero.** Run them as written; if one
    fails because of the gate itself, report it, do not edit it on the host.
-4. **`57c7621` and `2cf1911` change `scripts/stage_to_belfem.sh`,** and R9 is the first host to
+4. **`57c7621` and `2cf1911` change `scripts/stage_to_belfem.sh`,** and EL9 is the first host to
    run it on a real rpmdb. The `rpm -qa` query now has a fifth field, `%{SOURCERPM}`, and a new
    `never_ship_reason()` excludes a binary when its own name **or its source package's** is a
    NEVER_SHIP recipe (so a subpackage of suitesparse cannot ship). It is checked twice: from the
@@ -192,7 +198,7 @@ reachable for a direct message, so it is here. What changed on the branch since 
    the function extracted and canned input. **On the first `--flavor debug --column R9` select
    run (no `--build`), check and report:**
    - the script runs to the end under `set -u -o pipefail`;
-   - `excluded:` contains nothing that was not excluded before (expected: empty on R9, since
+   - `excluded:` contains nothing that was not excluded before (expected: empty on EL9, since
      suitesparse was removed from this host on 2026-09-25);
    - lapack's `blas`, `cblas`, `lapacke` and the `*-examples` packages are selected or listed as
      already published, not excluded;
