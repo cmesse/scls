@@ -171,7 +171,7 @@
     <nav>
         <a href="index.html" title="BELFEM">BELFEM</a>
         <a href="scls.html" title="SCLS" class="active" aria-current="page">SCLS</a>
-        <a href="examples.html" title="Examples">Examples</a>
+        <a href="https://belfem.lbl.gov/doc/" title="Documentation">Documentation</a>
         <a href="publications.html" title="Publications">Publications</a>
         <a href="contact.html" title="Contact">Contact</a>
     </nav>
@@ -219,7 +219,7 @@
         <li>The math backend is selected by flavor (OpenBLAS for <code>gcc</code>, Intel MKL for <code>mkl</code>, reference BLAS/LAPACK for <code>debug</code>), not toggled package by package.</li>
         <li>OpenMPI is the default MPI implementation.</li>
         <li>Shared libraries are the normal target.</li>
-        <li>LP64 (32-bit BLAS/LAPACK integer indices) is the default; ILP64 can be turned on optionally in the build scripts.</li>
+        <li>LP64 (32-bit BLAS/LAPACK integer indices) is the default; ILP64 can be enabled in the build scripts.</li>
         <li>Numerical correctness matters more than aggressive flag games &mdash; no <code>-ffast-math</code>.</li>
         <li>Binaries are built from explicit recipe dependencies, not from whatever optional libraries the build host happens to expose through autodetection.</li>
     </ul>
@@ -227,7 +227,7 @@
     <ul>
         <li><strong>No Python in the stack.</strong> Interpreter choice (system, pyenv, conda, Spack, modules) is site- and user-specific, so recipes disable Python and other language bindings by default. Users bring their own interpreter and link it to the installed C/C++ libraries.</li>
         <li><strong>No Boost.</strong> Modern C++ (C++17/20) covers most of what scientific code once used Boost for, and the libraries SCLS targets either never required it or have dropped the dependency.</li>
-        <li><strong>No GPL in the published binaries.</strong> Every package in the public binary flavors carries a BSD-3-Clause-compatible license: permissive, or weak copyleft (LGPL, CeCILL-C, EPL-2.0) whose obligations attach to the library itself rather than to code that merely links against it. GPL libraries of any version are excluded, so downstream codes can link SCLS without strong-copyleft concerns. GPL build tools are allowed in the build scripts, because macOS and other Unix systems without SCLS binaries may need them; they run during the build and are not linked into the delivered libraries. The GCC runtime libraries are linked, under the GCC Runtime Library Exception. See the <a href="https://github.com/cmesse/scls/blob/main/doc/LICENSE_POLICY.md">license policy</a> for details.</li>
+        <li><strong>No GPL in the published binaries.</strong> Every package in the public binary flavors carries a BSD-3-Clause-compatible license: permissive, or weak copyleft (LGPL, CeCILL-C, EPL-2.0) whose obligations attach to the library itself rather than to code that merely links against it. GPL libraries of any version are excluded, so downstream codes can link SCLS without strong-copyleft concerns. GPL build tools are allowed in the build scripts, because macOS and other Unix systems without SCLS binaries may need them; they run during the build and are not linked into the delivered libraries. The GCC runtime libraries are linked under the GCC Runtime Library Exception. See the <a href="https://github.com/cmesse/scls/blob/main/doc/LICENSE_POLICY.md">license policy</a> for details.</li>
     </ul>
     <p>This bias toward curation is intentional. If a project needs many custom feature toggles for a single package, SCLS is probably the wrong tool. If it needs PETSc, Ipopt, HDF5, OpenBLAS, NetCDF, MUMPS, and related libraries to build and coexist predictably, SCLS is built for that job.</p>
 
@@ -321,14 +321,14 @@ sudo apt install --reinstall $(dpkg-query -W -f='${Package}\n' 'scls-*')</code><
     </div>
     <p>Outside the public Enterprise Linux and Ubuntu repositories, clone the SCLS source tree and use the <code>./scls</code> wrapper. It selects RPM mode on supported RHEL-family hosts, including Amazon Linux 2023; DEB mode on Debian-family systems; and direct Unix-install mode elsewhere.</p>
     <p>On Debian-family systems outside the public Ubuntu 24.04 and 26.04 repositories, <code>./scls</code> can still build local <code>.deb</code> packages. On macOS and other Unix systems, the Unix builder installs the packages directly into the selected SCLS prefix.</p>
-    <p><strong>macOS is supported on both Intel Macs and Apple Silicon</strong>; Apple Silicon support is no longer beta, and the stack has been built from source on each. Upstream GCC carries no <code>aarch64-apple-darwin</code> target of its own, so on arm64 hosts SCLS vendors the <a href="https://github.com/Homebrew/homebrew-core/tree/main/Patches/gcc">Apple Silicon GCC patch maintained by Homebrew</a> and applies it automatically. Rosetta is not a supported path: an <code>x86_64</code> shell gets the Intel toolchain instead.</p>
-    <p>The macOS flavor assumes familiarity with a Unix toolchain: installing Xcode Command Line Tools, understanding linker and sysroot settings, and interpreting build logs that point to an SDK or path issue. It builds its own GCC for Fortran support, which adds time to the first build. If that bootstrap fails (Apple Clang building GCC 16), Homebrew's prebuilt GCC is supported as a fallback on either architecture. See the <a href="https://github.com/cmesse/scls/blob/main/doc/MACOS_BUILD.md">macOS build guide</a> for prerequisites, the step-by-step flow, and the two Homebrew fallback routes.</p>
+    <p><strong>macOS is supported on both Intel Macs and Apple Silicon</strong>; Apple Silicon support is no longer beta, and the stack has been built from source on both. Upstream GCC carries no <code>aarch64-apple-darwin</code> target of its own, so on arm64 hosts SCLS vendors the <a href="https://github.com/Homebrew/homebrew-core/tree/main/Patches/gcc">Apple Silicon GCC patch maintained by Homebrew</a> and applies it automatically. Rosetta is not a supported path: an <code>x86_64</code> shell gets the Intel toolchain instead.</p>
+    <p>The macOS flavor assumes familiarity with a Unix toolchain: installing Xcode Command Line Tools, understanding linker and sysroot settings, and interpreting build logs that point to an SDK or path issue. It builds its own GCC for Fortran support, which adds time to the first build. If that bootstrap (Apple Clang building GCC 16) fails, Homebrew's prebuilt GCC is supported as a fallback on either architecture. See the <a href="https://github.com/cmesse/scls/blob/main/doc/MACOS_BUILD.md">macOS build guide</a> for prerequisites, the step-by-step flow, and the two Homebrew fallback routes.</p>
     <p>Quick start:</p>
     <ol>
         <li>Clone the repository:<br>
             <pre class="command"><code>git clone https://github.com/cmesse/scls.git
 cd scls</code></pre></li>
-        <li>Create <code>flavor.conf</code> for your platform. Linux default / local package build:<br>
+        <li>Create <code>flavor.conf</code> for your platform. Linux (the default flavor, also used for local package builds):<br>
             <pre class="command"><code>echo "flavor: gcc" &gt; flavor.conf</code></pre>
             macOS:
             <pre class="command"><code>echo "flavor: macos" &gt; flavor.conf</code></pre></li>
@@ -445,7 +445,10 @@ cmake --build build</code></pre>
         </tbody>
     </table>
     </div>
-    <p>Ipopt is built against the stack's own linear solvers: the MPI build of MUMPS (the default <code>linear_solver</code>) and SPRAL's SSIDS on every flavor, plus MKL Pardiso on the MKL flavors. Users select a solver in <code>ipopt.opt</code>; SSIDS additionally needs <code>OMP_CANCELLATION=TRUE</code> in the environment of the program that uses it. The HSL solvers (MA27, MA57, HSL_MA77, HSL_MA86, HSL_MA97) are supported through Ipopt's runtime loader for users who hold an HSL licence: SCLS does not distribute HSL in any form, but <code>./scls build hsl</code> builds a private library from the user's own licensed Coin-HSL source tarball against the stack's METIS and BLAS/LAPACK. See <a href="https://github.com/cmesse/scls/blob/main/doc/HSL_BUILD.md">HSL_BUILD.md</a>.</p>
+    <p>Ipopt is built against the stack's own linear solvers: the MPI build of MUMPS (the default <code>linear_solver</code>) and SPRAL's SSIDS on every flavor, plus MKL Pardiso on the MKL flavors. Users select a solver in <code>ipopt.opt</code>; SSIDS additionally needs <code>OMP_CANCELLATION=TRUE</code> in the environment of the program that uses it.</p>
+
+    <h3>Coin-HSL for Ipopt</h3>
+    <p>The HSL linear solvers (MA27, MA57, HSL_MA77, HSL_MA86, HSL_MA97) are proprietary, and SCLS ships neither their source nor a binary. What SCLS provides is the build scripts: <code>./scls build hsl</code> and <code>./scls install hsl</code> turn your own Coin-HSL source tarball into a private library linked against the stack's METIS and BLAS/LAPACK. The packaged Ipopt loads that library at runtime. You must bring your own sources and your own HSL licence, obtained from <a href="https://licences.stfc.ac.uk">STFC</a>. See <a href="https://github.com/cmesse/scls/blob/main/doc/HSL_BUILD.md">HSL_BUILD.md</a> for the details.</p>
 
 </section>
 

@@ -3,7 +3,7 @@
 HSL's linear solvers are proprietary (STFC HSL licence). SCLS ships no HSL source or
 binary and no package that depends on HSL; see the HSL section of
 [`LICENSE_POLICY.md`](LICENSE_POLICY.md). What SCLS provides is build tooling: you supply
-the tarballs you are licensed for, SCLS builds one shared library from them against the
+the tarballs you are licensed to use, SCLS builds one shared library from them against the
 stack's own METIS and BLAS/LAPACK, and the stack's unchanged Ipopt loads it at runtime
 (`linear_solver ma27|ma57|ma77|ma86|ma97`).
 
@@ -17,12 +17,9 @@ the SCLS checkout (git-ignored), or anywhere else passed with `--sources DIR`.
 | Tarball | Status | What it is used for |
 |---|---|---|
 | `coinhsl-2024.05.15.tar.gz` | **required** | Coin-HSL, the full STFC bundle for Ipopt: MA27, MA28, MA57, MC19, HSL_MA77, HSL_MA86, HSL_MA97, HSL_MC68 and the METIS 5 adapter. This is the base of the build. |
-| `hsl_ma77-<version>.tar.gz` | optional | Used **only if newer** than the HSL_MA77 inside Coin-HSL (6.4.0). Today 6.5.0 is newer and is taken; it is also what the refactorization test requires. |
-| `hsl_ma86-<version>.tar.gz` | optional | Same rule, against Coin-HSL's 1.7.4. Equal today → ignored. |
-| `hsl_ma97-<version>.tar.gz` | optional | Same rule, against Coin-HSL's 2.8.1. Equal today → ignored. |
-| `ma57-*`, `hsl_ma57-*` | ignored | Standalone MA57 calls the METIS 4 interface; Coin-HSL's copy uses the METIS 5 adapter. `hsl_ma57` is a different package line. |
-| `hsl_mc68-*` | ignored | HSL_MC68 is already inside Coin-HSL (`common/deps90.f90`). |
-| `hsl-galahad*` | ignored | The GALAHAD HSL subset; superseded by Coin-HSL for this purpose. |
+| `hsl_ma77-<version>.tar.gz` | optional | Used **only if newer** than the HSL_MA77 inside Coin-HSL (6.4.0). Today 6.5.0 is newer and is used; it is also what the refactorization test requires. |
+| `hsl_ma86-<version>.tar.gz` | optional | Same rule, against Coin-HSL's 1.7.4. Equal today, so it is ignored. |
+| `hsl_ma97-<version>.tar.gz` | optional | Same rule, against Coin-HSL's 2.8.1. Equal today, so it is ignored. |
 
 Notes:
 - It must be the **full** Coin-HSL, not "Coin-HSL Archive" (MA27/MA28/MC19 only). The
@@ -31,7 +28,7 @@ Notes:
 - A standalone override combines two HSL distributions you hold into one build: the solver's
   own source files are taken from the newer release, everything else from Coin-HSL. It is
   applied only after the assembler has verified that the two releases agree on every C
-  interface, header and shared dependency unit; anything else stops the build. The original
+  interface, header, and shared dependency unit; anything else stops the build. The original
   tarballs are never modified. Whether combining releases is within your licence is your call;
   `--no-overrides` builds Coin-HSL exactly as shipped.
 - The build is pinned to Coin-HSL **2024.05.15**. A newer Coin-HSL release stops the build
@@ -69,8 +66,8 @@ on errors and interrupts, unless `--keep-work`.
    alone; the software and its use may not be shared with anyone, including colleagues at
    your institution) or `commercial` (an agreement with STFC whose terms you hold).
    `--licence academic|commercial`. A global install under an academic licence is permitted
-   only if you are the sole user of the machine, and asks you to confirm that (`--sole-user`);
-   otherwise it is refused.
+   only if you are the sole user of the machine; `install` asks you to confirm this
+   (`--sole-user`) and is refused otherwise.
 3. **Acceptance** — the licence files from your tarballs are printed (Coin-HSL's own is a
    pointer to the agreement you accepted on the STFC portal), followed by what you confirm for
    the chosen licence and install type; type `yes` (`--accept-licence`). SCLS grants no rights
@@ -84,7 +81,7 @@ With GNU Fortran the fixed-form (`.f`) sources are compiled with `-std=legacy`. 
 routines use arithmetic `IF` and labelled `DO` terminations, which gfortran otherwise reports as
 "Fortran 2018 deleted feature" on every use; no `-Wno-` switch covers that message, and the
 sources are your unmodified tarballs. `-std=legacy` is gfortran's default dialect without those
-messages; for sources that already compile it generates the same code. The `.f90` solvers keep the default diagnostics. The flag
+messages; for sources that already compile, it generates the same code. The `.f90` solvers keep the default diagnostics. The flag
 is recorded as `fixed_form_fflags` in `build-info.yaml`.
 
 ## Using it from Ipopt
@@ -106,7 +103,7 @@ linear_solver ma97
 `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` are not used in SCLS and not needed here.
 
 An installed HSL library never changes how Ipopt is built: the Ipopt recipe passes
-`--without-hsl`, which disables Ipopt's build-time HSL probe, and the install ships no
+`--without-hsl`, which disables Ipopt's build-time HSL probe, and the HSL install ships no
 `coinhsl.pc` or headers for that probe to find. Ipopt reaches HSL only through its runtime
 loader, so the packaged Ipopt is identical on every host. There is deliberately no option to
 link HSL into `libipopt`: that would make Ipopt itself HSL-derived and unpackageable, for no
@@ -150,7 +147,7 @@ another entry depends on. On RPM and DEB hosts the package manager does not read
 `dnf remove` or `apt-get remove` of `scls-<flavor>-metis` will go ahead and leave the private
 library unable to load. Remove HSL first, or rebuild it afterwards.
 
-An install made before the registry entry existed has none; `./scls build hsl` followed by
+An install made before the registry entry existed has no entry; `./scls build hsl` followed by
 a global `./scls install hsl` adds it.
 
 Never share the library, the assembled sources or the tarballs beyond what your own HSL
