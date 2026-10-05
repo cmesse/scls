@@ -94,7 +94,7 @@ belfem (session "Server"): contract v1.7, RPM drops unchanged from v1.6; no NEVR
 |---|---|---|---|---|---|
 | R10-debug-20261005T0641Z | 36 | 214186574 | `27aa94ef…6b7b` | `5e1b971` | uploaded; verified and promoted (belfem) |
 | R10-gcc-20261005T0702Z | 31 | 203019227 | `03999e4f…5398` | `4b57cbd` | uploaded; verified and promoted (belfem) |
-| R10-mkl-20261005T0850Z | 31 | 203057687 | `15eb48e6…3958` | `2faf7e1` | uploaded, payload and READY rc 0; belfem's arrival result pending |
+| R10-mkl-20261005T0850Z | 31 | 203057687 | `15eb48e6…3958` | `2faf7e1` | uploaded; verified and promoted (belfem) |
 
 Each payload is the table of hosts file §4 and nothing else; `excluded: 0` on all three
 (suitesparse is not installed on EL10); `scls-<F>-examples` is not in any payload.
@@ -112,7 +112,8 @@ drop.
 ## Open
 
 - Blocker: none on EL10.
-- Pending at belfem, not on this host: arrival check and promotion of the R10 mkl drop.
+- All three R10 drops are promoted; belfem reports el10 complete for this campaign (258 RPMs).
+  A select run on each flavor against the regenerated published list gives an empty payload.
 - Backlog: one note added to the existing entry on gate G2 (`todo/backlog.md`): it runs as
   written on EL10 mkl.
 - AMZN shares the physical host and was told that EL10 has finished compiling.
