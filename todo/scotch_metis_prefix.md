@@ -115,8 +115,8 @@ the second.
 | **B. `-DSCOTCH_METIS_PREFIX=ON`** | `recipes/scotch.yaml` (one option) | scotch on 14 host/flavor cells; macOS and lbl source builds | Matches PETSc upstream. On ELF the already-built `libpetsc` should then resolve `ParMETIS_V3_PartKway` from `libparmetis` without a rebuild (lookup is by name across loaded libraries) — **inferred, to be confirmed on one Linux host**. macOS needs petsc and slepc rebuilt (two-level namespace). Manifest expected unchanged (file names do not change) — unconfirmed |
 | **C. `-DBUILD_LIBSCOTCHMETIS=OFF`** | scotch recipe; `files/scotch.txt` (10 lines); petsc: drop `--with-ptscotch-dir` or patch `PTSCOTCH.py` | scotch, petsc, slepc: 3 x 14 = 42 cells, petsc being the longest build in the stack | petsc and slepc must rebuild because they carry the library as a dependency and would not load. petsc 3.25.5-1 and slepc 3.25.2-1 are published, so both need a release bump. Dropping PT-Scotch from PETSc removes its `ptscotch` partitioner |
 
-scotch 7.0.15-2 is unpublished until round 2 is staged; after that, B or C costs scotch a release
-bump as well. mumps, strumpack and ipopt are unaffected by either option: `libscotch`,
+scotch 7.0.15-2 has been published on noble and resolute since 2026-10-05 UTC, so the option costs a
+release bump (7.0.15-3). mumps, strumpack and ipopt are unaffected by either option: `libscotch`,
 `libptscotch` and `libesmumps` keep their SONAMEs.
 
 **Decision (Christian, 2026-10-04): option B, stay close to PETSc upstream.** `-DSCOTCH_METIS_PREFIX=ON`

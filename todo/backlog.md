@@ -21,11 +21,13 @@ Separate files that carry their own analysis:
 
 ---
 
-## 1. Release — round 2 and the 2026-10-04 math campaign, one drop per host and flavor
+## 1. Release — the 2026-10-04 math campaign, with round 2 on the RPM hosts
 
-Round 2 is built and installed on R9, R10 (debug/gcc/mkl), AMZN (gcc/mkl), U24 and U26
-(debug/gcc/mkl) and was never staged. The math campaign (`todo/rebuild_campaign_20261004.md`)
-adds six packages per flavor. Per-host instructions: `todo/campaign_20261004_hosts.md`.
+Round 2 is published for U24 (noble) and U26 (resolute) since 2026-10-05 UTC. On R9, R10
+(debug/gcc/mkl) and AMZN (gcc/mkl) it is built and installed and was never staged. The math
+campaign (`todo/rebuild_campaign_20261004.md`) adds six packages per flavor on every host. The RPM
+drops carry round 2 and the campaign together; the Ubuntu drops carry the campaign.
+Per-host instructions: `todo/campaign_20261004_hosts.md`.
 
 - [ ] **Build the campaign:** pilot on R9 and U24, then R10, AMZN and U26 on the commit Christian
       releases.
@@ -62,13 +64,13 @@ adds six packages per flavor. Per-host instructions: `todo/campaign_20261004_hos
       (xz, on every Linux flavor but `lbl`) link host libraries that no recipe declares; the
       `-devel` packages are host prep (`doc/BUILD_EXECUTION.md` §1.1b). Declaring them is a metadata
       change: the binaries already link these libraries on every host. Radius: netcdf and libunwind
-      only, 14 builds each, no cascade. netcdf -2 is published, so it needs -3; libunwind -3 is
-      unpublished until round 2 is staged. `libzstd` (runtime) has no .deb mapping yet. scotch is
+      only, 14 builds each, no cascade. netcdf -2 and libunwind -3 are published (libunwind -3 on
+      noble and resolute), so both need a release bump. `libzstd` (runtime) has no .deb mapping yet. scotch is
       done (7.0.15-2).
 - [ ] **PRRTE and libnl (informational).** Ubuntu's PRRTE builds the `prtereachable/netlink`
       component (libnl comes in with the rdma dev packages); el9's does not. Enabling it on RPM
-      touches openmpi only (R9, R10, AMZN: 8 builds, no cascade, SONAMEs unchanged); openmpi
-      5.0.11-2 is unpublished on the RPM hosts until round 2 is staged. The Ubuntu openmpi .deb
+      touches openmpi only (no cascade, SONAMEs unchanged); openmpi 5.0.11-2 is published on noble
+      and resolute, so it would be -3 on all five hosts (14 builds). The Ubuntu openmpi .deb
       links libnl without declaring it (covered transitively by ucx → libibverbs1).
 
 ## 3. Recipes and manifests (each needs approval)

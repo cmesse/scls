@@ -6,8 +6,9 @@ hosts pull the branch he names)
 **Policy:** `doc/CAMPAIGN_POLICY.md`. This tracker is the scope (§1). Pilot hosts are R9 and U24
 (§5). Nothing is uploaded until every host has passed (§7).
 **Purpose:** PETSc 3.26.0 with slepc 3.26.0, armadillo 15.6.1, hwloc 2.15.0 and the Scotch
-METIS-prefix option (both to match what PETSc 3.26.0 pins, policy §9), and the one rebuild they force. Round 2 (2026-10-03/04) is built on all five hosts and was never staged, so
-each host stages **one** drop per flavor that carries round 2 and this campaign together.
+METIS-prefix option (both to match what PETSc 3.26.0 pins, policy §9), and the one rebuild they force. **Round 2 (2026-10-03/04):** published for U24 (noble) and U26 (resolute) on 2026-10-05 UTC; built
+and installed but never staged on R9, R10 and AMZN. So the Ubuntu drops of this campaign carry the
+six packages below, and the RPM drops carry round 2 and this campaign together.
 **Scope:** 6 packages, one row each, one cell per (host, flavor). Public binary flavors only
 (`gcc`, `mkl`, `debug`).
 **Column grouping:**
@@ -35,7 +36,7 @@ recipe, rebuilt because that dependency changed its SONAME.
 | # | G | Package | why | R9 DBG | R9 GCC | R9 MKL | R10 DBG | R10 GCC | R10 MKL | AMZN GCC | AMZN MKL | U24 DBG | U24 GCC | U24 MKL | U26 DBG | U26 GCC | U26 MKL |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 2 | hwloc 2.14.0-2 → 2.15.0-1 | up (PETSc pin) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 2 | 6 | scotch 7.0.15-2 (release kept) | opt (`-DSCOTCH_METIS_PREFIX=ON`) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 2 | 6 | scotch 7.0.15-2 → -3 | opt (`-DSCOTCH_METIS_PREFIX=ON`) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 3 | 8 | armadillo 15.6.0 → 15.6.1 | up | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 4 | 10 | petsc 3.25.5 → 3.26.0 | up | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 5 | 11 | slepc 3.25.2 → 3.26.0 | up | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
@@ -54,12 +55,12 @@ exported ABI, headers or installed file names change.
   claim on the pilot hosts instead of assuming it.
 - armadillo is a leaf.
 - hwloc keeps SONAME `libhwloc.so.15` (libtool `25:3:10` → `25:4:10` in upstream `VERSION`). Its
-  consumers pmix, openmpi and spral are **not rebuilt**; petsc is rebuilt anyway. hwloc 2.14.0-2
-  was never published, so 2.15.0-1 replaces it. Gate G3 covers this claim too.
+  consumers pmix, openmpi and spral are **not rebuilt**; petsc is rebuilt anyway. Gate G3 covers
+  this claim too.
 
-scotch 7.0.15-2 was built in round 2 and never published, so the release stays at 2
-(`doc/BUILD_EXECUTION.md` §0.6) and every host rebuilds it: the option changes what the build does
-on every flavor (policy §6).
+scotch goes to release 3: 7.0.15-2 is published on noble and resolute, and the option changes
+what ships (`doc/BUILD_EXECUTION.md` §0.6). The RPM hosts never published -2 and go from the
+published -1 to -3.
 
 ### Gates (fixed with this scope, policy §4)
 
@@ -229,7 +230,7 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
 
 ## Status
 
-- 2026-10-04 — recipes, patches, manifests and changelogs committed on `ipopt` (`3ae0c19`). No build yet.
+- 2026-10-04 — recipes, patches, manifests and changelogs committed on `ipopt`. No build yet.
 - 2026-10-04 — review gate for the Scotch option closed. Plan round and implementation round, each
   blind, Codex `gpt-5.6-terra`/high and Grok `grok-4.7`/high. No finding against the recipe diff:
   the option reaches every flavor's configure line, and slepc and sundials are the only in-stack
@@ -240,6 +241,10 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   `libptesmumps` added to the changelog; the PETSc changelog and recipe comment corrected. Not
   taken: Codex's P2 to write `%{version}` in `files/petsc.txt` and `files/slepc.txt` (backlog).
   Still open by execution only: scotch's `ctest` with the prefix, and the pilot builds.
+- 2026-10-04 — correction after pulling the Ubuntu sessions' commits: the U24 and U26 round-2 drops
+  were uploaded and promoted this evening (`devlog/dl20261004_u24_round2.md`,
+  `dl20261004_u26_round2.md`), so scotch 7.0.15-2 and hwloc 2.14.0-2 are published there. scotch
+  is therefore 7.0.15-3, not a same-release rebuild as first committed.
 
 ## Blockers
 

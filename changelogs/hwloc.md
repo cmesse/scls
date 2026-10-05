@@ -6,7 +6,8 @@
 - SONAME unchanged: libtool version `25:3:10` → `25:4:10` in upstream `VERSION`, so still
   `libhwloc.so.15`. pmix, openmpi and spral are therefore not rebuilt; petsc is rebuilt in the
   same campaign anyway (`todo/rebuild_campaign_20261004.md`).
-- Carries the unpublished 2.14.0-2 change (tools under their plain names).
+- Carries the 2.14.0-2 change (tools under their plain names), which is published on noble and
+  resolute and was never published for the RPM hosts.
 
 ## Version 2.14.0-2 - Sat Oct 03 2026
 - Tools ship under their plain names (`lstopo`, `hwloc-bind`, ...). Since the builder's first

@@ -499,8 +499,8 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
   mkl linkage gate PASS; HSL script test done on gcc. Not staged. `devlog/dl20261004_r10_round2.md`.
 
 - 2026-10-04 — **Campaign closed.** Every cell in section A is ticked, rows 30–31 included.
-  Round 2 (spral, ipopt and the RPM-side fixes) is built on all five hosts and not staged; the
-  staging list and everything else still open is in `todo/backlog.md`. This file
+  Round 2 (spral, ipopt and the RPM-side fixes) is published for U24 and U26 and built but not
+  staged on R9, R10 and AMZN; what is still open is in `todo/backlog.md`. This file
   stays as the layout reference for `/update-plan`.
 
 ## Blockers

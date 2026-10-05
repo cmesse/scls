@@ -4,9 +4,11 @@
 **Tracker:** `todo/rebuild_campaign_20261004.md` (the package table, the gates G1–G3, the cells to
 tick). **Policy:** `doc/CAMPAIGN_POLICY.md` — read it first; it decides what a session does with a
 finding and when a host rebuilds.
-**State:** round 2 (2026-10-03/04) is built and installed on all five hosts and was never staged.
-This campaign builds six more packages per flavor. Each host then stages **one** drop per flavor
-that carries round 2 and this campaign together.
+**State:** round 2 (2026-10-03/04) is **published for U24 and U26** (uploaded and promoted
+2026-10-05 UTC) and is built and installed but **not staged on R9, R10 and AMZN**. This campaign
+builds six more packages per flavor on every host. The Ubuntu hosts then stage the six campaign
+packages; the RPM hosts stage **one** drop per flavor that carries round 2 and this campaign
+together.
 
 Cell legend: `[ ]` to do · `[x]` done · `n/a` not applicable · `kept: <reason>` not rebuilt (policy §6).
 
@@ -75,8 +77,8 @@ AMZN built from (`21f141e`).
   ```
 
   - Diff inside `%changelog` only → the cell is `kept: changelog-only (d908cfc)`. No rebuild.
-  - Any other difference → rebuild and reinstall spral at the same release (it is unpublished,
-    `doc/BUILD_EXECUTION.md` §0.6), then ipopt's `%check` again. Report the difference.
+  - Any other difference → report it before doing anything. spral 2025.09.18-1 is published on
+    noble and resolute, so whether an RPM-side rebuild keeps the release is Christian's call.
 
 | spral at `d908cfc` | R9 dbg | R9 gcc | R9 mkl | R10 dbg | R10 gcc | R10 mkl | AMZN gcc | AMZN mkl |
 |---|---|---|---|---|---|---|---|---|
@@ -85,8 +87,7 @@ AMZN built from (`21f141e`).
 ### 2b. Drift sweep and linkage (every host, every flavor; read-only)
 
 - Drift sweep over the full `build_order.py` list (`doc/BUILD_EXECUTION.md` §1.6). Expected:
-  hwloc, armadillo, petsc, slepc and sundials, and nothing else (scotch keeps its version-release
-  and does not show). `scls-<F>` is installed at `2026-2`.
+  hwloc, scotch, armadillo, petsc, slepc and sundials, and nothing else. `scls-<F>` is installed at `2026-2`.
 - `scripts/check_mkl_linkage.sh --flavor <F> --prefix /opt/scls/<F>` passes on every flavor.
 
 ### 2c. R9 only, once, before §3: today's ParMETIS binding (the "before" for gate G2)
@@ -111,17 +112,12 @@ which library each `ParMETIS_V3_*` symbol of `libpetsc.so` binds to. On the macO
 | # | Package | Version-release | After it |
 |---|---|---|---|
 | 1 | hwloc | 2.15.0-1 | — |
-| 2 | scotch | 7.0.15-2, same release, now with `-DSCOTCH_METIS_PREFIX=ON` | **G1**, then **G3** before anything else is built |
+| 2 | scotch | 7.0.15-3, now with `-DSCOTCH_METIS_PREFIX=ON` | **G1**, then **G3** before anything else is built |
 | 3 | armadillo | 15.6.1-1 | — |
 | 4 | petsc | 3.26.0-1 | **G2** |
 | 5 | slepc | 3.26.0-1 | — |
 | 6 | sundials | 7.9.0-2 | — |
 
-- scotch keeps its version-release, so `./scls build next` and the drift sweep do not see it.
-  Build and install it **by name** (`./scls build scotch && ./scls install scotch`). On RPM hosts
-  `./scls install` detects the identical NVRA and runs `dnf reinstall` (`python/rpm_builder.py`,
-  `_partition_rpms_for_install`). G1 confirms that the new build is the one in the prefix. On the DEB hosts the same-version reinstall needs `--allow-downgrades` once the
-  SCLS apt source is configured (already in `deb_builder`).
 - pmix, openmpi, spral, mumps, strumpack and ipopt are **not** rebuilt. G3 is the check.
 - Tick the cells in the tracker.
 
@@ -134,22 +130,25 @@ which library each `ParMETIS_V3_*` symbol of `libpetsc.so` binds to. On the macO
 
 Expected payload per flavor, and nothing else:
 
-| Package | Version-release | From |
-|---|---|---|
-| environment | 2026-3 | round 2 |
-| libunwind | 1.8.3-3 | round 2 |
-| gperftools | 2.18.1-2 | round 2 |
-| openmpi | 5.0.11-2 | round 2 (RPM hosts; published on U24/U26 in round 1) |
-| lapack, blas, cblas, lapacke | 3.12.1-2 | round 2, debug only (R9, R10; published on U24/U26) |
-| spral | 2025.09.18-1 (new) | round 2 |
-| ipopt | 3.14.20-1 (new) | round 2 |
-| `scls-<F>` | 2026-2 | round 2 |
-| hwloc | 2.15.0-1 | campaign (replaces the unpublished 2.14.0-2) |
-| scotch | 7.0.15-2 | round 2 + campaign (prefix) |
-| armadillo | 15.6.1-1 | campaign |
-| petsc | 3.26.0-1 | campaign |
-| slepc | 3.26.0-1 | campaign |
-| sundials | 7.9.0-2 | campaign |
+| Package | Version-release | RPM hosts (R9, R10, AMZN) | Ubuntu (U24, U26) |
+|---|---|---|---|
+| hwloc | 2.15.0-1 | in the drop | in the drop |
+| scotch | 7.0.15-3 | in the drop | in the drop |
+| armadillo | 15.6.1-1 | in the drop | in the drop |
+| petsc | 3.26.0-1 | in the drop | in the drop |
+| slepc | 3.26.0-1 | in the drop | in the drop |
+| sundials | 7.9.0-2 | in the drop | in the drop |
+| environment | 2026-3 | in the drop (round 2) | already published |
+| libunwind | 1.8.3-3 | in the drop (round 2) | already published |
+| gperftools | 2.18.1-2 | in the drop (round 2) | already published |
+| openmpi | 5.0.11-2 | in the drop (round 2) | already published |
+| lapack, blas, cblas, lapacke | 3.12.1-2 | in the drop, debug only (R9, R10) | already published |
+| spral | 2025.09.18-1 | in the drop (round 2) | already published |
+| ipopt | 3.14.20-1 | in the drop (round 2) | already published |
+| `scls-<F>` | 2026-2 | in the drop (round 2) | already published |
+
+hwloc 2.14.0-2 and scotch 7.0.15-2 are published on noble and resolute and are superseded there by
+this campaign; the RPM hosts never ship them.
 
 - Everything else belongs under `already_published:`. A package in the payload that is not in
   this table is a finding: report it before anything is uploaded. Known candidate on R9 debug
@@ -160,7 +159,7 @@ Expected payload per flavor, and nothing else:
 
 ## 5. Upload (only on Christian's go-ahead per drop)
 
-Policy §7: uploads start once all five hosts are through §4. Then `/stage-drop`: one drop in
+Policy §7: uploads of this campaign start once all five hosts are through §4. Then `/stage-drop`: one drop in
 flight, debug → gcc → mkl per host, each after belfem's size OK and promotion of the previous
 one. Use `--upload --drop <DROP>` so the bytes that were sized are the bytes that go. If the branch
 head moved after §4, restage first.
