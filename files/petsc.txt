@@ -163,7 +163,9 @@
 %{prefix}/include/petsc/private/matdensecupmimpl.h
 %{prefix}/include/petsc/private/matimpl.h
 %{prefix}/include/petsc/private/matisimpl.h
+%{prefix}/include/petsc/private/matmetisimpl.h
 %{prefix}/include/petsc/private/matorderimpl.h
+%{prefix}/include/petsc/private/matparmetisimpl.h
 %{prefix}/include/petsc/private/mempoison.h
 %{prefix}/include/petsc/private/partitionerimpl.h
 %{prefix}/include/petsc/private/pcasmimpl.h
@@ -383,6 +385,7 @@
 %{prefix}/lib/petsc/bin/petscnagfor
 %{prefix}/lib/petsc/bin/petscnagupgrade.py
 %{prefix}/lib/petsc/bin/petscversion
+%{prefix}/lib/petsc/bin/search.py
 %{prefix}/lib/petsc/bin/saws/SAWs.py
 %{prefix}/lib/petsc/bin/saws/getSAWs.bash
 %{prefix}/lib/petsc/bin/saws/getStack.bash
@@ -397,6 +400,7 @@
 %{prefix}/lib/petsc/conf/reconfigure-arch-linux-c-opt.py
 %{prefix}/lib/petsc/conf/rules
 %{prefix}/lib/petsc/conf/rules_doc.mk
+%{prefix}/lib/petsc/conf/rules_gm.mk
 %{prefix}/lib/petsc/conf/rules_util.mk
 %{prefix}/lib/petsc/conf/test
 %{prefix}/lib/petsc/conf/uninstall.py
