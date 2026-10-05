@@ -31,7 +31,7 @@ recipe commit by hash.
 | §3 build the campaign, gates G1–G3 | [x] | [ ] | [x] | [x] | [ ] |
 | §4 standing gates, stage with `--build` | [x] | [ ] | [x] | [x] | [ ] |
 | released for fan-out (Christian, commit hash) | pilot | pilot | [x] | [x] | [ ] |
-| §5 upload, per drop | [x] | [ ] | [ ] | [x] gcc, mkl; gcc ipopt replacement open | [ ] |
+| §5 upload, per drop | [x] | [ ] | [ ] | [x] | [ ] |
 
 **Rules.**
 

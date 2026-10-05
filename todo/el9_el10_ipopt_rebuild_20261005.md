@@ -32,9 +32,9 @@ package. The build steps of ipopt on debug and gcc are unchanged; the spec diffe
   its SRPM, and both are written under `replace_published:`. A name that selects nothing stops the
   script. Without `--replace` the selection is unchanged.
   Evidence so far: select-only runs on AMZN (no `--replace`: 0 files; `--replace scls-gcc-ipopt`:
-  2 files, `replace_published: 2`; unknown name: exit 2). **Not yet run with `--build` or accepted
-  by belfem** when this file was written; the AMZN gcc replacement drop is the first. Check the
-  tracker Status for its result before you upload.
+  2 files, `replace_published: 2`; unknown name: exit 2), and one real drop:
+  `AMZN-gcc-20261005T1033Z` (2 files) was staged with `--build`, uploaded, and verified by belfem
+  with the manifest accepted as written.
 - belfem is patched for the same interface (Server session, 2026-10-05). Its verifier fails a
   published NEVRA in the payload that is not under `replace_published:`, a listed NEVRA that is not
   published or not in the payload, a listed NEVRA whose `SHA256HEADER` and `PAYLOADDIGEST` equal

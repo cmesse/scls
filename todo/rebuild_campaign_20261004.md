@@ -342,6 +342,13 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   PASS with the lookup, loader log unavailable (exit 139 under `LD_BIND_NOW`). The G2 results
   recorded above for R9 mkl ("does not run as written", substitute evidence) and for AMZN mkl
   are the same lookup the gate now performs. U24 and U26 run the new text.
+- 2026-10-05 — AMZN drops: `AMZN-mkl-20261005T1024Z` verified and promoted. Replacement drop
+  `AMZN-gcc-20261005T1033Z` (ipopt 3.14.20-1 x86_64 and src, `replace_published: 2`, 2927173
+  bytes) uploaded and verified by belfem, promotion pending; it is the first RPM drop staged with
+  `--replace`. AMZN is complete: gcc 8/8 (row 8 rebuilt by Christian's override), mkl 8/8.
+  Details: `devlog/dl20261005_amzn_math_campaign.md`. Not done: EL9 and EL10 ipopt on debug and
+  gcc and their G2 re-run (`todo/el9_el10_ipopt_rebuild_20261005.md`); U24, U26 (rows 1–8), and
+  the Ubuntu ipopt replacement.
 
 ## Blockers
 
