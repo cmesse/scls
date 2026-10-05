@@ -42,7 +42,7 @@ recipe, rebuilt because that dependency changed its SONAME.
 | 5 | 11 | slepc 3.25.2 → 3.26.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 6 | 11 | sundials 7.9.0-1 → -2 | casc (petsc) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 7 | — | mumps 5.9.1-2 → -3 | fix (MKL RUNPATH; added 2026-10-04) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | kept: build unchanged | kept: build unchanged | [x] | kept: build unchanged | kept: build unchanged | [x] | kept: build unchanged | [x] | kept: build unchanged | kept: build unchanged | [ ] | kept: build unchanged | kept: build unchanged | [ ] |
+| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | kept: build unchanged | kept: build unchanged | [x] | kept: build unchanged | kept: build unchanged | [x] | [x] (rebuilt 2026-10-05, same release) | [x] | kept: build unchanged | kept: build unchanged | [ ] | kept: build unchanged | kept: build unchanged | [ ] |
 
 6 packages × 14 cells = **84 builds**. petsc is the longest.
 
@@ -290,6 +290,21 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   pending; mkl staged with `--build` (31 files, 203057687 bytes), not uploaded: the belfem session
   was offline. Details: `devlog/dl20261005_el10_math_campaign.md`. Not done: the R10 mkl upload;
   AMZN, U24, U26 (rows 1–8), and the Ubuntu ipopt replacement.
+- 2026-10-05 — AMZN (Amazon Linux 2023), built from `7623f57`/`2faf7e1` (docs-only difference):
+  gcc 7/7, mkl 8/8 built and installed (rows 1–7, and ipopt on mkl). No class M/P/D fix. spral
+  kept as changelog-only (`d908cfc`) on both flavors. Gates: G1 and G3 pass on both (G3 on mkl
+  failed after scotch on the known `libdmumps` lines and passes after mumps 5.9.1-3 and ipopt);
+  G2 passes on gcc and does not run as written on mkl (`LD_BIND_NOW=1` exits 139, as on R9;
+  the `dlsym` + `dladdr` substitute resolves the five `ParMETIS_*` symbols to `libparmetis.so`
+  and `SCOTCH_ParMETIS_V3_NodeND` to `libptscotchparmetisv3.so.7.0`). Standing gates pass.
+  Drops: `AMZN-gcc-20261005T0954Z` (31 files, 202975269 bytes) uploaded, verified and promoted;
+  `AMZN-mkl-20261005T1024Z` (31 files, 202899916 bytes) uploaded, script exit 0, arrival result
+  pending. Scope addition by Christian, 2026-10-05: ipopt
+  3.14.20-1 on gcc is rebuilt at the unchanged release so its `%changelog` matches mkl ("I
+  override this rule for this time. We don't need to bump"), and replaces the published
+  package through `stage_to_belfem.sh --replace` on the RPM path (`b333cf8`); he announced the
+  same for el9 and el10 in the belfem session. Rebuilt and installed on AMZN gcc; G3 passes
+  with it. Not done: the AMZN gcc ipopt replacement drop; U24, U26 (rows 1–8), and the Ubuntu ipopt replacement.
 
 ## Blockers
 
