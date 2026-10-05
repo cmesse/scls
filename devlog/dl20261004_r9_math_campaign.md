@@ -147,6 +147,33 @@ upload when you are ready"; "You can upload R9-gcc*". The debug drop was restage
 `…0453Z` after a tracker-only commit moved the head; payload and digest were identical and belfem
 accepted it.
 
+## 6. Sync with the dev host; the changed staging script on a real rpmdb
+
+Christian promoted all five drops; belfem's repodata lists mumps 5.9.1-3 and ipopt 3.14.20-1 on
+debug, gcc and mkl. `origin/ipopt` had moved to `c7c3871` (`57c7621`, `2cf1911`: `require_buildable()`
+in the builders, `never_ship_reason()` and `%{SOURCERPM}` in `stage_to_belfem.sh`; `8196929`,
+`c7c3871`: hosts file). Merged, not rebased, so that the commit hashes written into the five drop
+manifests (`git_head`) and into this file stay valid. No conflict. **All five drops were staged
+with the script as of `a110ea7`, before this change.**
+
+After the merge, on EL9:
+
+- `bash -n scripts/stage_to_belfem.sh`, `py_compile` of `python/*.py` and
+  `scripts/deb_drop_select.py`, `validate_project.py` (0 errors).
+- `--spec-only` for mumps, ipopt and petsc on debug, gcc, mkl: identical to before the merge.
+- Select-only run, all three flavors, with the published list regenerated after the promotions
+  (258 NEVRAs): exit 0 under `set -u -o pipefail`; payload 0 files; `excluded: 1`.
+- `--build` into a scratch stage with an empty published list, debug: 86 files selected,
+  `sha256sum -c` OK, linkage pass. `excluded:` is `scls-debug-suitesparse-7.12.2-1` only, the same
+  single exclusion as with the old script. `blas`, `cblas`, `lapacke`, `lapack` and the
+  `petsc`/`slepc`/`sundials` `-examples` packages are selected. Scratch stage removed.
+- `rpm -qa --qf '%{NAME} %{SOURCERPM}\n' 'scls-*' | awk '$2=="(none)" || $2==""'` prints nothing.
+- The hosts-file note expected `excluded:` to be empty because suitesparse was removed from this
+  host on 2026-09-25. It is installed: `scls-{debug,gcc,mkl}-suitesparse-7.12.2-1.el9`. Not
+  investigated when or why it came back.
+- `scls-debug-examples` and `scls-gcc-examples` are not installed on this host, so the script
+  never sees them; `scls-mkl-examples` 2026-1 is listed as already published.
+
 ## Open
 
 - Blockers: none on R9.

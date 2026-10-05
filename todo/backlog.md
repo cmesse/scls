@@ -118,9 +118,10 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
       first, or teach `build_order.py` and that helper the opt-in (Grok, implementation audit).
 - [ ] **`stage_to_belfem.sh` globs `scls-<F>-*`,** which for `gcc` also matches
       `scls-gcc-mkl-cuda-*`. Pre-existing; found by Grok on 2026-10-04.
-- [ ] **Verify the 2026-10-04 staging change on real package databases:** one
-      `stage_to_belfem.sh --build` on an RPM host (`%{SOURCERPM}` in the `rpm -qa` query) and one
-      on a DEB host. On the dev host it was tested with the function extracted and with fixtures.
+- [ ] **Verify the 2026-10-04 staging change on a real DEB package database:** one
+      `stage_to_belfem.sh --build` on a DEB host. The RPM side was run on EL9 on 2026-10-04
+      (`devlog/dl20261004_r9_math_campaign.md` §6). On the dev host it was tested with the
+      function extracted and with fixtures.
 - [ ] **unix/deb ignore `configure.flavor_pre` / `configure.flavor_post`** for every configure
       type; rpm_builder runs them. Live case: openmpi's gcc-mkl-cuda CUDA-support check never runs
       on .deb hosts.
