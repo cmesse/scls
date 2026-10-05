@@ -26,12 +26,12 @@ recipe commit by hash.
 
 | Phase | R9 | U24 | R10 | AMZN | U26 |
 |---|---|---|---|---|---|
-| §1 sync | [x] | [ ] | [x] | [x] | [ ] |
-| §2 state before the campaign | [x] | [ ] | [x] | [x] | [ ] |
-| §3 build the campaign, gates G1–G3 | [x] | [ ] | [x] | [x] | [ ] |
-| §4 standing gates, stage with `--build` | [x] | [ ] | [x] | [x] | [ ] |
+| §1 sync | [x] | [x] | [x] | [x] | [ ] |
+| §2 state before the campaign | [x] | [x] | [x] | [x] | [ ] |
+| §3 build the campaign, gates G1–G3 | [x] | [x] | [x] | [x] | [ ] |
+| §4 standing gates, stage with `--build` | [x] | [x] | [x] | [x] | [ ] |
 | released for fan-out (Christian, commit hash) | pilot | pilot | [x] | [x] | [ ] |
-| §5 upload, per drop | [x] | [ ] | [x] | [x] | [ ] |
+| §5 upload, per drop | [x] | [x] | [x] | [x] | [ ] |
 
 **Rules.**
 

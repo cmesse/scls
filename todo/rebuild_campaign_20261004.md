@@ -385,6 +385,19 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   Not done: the report to belfem, arrival result and promotion of both drops; U24, U26
   (rows 1–8), and the Ubuntu ipopt replacement.
 
+- 2026-10-05 — U24, from origin `860347d` (no build-relevant change since `2faf7e1`): debug 8/8,
+  gcc 8/8, mkl 8/8 built and installed (rows 1–7, and ipopt on all three after Christian widened
+  the scope by 2 builds). No class M/P/D fix. Gates: G1, G2 (text of `11e38af`, plain pass on mkl
+  too) and G3 pass on all three; G3 on mkl passed already after scotch, because the published
+  Ubuntu mumps 5.9.1-2 carried the MKL RUNPATH. Standing gates pass. Drops, each with
+  `replace_published: 2` (ipopt) and `excluded: 0`: `U24-debug-20261005T1120Z` (35 files,
+  140285302 bytes) and `U24-gcc-20261005T1138Z` (35 files, 119515962 bytes) uploaded, verified
+  and promoted by belfem; `U24-mkl-20261005T1247Z` (35 files, 119515562 bytes) uploaded and
+  verified by belfem, promotion pending. belfem: on all three flavors the rebuilt ipopt differs
+  from the published .deb in the container only. Details:
+  `devlog/dl20261005_u24_math_campaign.md`. Not done: the mkl promotion; U26 (rows 1–8), started
+  after U24's last build.
+
 ## Blockers
 
 (none)
