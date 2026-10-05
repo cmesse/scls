@@ -22,6 +22,7 @@
 %{prefix}/include/slepc/finclude/slepcsys.h
 %{prefix}/include/slepc/finclude/slepcvec.h
 %{prefix}/include/slepc/private/bvimpl.h
+%{prefix}/include/slepc/private/cupmblas.h
 %{prefix}/include/slepc/private/dsimpl.h
 %{prefix}/include/slepc/private/epsimpl.h
 %{prefix}/include/slepc/private/fnimpl.h
@@ -42,6 +43,7 @@
 %{prefix}/include/slepcbv.mod
 %{prefix}/include/slepcbvdef.mod
 %{prefix}/include/slepcconf.h
+%{prefix}/include/slepcconfiginfo.h
 %{prefix}/include/slepccupmblas.h
 %{prefix}/include/slepcds.h
 %{prefix}/include/slepcds.mod
