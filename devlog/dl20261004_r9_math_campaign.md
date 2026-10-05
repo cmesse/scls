@@ -160,7 +160,8 @@ After the merge, on EL9:
 
 - `bash -n scripts/stage_to_belfem.sh`, `py_compile` of `python/*.py` and
   `scripts/deb_drop_select.py`, `validate_project.py` (0 errors).
-- `--spec-only` for mumps, ipopt and petsc on debug, gcc, mkl: identical to before the merge.
+- `--spec-only` for every package in `build_order.py` on mkl, gcc and debug (116 specs), `0d0a5a5`
+  against the merge: all identical.
 - Select-only run, all three flavors, with the published list regenerated after the promotions
   (258 NEVRAs): exit 0 under `set -u -o pipefail`; payload 0 files; `excluded: 1`.
 - `--build` into a scratch stage with an empty published list, debug: 86 files selected,

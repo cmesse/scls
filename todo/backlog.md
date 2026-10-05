@@ -36,7 +36,8 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
       it before `devel` is deleted, and edit those four files to match.
 - [ ] **macOS:** rebuild scotch, petsc and slepc for the prefix (two-level namespace: the existing
       `libpetsc` names Scotch's library for `ParMETIS_V3_PartKway`), plus hwloc, armadillo and
-      sundials at the new versions.
+      sundials at the new versions, and mumps 5.9.1-3 (`0a256a1`; no build change on macOS,
+      version parity only). ipopt 3.14.20-1 is unchanged on macOS.
 
 ## 2. Decisions pending (Christian)
 
