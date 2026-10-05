@@ -186,6 +186,11 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
 - [ ] **R9 sudo grant is not durable:** there is no `/etc/sudoers.d/scls-build`; the round-2 builds
       ran on a cached login. `scripts/grant_pkg_sudo.sh --user mockbuild --scope all --apply`
       (Christian).
+- [ ] **U24 and U26 share one physical host and slow each other down.** On 2026-10-05 U26 needed
+      two hours for a flavor that U24 built in 35 minutes, and 44 minutes once the U24 VM was off;
+      a single-core loop varied fourfold between consecutive runs. Not diagnosed from inside the
+      VM. Check the host (temperature, frequency, vCPU overcommit) before the next campaign, or
+      keep building the Ubuntu hosts one after the other (`devlog/dl20261005_u26_math_campaign.md` §5).
 - [ ] `flavor.conf` is tracked with `macos` as the committed default. Each build host:
       `git checkout flavor.conf` before pulling the merged branch.
 

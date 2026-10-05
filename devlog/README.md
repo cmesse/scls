@@ -11,6 +11,7 @@ file, it is lost.
 
 ## Entries
 
+- [dl20261005_u26_math_campaign.md](dl20261005_u26_math_campaign.md) — U26 math campaign: 8 packages on debug/gcc/mkl (GCC 15.2), gates G1–G3 and standing gates pass, ipopt rebuilt on all three; three resolute drops uploaded; slow builds while the U24 VM shared the host
 - [dl20261005_license_policy_no_gpl.md](dl20261005_license_policy_no_gpl.md) — licence policy restated: published binaries BSD-3-compatible (permissive or weak copyleft), no GPL of any version; GPL only for build tools; website build-tools table gains pkg-config and the generator refuses to render a policy violation
 
 - [dl20261004_campaign_policy_and_math_campaign.md](dl20261004_campaign_policy_and_math_campaign.md) — devlog review for procedure gaps, new campaign policy, PETSc 3.26 math campaign, and the measurement that Scotch's ParMETIS emulation shadowed the real ParMETIS in PETSc (`SCOTCH_METIS_PREFIX`)

@@ -35,14 +35,14 @@ recipe, rebuilt because that dependency changed its SONAME.
 
 | # | G | Package | why | R9 DBG | R9 GCC | R9 MKL | R10 DBG | R10 GCC | R10 MKL | AMZN GCC | AMZN MKL | U24 DBG | U24 GCC | U24 MKL | U26 DBG | U26 GCC | U26 MKL |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 2 | hwloc 2.14.0-2 → 2.15.0-1 | up (PETSc pin) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 2 | 6 | scotch 7.0.15-2 → -3 | opt (`-DSCOTCH_METIS_PREFIX=ON`) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 3 | 8 | armadillo 15.6.0 → 15.6.1 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 4 | 10 | petsc 3.25.5 → 3.26.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 5 | 11 | slepc 3.25.2 → 3.26.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 6 | 11 | sundials 7.9.0-1 → -2 | casc (petsc) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 7 | — | mumps 5.9.1-2 → -3 | fix (MKL RUNPATH; added 2026-10-04) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] |
-| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | [x] (rebuilt 2026-10-05, same release) | [x] | [x] | [x] | [x] | kept: build unchanged | kept: build unchanged | [ ] |
+| 1 | 2 | hwloc 2.14.0-2 → 2.15.0-1 | up (PETSc pin) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] |
+| 2 | 6 | scotch 7.0.15-2 → -3 | opt (`-DSCOTCH_METIS_PREFIX=ON`) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] |
+| 3 | 8 | armadillo 15.6.0 → 15.6.1 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] |
+| 4 | 10 | petsc 3.25.5 → 3.26.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] |
+| 5 | 11 | slepc 3.25.2 → 3.26.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] |
+| 6 | 11 | sundials 7.9.0-1 → -2 | casc (petsc) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] |
+| 7 | — | mumps 5.9.1-2 → -3 | fix (MKL RUNPATH; added 2026-10-04) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] |
+| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | [x] (rebuilt 2026-10-05, same release) | [x] | [x] | [x] | [x] | [x] | [x] | [x] |
 
 6 packages × 14 cells = **84 builds**. petsc is the longest.
 
@@ -59,6 +59,15 @@ Gate G3 failed on R9 mkl because `libdmumps.so`, `libsmumps.so`, `libmumps_commo
   on deb, better safe than sorry. No version bump"). Check `readelf -d libsipopt.so` first and
   record what the published .deb had. The debug and gcc builds are unchanged everywhere.
 - After mumps and ipopt install on an MKL flavor, re-run G3.
+
+**Scope widened by Christian on 2026-10-05 (policy §1), before the U26 builds: +2 builds.**
+Row 8 is also rebuilt on U26 debug and U26 gcc. Christian to the U26 session: "U24 is building the
+final round of its campaign. Reach out to it to get instructions and mirror what it does", and
+then: "we don't keep, we rebuild ipopt for all three, no bumping (overruled by me)". U26 therefore
+builds 24 packages too, and the published resolute ipopt .debs are replaced at the same version
+(`stage_to_belfem.sh --replace`). Read on U26 before the builds: the published mkl `libsipopt.so`,
+`libipopt.so`, `libdmumps.so` and `libmumps_common.so` carry the same three-directory RUNPATH as
+on U24, and `ldd` reports nothing missing.
 
 **Scope widened by Christian on 2026-10-05 (policy §1), before the U24 builds: +2 builds.**
 Row 8, ipopt 3.14.20-1 at the same release, is also rebuilt on U24 debug and U24 gcc (Christian:
@@ -396,6 +405,14 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   and promoted by belfem; noble is complete for this campaign. belfem: on all three flavors the rebuilt ipopt differs
   from the published .deb in the container only. Details:
   `devlog/dl20261005_u24_math_campaign.md`. Not done: U26 (rows 1–8), started after U24's last build.
+- 2026-10-05 — U26, from `0d0f073`/`8591573` (no build-relevant change since `860347d`): debug 8/8,
+  gcc 8/8, mkl 8/8 built and installed (rows 1–7, and ipopt on all three; Christian: "we rebuild
+  ipopt for all three, no bumping"). No class M/P/D fix. Gates: G1, G2 (text of `11e38af`, plain
+  pass on mkl) and G3 pass on all three under GCC 15.2. Standing gates pass. Drops, each 35 files
+  with `replace_published: 2` (ipopt) and `excluded: 0`: `U26-debug-20261005T1527Z` (141054466
+  bytes) uploaded, verified and promoted by belfem; `U26-gcc-20261005T1633Z` (119544150 bytes) and
+  `U26-mkl-20261005T1634Z` (119542324 bytes) uploaded on belfem's size OK, arrival result and
+  promotion pending. Details: `devlog/dl20261005_u26_math_campaign.md`.
 
 ## Blockers
 
