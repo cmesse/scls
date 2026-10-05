@@ -169,6 +169,43 @@ head moved after §4, restage first.
 
 ### EL9 (R9) — RPM pilot
 
+**From the dev-host session, 2026-10-04 evening — read this before §1.** No R9 session was
+reachable for a direct message, so it is here. What changed on the branch since R9 last pulled
+(`21f141e` recipe state), newest last:
+
+1. **`doc/CAMPAIGN_POLICY.md` is new and in force.** A finding blocks only as B1–B4; everything
+   else goes to `todo/backlog.md` in the policy's report format and the run continues. `todo/`
+   was consolidated: the round-2 trackers are gone, this file and
+   `todo/rebuild_campaign_20261004.md` replace them.
+2. **The math campaign** (`3ae0c19` and follow-ups): hwloc 2.15.0-1, scotch **7.0.15-3** with
+   `-DSCOTCH_METIS_PREFIX=ON`, armadillo 15.6.1-1, petsc 3.26.0-1, slepc 3.26.0-1,
+   sundials 7.9.0-2. `petsc-baijmkl-decls.patch` has refreshed context for 3.26.0; it was checked
+   with Apple `patch` only, so the first `rpmbuild --fuzz=0` here is its real test. Scotch is -3,
+   not a same-release rebuild: 7.0.15-2 was published on noble and resolute this evening.
+3. **Gates G1–G3 in the tracker are scripts that exit non-zero.** Run them as written; if one
+   fails because of the gate itself, report it, do not edit it on the host.
+4. **`57c7621` and `2cf1911` change `scripts/stage_to_belfem.sh`,** and R9 is the first host to
+   run it on a real rpmdb. The `rpm -qa` query now has a fifth field, `%{SOURCERPM}`, and a new
+   `never_ship_reason()` excludes a binary when its own name **or its source package's** is a
+   NEVER_SHIP recipe (so a subpackage of suitesparse cannot ship). It is checked twice: from the
+   rpmdb, and again from the RPM file's own `SOURCERPM`. On the dev host it was tested only with
+   the function extracted and canned input. **On the first `--flavor debug --column R9` select
+   run (no `--build`), check and report:**
+   - the script runs to the end under `set -u -o pipefail`;
+   - `excluded:` contains nothing that was not excluded before (expected: empty on R9, since
+     suitesparse was removed from this host on 2026-09-25);
+   - lapack's `blas`, `cblas`, `lapacke` and the `*-examples` packages are selected or listed as
+     already published, not excluded;
+   - `rpm -qa --qf '%{NAME} %{SOURCERPM}\n' 'scls-debug*' | awk '$2=="(none)" || $2==""'` prints
+     nothing.
+   A wrong exclusion here is a B1 finding: stop before `--build`.
+5. **`python/rpm_builder.py` now calls `build_common.require_buildable()`** for the
+   flavor/`extra_packages:` check. Messages are unchanged and `--spec-only` output for all 58
+   recipes on gcc, mkl and debug was identical before and after on the dev host. Nothing to do;
+   a "not built for" error on a package that built before would be a B1 finding.
+6. Both changes went through plan and implementation audits (Codex and Grok, blind): no P0, no P1.
+   Record: `devlog/dl20261004_campaign_policy_and_math_campaign.md`.
+
 - **sudo grant is not durable** (no `/etc/sudoers.d/scls-build`). Round 2 ran on a cached login
   and one install failed when it lapsed. Christian, before §3:
   `scripts/grant_pkg_sudo.sh --user mockbuild --scope all --apply`.
