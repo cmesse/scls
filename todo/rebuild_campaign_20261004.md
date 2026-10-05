@@ -42,7 +42,7 @@ recipe, rebuilt because that dependency changed its SONAME.
 | 5 | 11 | slepc 3.25.2 → 3.26.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 6 | 11 | sundials 7.9.0-1 → -2 | casc (petsc) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 7 | — | mumps 5.9.1-2 → -3 | fix (MKL RUNPATH; added 2026-10-04) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | kept: build unchanged | kept: build unchanged | [x] | kept: build unchanged | kept: build unchanged | [x] | [x] (rebuilt 2026-10-05, same release) | [x] | kept: build unchanged | kept: build unchanged | [ ] | kept: build unchanged | kept: build unchanged | [ ] |
+| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | kept: build unchanged | kept: build unchanged | [x] | [x] (rebuilt 2026-10-05, same release) | [x] | kept: build unchanged | kept: build unchanged | [ ] | kept: build unchanged | kept: build unchanged | [ ] |
 
 6 packages × 14 cells = **84 builds**. petsc is the longest.
 
