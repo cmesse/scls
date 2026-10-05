@@ -392,11 +392,10 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   Ubuntu mumps 5.9.1-2 carried the MKL RUNPATH. Standing gates pass. Drops, each with
   `replace_published: 2` (ipopt) and `excluded: 0`: `U24-debug-20261005T1120Z` (35 files,
   140285302 bytes) and `U24-gcc-20261005T1138Z` (35 files, 119515962 bytes) uploaded, verified
-  and promoted by belfem; `U24-mkl-20261005T1247Z` (35 files, 119515562 bytes) uploaded and
-  verified by belfem, promotion pending. belfem: on all three flavors the rebuilt ipopt differs
+  and promoted by belfem; `U24-mkl-20261005T1247Z` (35 files, 119515562 bytes) uploaded, verified
+  and promoted by belfem; noble is complete for this campaign. belfem: on all three flavors the rebuilt ipopt differs
   from the published .deb in the container only. Details:
-  `devlog/dl20261005_u24_math_campaign.md`. Not done: the mkl promotion; U26 (rows 1–8), started
-  after U24's last build.
+  `devlog/dl20261005_u24_math_campaign.md`. Not done: U26 (rows 1–8), started after U24's last build.
 
 ## Blockers
 

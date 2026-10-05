@@ -88,7 +88,7 @@ accepted for .debs. Each drop was staged with `--build`, sized by belfem, then u
 |---|---|---|---|---|---|
 | `U24-debug-20261005T1120Z` | 35 | 140285302 | `2c2e626fcb4637032d4e399e0bf103bae0449bfefec013cfe3b50402128b430b` | `5ef32ba` | uploaded; verified and promoted (belfem) |
 | `U24-gcc-20261005T1138Z` | 35 | 119515962 | `8e8b173dba6446bbb8c0ca2fd39b00b90455a7643eece1c3d652a06695331e06` | `0f771d8` | uploaded; verified and promoted (belfem) |
-| `U24-mkl-20261005T1247Z` | 35 | 119515562 | `d144b1dcca7b584750dd92ce5a32abb94667ccb99ffa865c452dfc70cecccada` | `f50cb97` | uploaded; verified (belfem), promotion pending |
+| `U24-mkl-20261005T1247Z` | 35 | 119515562 | `d144b1dcca7b584750dd92ce5a32abb94667ccb99ffa865c452dfc70cecccada` | `f50cb97` | uploaded; verified and promoted (belfem) |
 
 - Each drop: 11 .deb (the seven packages, ipopt, and the petsc, slepc and sundials `-examples`)
   and 24 source files; `excluded: 0`, `no_source: 0`, `replace_published: 2` (ipopt binary and
@@ -103,6 +103,13 @@ accepted for .debs. Each drop was staged with `--build`, sized by belfem, then u
   identical control file, file list and installed files; only the .deb container differs. The
   replacement changes nothing a user sees on noble.
 
+- **Client check on U24 after the three promotions:** `apt-get update` clean; for the 33
+  campaign packages (11 per flavor) the belfem candidate equals the installed version;
+  `apt-get download` of petsc, mumps and ipopt for all three flavors gives files byte-identical
+  (`cmp`) to `work/pkgs`, the replaced ipopt included. No upgrade was run.
+- belfem after the mkl promotion: noble complete for this campaign, 132 binary packages,
+  signature good, every .deb matches the signed index.
+
 ## 6. Backlog
 
 - Removed: "Verify the 2026-10-04 staging change on a real DEB package database". Three
@@ -111,5 +118,4 @@ accepted for .debs. Each drop was staged with `--build`, sized by belfem, then u
 
 ## Open
 
-- Promotion of `U24-mkl-20261005T1247Z` (belfem, Christian).
 - U26: rows 1–8, started after this host's last build.
