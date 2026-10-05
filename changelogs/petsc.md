@@ -10,8 +10,9 @@
 - `files/petsc.txt`: `lib/petsc/conf/modules/petsc/3.25.5` → `3.26.0`. New minor series; expect
   a manifest refresh at the first Linux build.
 - Dependencies follow PETSc 3.26.0's own pins (`doc/CAMPAIGN_POLICY.md` §9): scotch 7.0.15, now
-  built with `SCOTCH_METIS_PREFIX` as PETSc builds it, and superlu_dist 9.2.1. Not matching yet:
-  hwloc (2.14.0 against PETSc's 2.15.0) and hdf5 (1.14.6 against 2.2.0).
+  built with `SCOTCH_METIS_PREFIX` as PETSc builds it, superlu_dist 9.2.1 and hwloc 2.15.0 (bumped
+  in the same campaign). Not matching: hdf5 (1.14.6 against 2.2.0, not this round) and
+  butterflypack (4.1.0, ahead of PETSc's 3.2.0).
 
 ## Version 3.25.5-1 - Tue Sep 22 2026
 - Updated to version 3.25.5

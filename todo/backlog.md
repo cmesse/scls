@@ -89,6 +89,9 @@ adds six packages per flavor. Per-host instructions: `todo/campaign_20261004_hos
       2026-10-04 with `--spec-only` (debug): the main package requires only `environment`.
 - [ ] **lapack licence notice (P2):** the binary packages ship no LAPACK LICENSE; `files/lapack.txt`
       has none.
+- [ ] **`files/petsc.txt` and `files/slepc.txt` carry the literal version** in
+      `lib/{petsc,slepc}/conf/modules/<pkg>/<version>` and are edited by hand on every bump;
+      `%{version}` would do (Codex, 2026-10-04 implementation audit).
 - [ ] **vtk dead option:** `-DVTK_BUILD_SCALED_SOA_ARRAYS=OFF` (`recipes/vtk.yaml:41`) is unused
       since VTK 9.7.0.
 - [ ] **CPATH / LIBRARY_PATH audit.** The DEB/unix build environment exports

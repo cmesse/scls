@@ -9,7 +9,8 @@ license: BSD-2-Clause
 source:
   url: https://web.cels.anl.gov/projects/petsc/download/release-snapshots/petsc-%{version}.tar.gz
 
-# Upstream PETSc 3.25.0: BAIJMKL sources compile under PETSC_HAVE_MKL_SPARSE_OPTIMIZE,
+# Upstream PETSc 3.25.0 through 3.26.0 (3.26.0 spells the guard PetscDefined(HAVE_MKL_SPARSE),
+# same mismatch): BAIJMKL sources compile under PETSC_HAVE_MKL_SPARSE_OPTIMIZE,
 # but their declarations in petscmat.h sit under PETSC_HAVE_MKL_SPARSE (legacy
 # mkl_dcsrmv). MKL 2025+ on RHEL 10 dropped mkl_dcsrmv, so the auto-generated
 # Fortran wrappers see no declarations and GCC 14 promotes the implicit-decl

@@ -67,29 +67,78 @@ The standing set of policy §4 (install and version match, drift sweep, meta-pac
 `check_mkl_linkage.sh` on every flavor, `stage_to_belfem.sh --build`), plus three for this
 campaign. They are defined here, before any build, so they block:
 
+Each gate is a script that exits non-zero on a wrong result (implementation audit, Grok P1:
+the first versions only printed, so a wrong binding or an unreadable library would have passed).
+Set `P=/opt/scls/<F>` first.
+
 - **G1 — no unprefixed emulation symbols.** After scotch installs:
-  `nm -D --defined-only <prefix>/lib/libptscotchparmetisv3.so libscotchmetisv3.so libscotchmetisv5.so | grep -E ' (METIS_|ParMETIS_|metis_|parmetis_)'`
-  prints nothing.
-- **G2 — PETSc's ParMETIS calls reach ParMETIS.** After petsc installs, build the five-line
-  program below and run it with `LD_BIND_NOW=1 LD_DEBUG=bindings`: every `ParMETIS_V3*` symbol of
-  `libpetsc.so` binds to `libparmetis.so`, and `SCOTCH_ParMETIS_V3_NodeND` to
-  `libptscotchparmetisv3.so`.
 
   ```bash
-  cat > /tmp/b.c <<'EOF'
+  rc=0
+  for l in libptscotchparmetisv3.so libscotchmetisv3.so libscotchmetisv5.so; do
+    syms=$(nm -D --defined-only "$P/lib/$l") || { echo "G1 FAIL: cannot read $l"; rc=1; continue; }
+    [ -n "$syms" ] || { echo "G1 FAIL: $l exports nothing"; rc=1; continue; }
+    bad=$(printf '%s\n' "$syms" | awk '{print $NF}' | grep -E '^(METIS_|ParMETIS_|metis_|parmetis_|PARMETIS_)' || true)
+    [ -z "$bad" ] || { echo "G1 FAIL: $l exports unprefixed:"; echo "$bad"; rc=1; }
+    printf '%s\n' "$syms" | awk '{print $NF}' | grep -q '^SCOTCH_' || { echo "G1 FAIL: $l has no SCOTCH_ symbol"; rc=1; }
+  done
+  [ $rc -eq 0 ] && echo "G1 PASS"; ( exit $rc )
+  ```
+
+- **G2 — PETSc's ParMETIS calls reach ParMETIS.** After petsc installs:
+
+  ```bash
+  cat > /tmp/g2.c <<'EOF'
   #include <petscsys.h>
   int main(int c, char **v){ PetscInitialize(&c,&v,NULL,NULL); return PetscFinalize(); }
   EOF
-  source <prefix>/share/scls/activate
-  mpicc /tmp/b.c -o /tmp/b $(pkg-config --cflags --libs PETSc) -Wl,-rpath,<prefix>/lib
-  LD_BIND_NOW=1 LD_DEBUG=bindings /tmp/b 2>&1 | grep -E "ParMETIS_V3|SCOTCH_ParMETIS" | grep libpetsc
+  ( source $P/share/scls/activate
+    mpicc /tmp/g2.c -o /tmp/g2 $(pkg-config --cflags --libs PETSc) -Wl,-rpath,$P/lib ) || { echo "G2 FAIL: build"; false; }
+  LD_BIND_NOW=1 LD_DEBUG=bindings /tmp/g2 2>&1 | grep 'binding file .*libpetsc\.so' > /tmp/g2.log
+  rc=0
+  for s in ParMETIS_V3_PartKway ParMETIS_V3_Mesh2Dual; do
+    grep -q "to .*libparmetis\.so.*\`$s'" /tmp/g2.log || { echo "G2 FAIL: $s not bound to libparmetis"; rc=1; }
+  done
+  grep -E "\`ParMETIS_" /tmp/g2.log | grep -v 'to .*libparmetis\.so' && { echo "G2 FAIL: a ParMETIS_* symbol binds elsewhere (lines above)"; rc=1; }
+  grep -q "to .*libptscotchparmetisv3\.so.*\`SCOTCH_ParMETIS_V3_NodeND'" /tmp/g2.log || { echo "G2 FAIL: SCOTCH_ParMETIS_V3_NodeND not bound to libptscotchparmetisv3"; rc=1; }
+  [ $rc -eq 0 ] && echo "G2 PASS"; ( exit $rc )
   ```
-- **G3 — the packages that were not rebuilt still load.** After hwloc and scotch install and
-  before anything else is built: `ldd -r` on `libpmix.so`, `libmpi.so`, `libdmumps.so`,
-  `libstrumpack.so`, `libipopt.so` and `libspral.so` reports no undefined symbol;
-  `mpirun -np 2 hostname` runs; Ipopt's hs071 solves with `linear_solver mumps` and with
-  `linear_solver spral`.
-  If this fails, the "no cascade" claim is wrong: stop, it is a B1 finding.
+
+  If `libpetsc.so` no longer imports one of the two named symbols in 3.26.0, the first loop fails:
+  report it as a finding with `/tmp/g2.log`; do not edit the gate on the host.
+
+- **G3 — the packages that were not rebuilt still load and run.** After hwloc and scotch install
+  and before anything else is built. glibc's `ldd -r` exits 0 even with undefined symbols, so the
+  output is searched:
+
+  ```bash
+  rc=0
+  for l in libpmix.so libmpi.so libdmumps.so libstrumpack.so libipopt.so libspral.so; do
+    out=$(ldd -r "$P/lib/$l" 2>&1) || { echo "G3 FAIL: ldd $l"; rc=1; continue; }
+    printf '%s\n' "$out" | grep -E 'undefined symbol|not found' && { echo "G3 FAIL: $l (lines above)"; rc=1; }
+  done
+  ( source $P/share/scls/activate; mpirun -np 2 hostname ) || { echo "G3 FAIL: mpirun"; rc=1; }
+  ```
+
+  Then the solver run, as in round 2 (`devlog/dl20261004_r10_round2.md`): Ipopt installs no
+  example, so build `examples/hs071_cpp` from the Ipopt 3.14.20 source tree in `work/` against
+  the installed prefix and run it once per solver:
+
+  ```bash
+  cd <ipopt-3.14.20 source>/examples/hs071_cpp
+  ( source $P/share/scls/activate
+    g++ hs071_main.cpp hs071_nlp.cpp -o /tmp/hs071 $(pkg-config --cflags --libs ipopt) -Wl,-rpath,$P/lib
+    cd /tmp
+    for s in mumps spral; do
+      echo "linear_solver $s" > ipopt.opt
+      ./hs071 | tee /tmp/hs071_$s.log | grep -q 'Optimal Solution Found' || { echo "G3 FAIL: hs071 with $s"; exit 1; }
+    done ) || rc=1
+  [ $rc -eq 0 ] && echo "G3 PASS"; ( exit $rc )
+  ```
+
+  If G3 fails, the "no cascade" claim is wrong: stop, it is a B1 finding. G3 does not prove ABI
+  compatibility of data structures; for hwloc that rests on upstream's libtool version
+  (`25:3:10` → `25:4:10`, read from both `VERSION` files on 2026-10-04).
 
 ## B. What was verified on the dev host before this file was written
 
@@ -175,7 +224,17 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
 
 ## Status
 
-- 2026-10-04 — recipes, patches, manifests and changelogs committed on `ipopt`. No build yet.
+- 2026-10-04 — recipes, patches, manifests and changelogs committed on `ipopt` (`3ae0c19`). No build yet.
+- 2026-10-04 — review gate for the Scotch option closed. Plan round and implementation round, each
+  blind, Codex `gpt-5.6-terra`/high and Grok `grok-4.7`/high. No finding against the recipe diff:
+  the option reaches every flavor's configure line, and slepc and sundials are the only in-stack
+  consumers of `libpetsc`. Taken from the implementation round: gates G1–G3 rewritten so that a
+  wrong result exits non-zero (Codex P0: G1 as first written passed when forbidden symbols were
+  present and searched two libraries in the current directory; Grok P1: G2 never checked the
+  binding target, glibc `ldd -r` exits 0 on undefined symbols, hs071 is not installed);
+  `libptesmumps` added to the changelog; the PETSc changelog and recipe comment corrected. Not
+  taken: Codex's P2 to write `%{version}` in `files/petsc.txt` and `files/slepc.txt` (backlog).
+  Still open by execution only: scotch's `ctest` with the prefix, and the pilot builds.
 
 ## Blockers
 

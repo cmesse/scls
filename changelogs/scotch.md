@@ -7,8 +7,8 @@
   (Fortran `scotchf*`) instead of the unprefixed names, which collided with the real METIS and
   ParMETIS: `libpetsc` bound `ParMETIS_V3_PartKway` and `ParMETIS_V3_Mesh2Dual` to Scotch's
   emulation. This is how PETSc builds its own Scotch. File names and SONAMEs are unchanged;
-  `libscotch`, `libptscotch` and `libesmumps` are not affected, so mumps and strumpack are not
-  rebuilt. A program outside the stack that linked the emulation libraries for the unprefixed
+  `libscotch`, `libptscotch`, `libesmumps` and `libptesmumps` are not affected, so mumps and
+  strumpack are not rebuilt. A program outside the stack that linked the emulation libraries for the unprefixed
   names must link METIS/ParMETIS instead. Scotch stays at 7.0.15, the version PETSc 3.26.0 pins.
 - Compressed graph files (gzip, bzip2, xz) on every flavor (Christian, 2026-10-03). The recipe's
   `-DCOMMON_FILE_COMPRESS_{BZ2,GZ,LZMA}=OFF` were never read by scotch's CMake (its options are
