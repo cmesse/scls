@@ -35,9 +35,10 @@ recipes and writes the tracker. Nothing in this file ever changes a package vers
    installing do not; that is the job.
 6. **A release is bumped only after its NEVRA has been dropped and published** (Christian,
    2026-10-04: "only bump when the drop and publish has happened"). A fix to a recipe whose
-   current version-release belfem does not publish yet keeps `release:` as it is. Every host and
-   flavor that already built that package rebuilds and reinstalls it at the same NEVRA, so the
-   artifacts, including the changelog rendered into them, match the recipe that is committed.
+   current version-release belfem does not publish yet keeps `release:` as it is. A host and
+   flavor that already built that package rebuilds and reinstalls it at the same NEVRA **only if
+   the change alters what the build does there**; a difference in `%changelog` text or comments
+   alone is not a reason to rebuild (`doc/CAMPAIGN_POLICY.md` §6, amended 2026-10-04).
    Once the NEVRA is published, a change to what ships needs `release:` +1: a same-NEVRA rebuild
    is invisible to dnf/apt and must never replace a signed file (`.claude/commands/stage-drop.md`
    §4). Whether a NEVRA is published is a question for belfem's published list, not for the local
@@ -45,6 +46,11 @@ recipes and writes the tracker. Nothing in this file ever changes a package vers
    2026-09-26) for packages that are not published; the changelog still gets a line saying what
    changed and that the release was kept. First applied to gperftools 2.18.1-2 and
    spral 2025.09.18-1 (`devlog/dl20261003_r9_round2.md`, round 2).
+7. **`doc/CAMPAIGN_POLICY.md` decides what belongs in the running campaign.** Scope is fixed with
+   the tracker. A finding blocks only as class B1–B4 (regression, broken, licence, cannot build);
+   everything else is appended to `todo/backlog.md` in the same session and reported in the
+   policy's finding format. Gates added mid-campaign report only. Nothing is uploaded until every
+   host has passed.
 
 ---
 

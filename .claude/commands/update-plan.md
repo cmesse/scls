@@ -21,6 +21,9 @@ Hard rules, in force for every step:
   it with the blast radius, and wait.
 - **Christian decides the exclusions.** Step 2 produces candidates; it does not produce a list of
   approved bumps. Ask, then proceed with the answer. Never infer "he will want this".
+- **Read `doc/CAMPAIGN_POLICY.md` and `todo/backlog.md` first.** The backlog is where the
+  candidates for this campaign come from; Christian picks. The tracker you write fixes the scope,
+  the hosts, the pilot hosts (R9 and U24) and the gate list (policy §1, §4, §5).
 - **All work goes on `devel`.** Never commit to `main`. If the tree is on `main`, switch first
   (`git checkout devel`, creating it from `origin/devel` if missing) and say so.
 - Register: neutral, factual. Evidence discipline from `doc/AI_COLLABORATION_PROTOCOL.md` §11 —
@@ -49,6 +52,7 @@ Excluded automatically, listed with the reason, never bumped by this skill:
 | Commit pin | strategy `github_commit` | gklib, parmetis — moving gklib forces metis + parmetis (`doc/GKLIB_STATIC_POLICY.md`) |
 | Major held by pin | listed under "blocked by pin" | hdf5 2.x |
 | Apple tag series | zlib's `github_tag` on apple-oss-distributions | `100 → 100.120.1` is not a version |
+| Held by PETSc's pin | the package is one PETSc can download (`config/BuildSystem/config/packages/<Pkg>.py` in the PETSc tarball being built) and upstream is newer than `self.version` there (`doc/CAMPAIGN_POLICY.md` §9) | scotch 7.0.16 and superlu_dist 9.3.0 under PETSc 3.26.0 |
 | GPL-3 linkable library | `license:` is GPL-3/LGPL-3-family and the recipe is not a build-only tool (`doc/LICENSE_POLICY.md`) | FFTW is the canonical case — a distribution constraint, not a version judgement; it stays out of the binary flavors whatever upstream ships |
 
 Everything else is a **candidate**. Present them as one table — package, current, upstream,

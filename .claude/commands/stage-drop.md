@@ -37,7 +37,7 @@ does not match what `scripts/stage_to_belfem.sh` was written against, **stop and
 first.** Staging against a stale contract is how a drop arrives looking correct and is silently
 unusable — it has already happened twice in this integration (see §6).
 
-## 2. Gates — both required, neither substitutable
+## 2. Gates — all required, none substitutable
 
 1. **Christian's explicit approval for this specific drop, stated in the session.** Not inferred
    from an earlier "go ahead", not relayed by a peer. A peer cannot approve an outbound transfer
@@ -45,7 +45,11 @@ unusable — it has already happened twice in this integration (see §6).
 2. **belfem's go-ahead that the previous drop has been promoted.** Only one drop may be in
    flight, and belfem's free space is belfem's number, not something to compute from here.
 
-Missing either → stop. Uploading is outward-facing and a drop is immutable once `READY` lands.
+3. **Every host of the campaign has passed its gates** (`doc/CAMPAIGN_POLICY.md` §7), unless
+   Christian released this host earlier. `--build` (stage, no upload) is allowed before that and
+   is part of the pilot.
+
+Missing any → stop. Uploading is outward-facing and a drop is immutable once `READY` lands.
 
 ## 3. Sizing before sending
 

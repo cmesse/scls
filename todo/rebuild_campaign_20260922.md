@@ -500,7 +500,7 @@ happens automatically on install (`SCLS_KEEP_OLD_ARTIFACTS=1` to keep them).
 
 - 2026-10-04 — **Campaign closed.** Every cell in section A is ticked, rows 30–31 included.
   Round 2 (spral, ipopt and the RPM-side fixes) is built on all five hosts and not staged; the
-  staging list and everything else still open is in `todo/open_issues_20261004.md`. This file
+  staging list and everything else still open is in `todo/backlog.md`. This file
   stays as the layout reference for `/update-plan`.
 
 ## Blockers

@@ -246,13 +246,23 @@ Supported strategies (set under `update:` in the recipe):
 
 When bumping a version, also update `changelogs/<package>.md`, and re-check `files/<package>.txt` and any patches for drift (patch hunks, hard-coded version directories like `lib/cmake/<pkg>-<x.y.z>/`, new installed files). Version-stamped *directories* need no manifest edit: `rpm_builder.get_file_list()` collapses them to a single `%files` entry and `glob_dir_version()` rewrites the trailing version to a glob (`share/cmake-4.4` -> `share/cmake-[0-9]*`), which RPM expands against the buildroot. Version-stamped *files* (e.g. `bin/vtkWrapPython-9.6`) are listed individually and still need the manifest regenerated. Note `%{version}` is not a substitute where the directory carries only part of the version — RPM expands it to the full recipe version (`4.4.2`) while the directory is `4.4`.
 
+## Campaign Policy
+
+See [`doc/CAMPAIGN_POLICY.md`](doc/CAMPAIGN_POLICY.md). A rebuild campaign has a fixed scope
+(the tracker), a fixed gate list, and a pilot on one RPM host and one DEB host before the other
+hosts build. A finding blocks the running campaign only if it is a regression against the
+published packages, a broken package, a licence problem, or a build that cannot complete;
+everything else is appended to `todo/backlog.md` and reported in the policy's finding format,
+not raised as an open decision. Rebuilds follow the payload: a `%changelog`-only difference does
+not rebuild a host. Nothing is uploaded until every host has passed.
+
 ## AI Collaboration
 
 Multi-AI work in this repository follows [`doc/AI_COLLABORATION_PROTOCOL.md`](doc/AI_COLLABORATION_PROTOCOL.md) — read it before invoking an auditor or writing to the exchange. Short version:
 
 - **Roles:** Claude explores and proposes; Codex and Grok audit read-only. Invoke them with `.claude/scripts/ask_codex.sh` / `.claude/scripts/ask_grok.sh` (prompt as an argument, or `-` for stdin).
 - **Exchange:** AI-to-AI scratch lives in `tmp/ai_exchange/<slug>.md`, one topic per file. It is git-ignored and ephemeral. Pin the topic with `AI_EXCHANGE_SLUG=<topic>`.
-- **Durable record:** `devlog/dlYYYYMMDD_topic.md` (tracked) is where a session's conclusions must land, alongside `changelogs/<package>.md` for version history and `doc/*.md` for standing policy. `todo/` is tracked too, so live plans and build trackers reach the build host — but it records intent, never the sole home of a finding.
+- **Durable record:** `devlog/dlYYYYMMDD_topic.md` (tracked) is where a session's conclusions must land, alongside `changelogs/<package>.md` for version history and `doc/*.md` for standing policy. `todo/` is tracked too, so live plans and build trackers reach the build host — but it records intent, never the sole home of a finding. Deferred work lives in `todo/backlog.md` only.
 - **Three-AI round:** `/cross-review` — Claude pre-registers its own findings, `scripts/cross_review.sh` dispatches both auditors blind, then Claude verifies every citation and writes the reconciliation table.
 - **Auto-review:** opt-in post-commit auditor, installed by `scripts/install_autoreview_hook.sh` and gated on `SCLS_AUTOREVIEW=1`. `scripts/review_status.sh` shows the backlog and any open P0 flags.
 - **Evidence discipline:** "reviewed" is not "verified". Name the gate that actually ran. The macOS dev host cannot run `rpmbuild`, so RPM claims top out at `--spec-only` generation and are written as pending a Linux build host.

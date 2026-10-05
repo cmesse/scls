@@ -21,6 +21,14 @@ Arguments: `--flavors` overrides the default sequence. `--from <pkg>` resumes at
 
 ---
 
+## 0. Campaign policy
+
+`doc/CAMPAIGN_POLICY.md` applies to every run. In short: the tracker is the scope; a finding
+blocks only as class B1–B4 and is otherwise appended to `todo/backlog.md` in this session, in the
+policy's finding format; a recipe change after this host built a package means a rebuild here only
+if the generated spec or build commands differ beyond `%changelog` (§6); hosts other than the
+pilot hosts (R9, U24) start only on the recipe commit Christian released (§5).
+
 ## 1. Preflight
 
 `doc/BUILD_EXECUTION.md` §1 in full — host classification, `devel` + `git pull --ff-only`,

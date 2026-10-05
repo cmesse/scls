@@ -1,57 +1,63 @@
-# Open issues — 2026-10-04
+# Backlog
 
-**Written:** 2026-10-04 on the macOS dev host, branch `ipopt` at `8802c45`, before merging `ipopt`
-into `main`.
-**Replaces:** `open_issues_20260927.md`, `r9_round2_20261003.md`, `round2_el10_amzn2023.md`,
-`spral_recipe.md`, `asc2026_final_upgrade.md`, `apple_silicon_report_fixes.md` and the completed
-plan files (all removed in the same commit; they stay in git history). Each item below was
-re-checked against the tree on 2026-10-04 unless it says otherwise. Closed items were dropped,
-not carried; their records are in the devlogs named in §8.
+The only place where deferred work lives (`doc/CAMPAIGN_POLICY.md` §3). Append a finding here in
+the session that makes it, with its source. `/update-plan` reads this file first; Christian picks
+what joins the next campaign. Remove an entry when it is done; the record of the work is the devlog
+and the changelog.
 
-Still separate, because they carry their own analysis:
-- `todo/scotch_metis_prefix.md` — the `-DBUILD_LIBSCOTCHMETIS` question
+Nothing in §2–§9 blocks the running campaign (`todo/rebuild_campaign_20261004.md`). Staging of
+round 2 and the campaign in one drop per flavor: §1 and `todo/campaign_20261004_hosts.md`.
+
+Last full re-check against the tree: 2026-10-04 (macOS dev host). §9 was carried over from devlog
+"Open" sections and has **not** been re-checked.
+
+Separate files that carry their own analysis:
+- `todo/scotch_metis_prefix.md` — Scotch's METIS/ParMETIS compatibility libraries
 - `todo/extra_packages_unix_deb_override.md` — bugs B1 and B2
 - `todo/libhsl_source_selection.md` — HSL policy §9, cited by `scripts/build_libhsl.py` and
   `scripts/hsl/assemble_sources.sh`
 - `todo/rebuild_campaign_20260922.md` — closed campaign, kept as the layout reference for
   `/update-plan` and because 16 changelogs and `/stage-drop` cite it
 
-Tick items here as they close. Record findings in the devlog or changelog, not only here.
-
 ---
 
-## 1. Release — round 2 is built everywhere and staged nowhere
+## 1. Release — round 2 and the 2026-10-04 math campaign, one drop per host and flavor
 
 Round 2 is built and installed on R9, R10 (debug/gcc/mkl), AMZN (gcc/mkl), U24 and U26
-(debug/gcc/mkl). No drop has been staged or uploaded from any host.
+(debug/gcc/mkl) and was never staged. The math campaign (`todo/rebuild_campaign_20261004.md`)
+adds six packages per flavor. Per-host instructions: `todo/campaign_20261004_hosts.md`.
 
-- [ ] **Stage and upload round 2** with `/stage-drop`, one flavor at a time (debug → gcc → mkl),
-      one drop in flight, each after belfem promotes the previous one. Upload only after the belfem
-      coordinator's size OK **and** Christian's go-ahead.
-      - [ ] R9 debug / gcc / mkl
-      - [ ] R10 debug / gcc / mkl
-      - [ ] AMZN gcc / mkl
-      - [ ] U24 debug / gcc / mkl
-      - [ ] U26 debug / gcc / mkl
-      New NEVRAs per drop: environment 2026-3, gperftools 2.18.1-2, scotch 7.0.15-2, hwloc 2.14.0-2,
-      libunwind 1.8.3-3, spral 2025.09.18-1, ipopt 3.14.20-1, `scls-<F>` 2026-2; on the RPM hosts
-      also openmpi 5.0.11-2 and (debug) lapack 3.12.1-2. Everything else goes under
-      `already_published:`.
-      `stage_to_belfem.sh` records `git_head`, so restage right before each upload, on the merged
-      commit. mkl: `check_mkl_linkage.sh` before READY.
-      belfem's arrival checks: gperftools NEEDs the SCLS `libunwind.so.8`; scotch NEEDED
-      `libz`/`libbz2`/`liblzma` match its new Requires; mkl objects carry one threading layer.
-- [ ] **Website:** regenerate with ipopt and deploy. The template changes are in the tree
-      (`8a5f7f6`, `0b37bd3`, `84efaca`); nothing is deployed.
+- [ ] **Build the campaign:** pilot on R9 and U24, then R10, AMZN and U26 on the commit Christian
+      releases.
+- [ ] **Stage and upload** with `/stage-drop` once all five hosts have passed: 14 drops, one in
+      flight, debug → gcc → mkl per host, each after the belfem coordinator's size OK, the
+      promotion of the previous drop and Christian's go-ahead.
+- [ ] **Website:** regenerate with ipopt and the new versions and deploy. The template changes are
+      in the tree (`8a5f7f6`, `0b37bd3`, `84efaca`); nothing is deployed.
 - [ ] **Branch names in the workflow.** `/update-plan`, `/update-build`, `/build-stack` and
-      `doc/BUILD_EXECUTION.md` §0 and §1.2 name `devel` as the working branch ("All work goes on
-      `devel`. Never commit to `main`."). Decide what replaces it before `devel` is deleted, and
-      edit those four files to match.
+      `doc/BUILD_EXECUTION.md` §0 and §1.2 name `devel` as the working branch. Decide what replaces
+      it before `devel` is deleted, and edit those four files to match.
+- [ ] **macOS:** rebuild scotch, petsc and slepc for the prefix (two-level namespace: the existing
+      `libpetsc` names Scotch's library for `ParMETIS_V3_PartKway`), plus hwloc, armadillo and
+      sundials at the new versions.
 
 ## 2. Decisions pending (Christian)
 
-- [ ] **`libscotchmetis`** — keep, switch off, or namespace. `todo/scotch_metis_prefix.md`. Needs a
-      Linux build plus a PETSc partitioner run to close.
+- [ ] **Version bumps not taken on 2026-10-04:** vtk 9.7.1 (Christian: next week), openssl 3.6.5
+      (macOS only), butterflypack 5.0.0 (major; declined for now).
+- [ ] **Held by PETSc 3.26.0's pins** (`doc/CAMPAIGN_POLICY.md` §9): scotch 7.0.16 (patch ready in
+      `patches/scotch/archive/`), superlu_dist 9.3.0, cmake 4.4.4. They become candidates when
+      PETSc moves.
+- [ ] **hdf5 is a major version behind PETSc's pin** (1.14.6 against 2.2.0; `max_major: 1`).
+      Christian, 2026-10-04: not this round. netcdf and exodus depend on it.
+- [ ] **Scotch's ParMETIS emulation shadows the real ParMETIS in PETSc.** Scotch is built without
+      `SCOTCH_METIS_PREFIX`, so `libptscotchparmetisv3` exports unprefixed `ParMETIS_V3_*`. On the
+      macOS install (scotch 7.0.11, petsc 3.25.0) `libpetsc` binds `ParMETIS_V3_PartKway` and
+      `ParMETIS_V3_Mesh2Dual` to Scotch's library, not to `libparmetis`. PETSc's own Scotch build
+      sets `-DSCOTCH_METIS_PREFIX=ON`. The library cannot simply be switched off: PETSc links it
+      and calls `SCOTCH_ParMETIS_V3_NodeND`. Linux binding unmeasured (read-only check in
+      `todo/campaign_20261004_hosts.md`). Analysis and radius: `todo/scotch_metis_prefix.md`.
+      **Decided 2026-10-04:** `-DSCOTCH_METIS_PREFIX=ON`, in `todo/rebuild_campaign_20261004.md`.
 - [ ] **Compression dependencies outside scotch (optional).** netcdf (bzip2, zstd) and libunwind
       (xz, on every Linux flavor but `lbl`) link host libraries that no recipe declares; the
       `-devel` packages are host prep (`doc/BUILD_EXECUTION.md` §1.1b). Declaring them is a metadata
@@ -159,7 +165,60 @@ Round 2 is built and installed on R9, R10 (debug/gcc/mkl), AMZN (gcc/mkl), U24 a
 - [ ] `flavor.conf` is tracked with `macos` as the committed default. Each build host:
       `git checkout flavor.conf` before pulling the merged branch.
 
-## 8. Where the closed work is recorded
+## 8. Engineering causes behind the 2026-09/10 rework (`doc/CAMPAIGN_POLICY.md` §10)
+
+- [ ] **One build environment for both builders.** rpm_builder and unix/deb_builder differ in
+      `CPATH`/`LIBRARY_PATH`, LDFLAGS for math recipes, `configure.args` expansion,
+      `configure.flavor_pre/post`, `flavor_env`, and the MKL environment. Six incidents trace to
+      this (PRRTE, gperftools libunwind, spral `cblas.h`, ipopt F1, `--as-needed`, intel MKL env).
+- [ ] **Builds depend on undeclared host state:** installed `-devel` packages, EPEL's `pprof`, a
+      venv on `PATH`, an earlier install of the same package in the prefix. Options: a clean-room
+      build (mock/chroot), or a host baseline check in preflight.
+- [ ] **Port belfem's arrival checks into the repo as gates:** the per-object el9 parity check
+      (§4, not started) and the installed-versus-recipe selection for staging (§9).
+- [ ] **Working branch after `devel` is deleted.** `/update-plan`, `/update-build`, `/build-stack`
+      and `doc/BUILD_EXECUTION.md` §0.2 and §1.2 name `devel`.
+
+## 9. Carried from devlog "Open" sections on 2026-10-04 — not re-checked
+
+Staging and tooling:
+- [ ] `stage_to_belfem.sh` selects from `rpm -qa`, so a package that is not installed is dropped
+      with no `excluded:` line (the meta-package is the risky case). Drive selection from the
+      recipes and cross-check against what is installed. (`dl20260925_r9_gcc_mkl_stage_drops` §3)
+- [ ] Upload mode reprints `excluded:` from current host state, not from the staged MANIFEST.
+      (`dl20260925_r10_build_and_publish`)
+- [ ] `stage_to_belfem.sh:4` header names an old contract version. (`dl20260925_r9_gcc_mkl_stage_drops` §2)
+- [ ] The keyring is selected into every drop until one is promoted; sequencing prevents a double
+      ship, no guard does. (`dl20260929_deb_no_as_needed`)
+- [ ] `BUILD_EXECUTION.md` §5.2 orphan check reports subpackages (`blas`, `cblas`, `lapacke`,
+      `*-examples`) as orphans. (`dl20260923_r9_rebuild_campaign`)
+- [ ] `./scls install hsl` leaves an empty `/tmp/scls-hsl-<uid>`. (`dl20261004_r10_round2`)
+- [ ] `python/scls.py` `_install_direct` continues after a failed removal. (`dl20261003_unix_install_sudo`)
+- [ ] `setup_environment` ignores `flavor_env` unless `configure.env` exists
+      (`build_common.py:1104-1134`). (`dl20261004_u24_round2`)
+
+Recipes and tests (each needs approval):
+- [ ] gperftools pipes `make check` through `tee`, so a test failure cannot fail the build.
+- [ ] libunwind has no `test:` block.
+- [ ] spral: `ssidst` runs close to meson's 300 s limit on loaded VMs; `meson test -t N` is a
+      recipe change.
+- [ ] spral on debug: a host with a system-wide `cblas.h` would defeat the `CPATH` fix.
+- [ ] `recipes/environment.yaml` says `BSD-3-Clause`; the repository is `BSD-3-Clause-LBNL`.
+- [ ] `pkg-config --libs ipopt` carries no rpath.
+- [ ] `hwloc-dump-hwdata` (sbin) may not belong in a prefix install.
+- [ ] The gperftools .deb installs 59 files, the RPM 73; not investigated.
+- [ ] mkl: ScaLAPACK's BLAS is threaded since 2.2.3-4 and nothing pins `MKL_NUM_THREADS`; accepted
+      on 2026-09-25, revisit if users report oversubscription.
+
+Verification owed elsewhere:
+- [ ] lbl: `scls-lbl-xz`, libunwind and scotch against the prefix liblzma (needs a Linux lbl host).
+- [ ] macOS: `files/xz.txt`, hwloc's plain tool names, scotch against the stack liblzma, a real
+      `--uninstall`.
+- [ ] RPM `%post` registry rewrite with `registry.pc_name` on a Linux host.
+- [ ] U26: the gcc specs override still has one inert `--as-needed` entry (Android branch).
+- [ ] Ipopt 3.14.20 upstream: an `hsllib` that cannot be loaded segfaults at exit.
+
+## 10. Where the closed work is recorded
 
 | Topic | Record |
 |---|---|
