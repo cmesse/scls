@@ -25,9 +25,9 @@ recipe commit by hash.
 | §1 sync | [x] | [ ] | [ ] | [ ] | [ ] |
 | §2 state before the campaign | [x] | [ ] | [ ] | [ ] | [ ] |
 | §3 build the campaign, gates G1–G3 | [x] | [ ] | [ ] | [ ] | [ ] |
-| §4 standing gates, stage with `--build` | [ ] | [ ] | [ ] | [ ] | [ ] |
+| §4 standing gates, stage with `--build` | [x] | [ ] | [ ] | [ ] | [ ] |
 | released for fan-out (Christian, commit hash) | pilot | pilot | [ ] | [ ] | [ ] |
-| §5 upload, per drop | [ ] | [ ] | [ ] | [ ] | [ ] |
+| §5 upload, per drop | [x] | [ ] | [ ] | [ ] | [ ] |
 
 **Rules.**
 

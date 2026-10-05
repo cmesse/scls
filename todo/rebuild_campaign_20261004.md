@@ -275,6 +275,13 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   `libptscotchparmetisv3.so.7.0`. Gate not edited (backlog). Drops: R9-debug-20261005T0453Z
   promoted; R9-gcc-20261005T0504Z uploaded and verified by belfem. Both predate mumps 5.9.1-3.
 
+- 2026-10-04 — R9 uploads (Christian released R9 ahead of the other hosts, policy §7). Standing
+  gates pass on debug, gcc, mkl. `R9-debug-20261005T0453Z` and `R9-gcc-20261005T0504Z` promoted.
+  Uploaded, script exit 0, size approved by belfem, arrival result pending:
+  `R9-mkl-20261005T0551Z` (31 files), `R9-debug-20261005T0552Z` and `R9-gcc-20261005T0552Z`
+  (mumps 5.9.1-3, 2 files each). Details: `devlog/dl20261004_r9_math_campaign.md`. Not done:
+  R10, AMZN, U24, U26 (rows 1–8), and the Ubuntu ipopt replacement.
+
 ## Blockers
 
 (none)
