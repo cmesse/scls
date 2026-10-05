@@ -281,6 +281,15 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   `R9-mkl-20261005T0551Z` (31 files), `R9-debug-20261005T0552Z` and `R9-gcc-20261005T0552Z`
   (mumps 5.9.1-3, 2 files each). Details: `devlog/dl20261004_r9_math_campaign.md`. Not done:
   R10, AMZN, U24, U26 (rows 1–8), and the Ubuntu ipopt replacement.
+- 2026-10-05 — R10 (EL10), from `7623f57` released by Christian: debug 7/7, gcc 7/7, mkl 8/8 built
+  and installed (rows 1–7, and ipopt on mkl). No class M/P/D fix. spral kept as changelog-only
+  (`d908cfc`) on all three flavors. Gates: G1, G2 and G3 pass on all three; G2 runs as written on
+  mkl here; G3 on mkl failed after scotch on the known `libdmumps` lines and passes after mumps
+  5.9.1-3 and ipopt were rebuilt. Standing gates pass. Drops: `R10-debug-20261005T0641Z` uploaded,
+  verified and promoted; `R10-gcc-20261005T0702Z` uploaded and verified by belfem, promotion
+  pending; mkl staged with `--build` (31 files, 203057687 bytes), not uploaded: the belfem session
+  was offline. Details: `devlog/dl20261005_el10_math_campaign.md`. Not done: the R10 mkl upload;
+  AMZN, U24, U26 (rows 1–8), and the Ubuntu ipopt replacement.
 
 ## Blockers
 
