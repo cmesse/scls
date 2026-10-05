@@ -52,14 +52,18 @@ Round 2 is built and installed on R9, R10 (debug/gcc/mkl), AMZN (gcc/mkl), U24 a
 
 - [ ] **`libscotchmetis`** — keep, switch off, or namespace. `todo/scotch_metis_prefix.md`. Needs a
       Linux build plus a PETSc partitioner run to close.
-- [ ] **`lbl` openmpi is 4.1.6-2 with no content change**, because `release:` is recipe-wide.
-      Accept it, or add a per-flavor release override (build-config change).
-- [ ] **Compression dependencies outside scotch (optional).** netcdf still takes bzip2 from
-      whatever the host has (U26 without `libbz2-dev` falls back to netcdf's built-in bz2; el9
-      links the system library). Same question for libunwind and xz/zstd. scotch is done
-      (7.0.15-2).
-- [ ] **PRRTE and libnl (informational).** Ubuntu's PRRTE links libnl, el9's does not. Decide only
-      if the RPM side should enable it.
+- [ ] **Compression dependencies outside scotch (optional).** netcdf (bzip2, zstd) and libunwind
+      (xz, on every Linux flavor but `lbl`) link host libraries that no recipe declares; the
+      `-devel` packages are host prep (`doc/BUILD_EXECUTION.md` §1.1b). Declaring them is a metadata
+      change: the binaries already link these libraries on every host. Radius: netcdf and libunwind
+      only, 14 builds each, no cascade. netcdf -2 is published, so it needs -3; libunwind -3 is
+      unpublished until round 2 is staged. `libzstd` (runtime) has no .deb mapping yet. scotch is
+      done (7.0.15-2).
+- [ ] **PRRTE and libnl (informational).** Ubuntu's PRRTE builds the `prtereachable/netlink`
+      component (libnl comes in with the rdma dev packages); el9's does not. Enabling it on RPM
+      touches openmpi only (R9, R10, AMZN: 8 builds, no cascade, SONAMEs unchanged); openmpi
+      5.0.11-2 is unpublished on the RPM hosts until round 2 is staged. The Ubuntu openmpi .deb
+      links libnl without declaring it (covered transitively by ucx → libibverbs1).
 
 ## 3. Recipes and manifests (each needs approval)
 
