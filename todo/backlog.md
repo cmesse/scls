@@ -29,8 +29,10 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
 - [ ] **Stage and upload** with `/stage-drop` once all five hosts have passed: 14 drops, one in
       flight, debug → gcc → mkl per host, each after the belfem coordinator's size OK, the
       promotion of the previous drop and Christian's go-ahead.
-- [ ] **Website:** regenerate with ipopt and the new versions and deploy. The template changes are
-      in the tree (`8a5f7f6`, `0b37bd3`, `84efaca`); nothing is deployed.
+- [ ] **Website:** regenerate with ipopt and the new versions and deploy, after the campaign is
+      published (the table shows recipe versions). The template changes are in the tree
+      (`8a5f7f6`, `0b37bd3`, `84efaca`, and the 2026-10-05 licence wording and build-tools table,
+      `devlog/dl20261005_license_policy_no_gpl.md`); nothing is deployed.
 - [ ] **Branch names in the workflow.** `/update-plan`, `/update-build`, `/build-stack` and
       `doc/BUILD_EXECUTION.md` §0 and §1.2 name `devel` as the working branch. Decide what replaces
       it before `devel` is deleted, and edit those four files to match.
@@ -129,6 +131,17 @@ Per-host instructions: `todo/campaign_20261004_hosts.md`.
       `work/parity/needed_parity.sh` + `score2.py` into a repo-relative `scripts/` tool and hook it
       into `stage_to_belfem.sh` before READY. Two blind audits. Not started; no parity script is in
       `scripts/`.
+- [ ] **Builder licence warning is keyed on the substring `GPL-3`.** `python/rpm_builder.py:2323-2328`
+      and `python/unix_builder.py:1544-1549` warn "GPL-3 libraries must NOT be distributed" when
+      `'GPL-3' in license`: true for LGPL-3 (mpfr, mpc), false for `GPL 2.0`, `GPL-2.0-or-later`
+      and gmp's `GPLv2+`, and it also fires for the intended GPL build tools. `deb_builder.py` has
+      no counterpart. Align with `doc/LICENSE_POLICY.md` as restated 2026-10-05 (no GPL of any
+      version in published binaries). Found by both auditors in the 2026-10-05 plan round.
+- [ ] **No licence gate on what is staged.** The staging selectors hard-code SuiteSparse as
+      never-shippable (`scripts/stage_to_belfem.sh:173`, `scripts/deb_drop_select.py:59`). A new
+      GPL recipe enabled for a public flavor would build and could enter a drop;
+      `python/generate_website.py` refuses to render in that case, but `./makeweb` is not a
+      shipment gate.
 - [ ] **sudo keepalive under sudo-rs (U26).** `scls build all` refreshes with `sudo -n -v`
       (`scls:168-176`), which sudo-rs rejects even with `--scope all`. Test
       `sudo -n apt-get --version` / `sudo -n dnf --version` instead, or switch U26 to sudo.ws.

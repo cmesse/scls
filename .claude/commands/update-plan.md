@@ -53,7 +53,7 @@ Excluded automatically, listed with the reason, never bumped by this skill:
 | Major held by pin | listed under "blocked by pin" | hdf5 2.x |
 | Apple tag series | zlib's `github_tag` on apple-oss-distributions | `100 → 100.120.1` is not a version |
 | Held by PETSc's pin | the package is one PETSc can download (`config/BuildSystem/config/packages/<Pkg>.py` in the PETSc tarball being built) and upstream is newer than `self.version` there (`doc/CAMPAIGN_POLICY.md` §9) | scotch 7.0.16 and superlu_dist 9.3.0 under PETSc 3.26.0 |
-| GPL-3 linkable library | `license:` is GPL-3/LGPL-3-family and the recipe is not a build-only tool (`doc/LICENSE_POLICY.md`) | FFTW is the canonical case — a distribution constraint, not a version judgement; it stays out of the binary flavors whatever upstream ships |
+| GPL linkable library | `license:` is GPL of any version (not LGPL, CeCILL-C or EPL) and the recipe is not a build-only tool (`doc/LICENSE_POLICY.md`) | FFTW is the canonical case — a distribution constraint, not a version judgement; it stays out of the binary flavors whatever upstream ships |
 
 Everything else is a **candidate**. Present them as one table — package, current, upstream,
 major-or-minor, direct dependents from `python/build_order.py` — and then **stop and ask

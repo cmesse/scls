@@ -227,7 +227,7 @@
     <ul>
         <li><strong>No Python in the stack.</strong> Interpreter choice (system, pyenv, conda, Spack, modules) is site- and user-specific, so recipes disable Python and other language bindings by default. Users bring their own interpreter and link it to the installed C/C++ libraries.</li>
         <li><strong>No Boost.</strong> Modern C++ (C++17/20) covers most of what scientific code once used Boost for, and the libraries SCLS targets either never required it or have dropped the dependency.</li>
-        <li><strong>No GPL-3 linkable libraries in binary flavors</strong>, so downstream codes can link SCLS without copyleft concerns. GPL-3 build tools are fine because they run during the build and are not linked into the delivered libraries; GPL-2, LGPL, and CeCILL-C scientific libraries are allowed when their source and redistribution obligations are practical to satisfy. See the <a href="https://github.com/cmesse/scls/blob/main/doc/LICENSE_POLICY.md">license policy</a> for details.</li>
+        <li><strong>No GPL in the published binaries.</strong> Every package in the public binary flavors carries a BSD-3-Clause-compatible license: permissive, or weak copyleft (LGPL, CeCILL-C, EPL-2.0) whose obligations attach to the library itself rather than to code that merely links against it. GPL libraries of any version are excluded, so downstream codes can link SCLS without strong-copyleft concerns. GPL build tools are allowed in the build scripts, because macOS and other Unix systems without SCLS binaries may need them; they run during the build and are not linked into the delivered libraries. The GCC runtime libraries are linked, under the GCC Runtime Library Exception. See the <a href="https://github.com/cmesse/scls/blob/main/doc/LICENSE_POLICY.md">license policy</a> for details.</li>
     </ul>
     <p>This bias toward curation is intentional. If a project needs many custom feature toggles for a single package, SCLS is probably the wrong tool. If it needs PETSc, Ipopt, HDF5, OpenBLAS, NetCDF, MUMPS, and related libraries to build and coexist predictably, SCLS is built for that job.</p>
 
@@ -248,7 +248,7 @@
     <p>Additional source-build flavors include <code>lbl</code> for an LBL-specific prefix, <code>intel</code> for Intel compiler builds, <code>gcc-mkl-cuda</code> for CUDA-enabled experiments, and <code>macos</code>. See the <a href="https://github.com/cmesse/scls/tree/main/flavors"><code>flavors/</code></a> directory for the complete list.</p>
     <p>CUDA binaries are not distributed, because a CUDA-linked stack would tie users to a specific driver and toolkit version. Users who need GPU acceleration can use the <code>gcc-mkl-cuda</code> source-build flavor and link against a locally installed CUDA toolkit.</p>
     <p>On macOS, the stack uses OpenBLAS rather than Apple's Accelerate framework. The <code>macos</code> flavor builds its own GCC for Fortran support. Pairing GCC-built Fortran with Accelerate is fragile: Accelerate is tuned for Apple's Clang toolchain, and its ABI is awkward to use from GCC. OpenBLAS works reliably with GCC, keeps math behavior aligned with the Linux binary flavors, and favors compute throughput over the performance and power tradeoffs that shape Accelerate.</p>
-    <p>The Unix build script also includes GPL-3 build tools and selected LGPL-3 arbitrary-precision dependencies that are excluded from the public Linux binary flavors. See the source-only package table below.</p>
+    <p>The Unix build script also includes GPL build tools and selected LGPL-3 arbitrary-precision dependencies that are excluded from the public Linux binary flavors. See the build-tools table below.</p>
 
 </section>
 
@@ -381,7 +381,7 @@ cmake --build build</code></pre>
        SPDX AND-chain (doc/text exceptions, FSF blanket terms, etc.). The recipe YAMLs
        keep the full SPDX expression; this map controls only what the tables show. #}
     {% set license_display = {
-        'gcc':      'GPL-3.0+',
+        'gcc':      'GPL-3.0+ WITH GCC-exception-3.1',
         'autoconf': 'GPL-3.0+',
         'automake': 'GPL-3.0+',
         'libtool':  'GPL-3.0+',
@@ -389,7 +389,8 @@ cmake --build build</code></pre>
         'm4':       'GPL-3.0+',
         'make':     'GPL-3.0+',
         'texinfo':  'GPL-3.0+',
-        'gmp':      'LGPL-3.0+ / GPL-2.0+',
+        'sed':      'GPL-3.0+',
+        'gmp':      'LGPL-3.0+ or GPL-2.0+',
         'mpfr':     'LGPL-3.0+',
         'mpc':      'LGPL-3.0+',
     } %}
@@ -401,7 +402,7 @@ cmake --build build</code></pre>
         <h2>Packages</h2>
         <span class="caption">Shipped in the binary flavors</span>
     </div>
-    <p>The table below lists packages that ship in the distributed binary flavors. Their licenses are permissive, weak-copyleft, or otherwise accepted under the SCLS binary-distribution policy. GPL-3 linkable libraries are excluded from the public binary flavors.</p>
+    <p>The table below lists packages that ship in the distributed binary flavors. Their licenses are BSD-3-Clause-compatible: permissive, or weak copyleft (LGPL, CeCILL-C, EPL-2.0). No GPL package, of any version, is part of the public binary flavors.</p>
     <div class="table-scroll">
     <table class="package-table">
         <thead>
@@ -450,10 +451,10 @@ cmake --build build</code></pre>
 
 <section class="section-band">
     <div class="section-head section-head--accent">
-        <h2>Source-Only Packages (GPL-3 / LGPL-3)</h2>
-        <span class="caption">Excluded from the binary flavors</span>
+        <h2>Build Tools and Toolchain Prerequisites (GPL / LGPL)</h2>
+        <span class="caption">Not in the public binary flavors</span>
     </div>
-    <p>The packages below carry GPL-3- or LGPL-3-family licenses and are therefore <em>not</em> included in the public Linux binary flavors. They are primarily for source builds, especially <code>macos</code>, where Xcode and the Command Line Tools do not provide the GNU build-tool chain (autoconf, automake, libtool, m4, bison, and texinfo) or the multiprecision dependencies the scientific stack needs. SCLS also includes a GCC recipe, so the <code>macos</code> flavor can build its own Fortran-capable toolchain from source. Some dependencies, including GMP, MPFR, and MPC, may be consumed as GCC extra sources rather than installed as public Linux binary packages.</p>
+    <p>The packages below are <em>not</em> part of the public Linux binary flavors. The build scripts provide them for source builds, especially <code>macos</code> and Unix systems without SCLS binaries, where the system does not supply them. The GNU build tools (autoconf, automake, libtool, m4, make, sed, bison, texinfo, and pkg-config) are GPL-licensed; they are executed during the build and are not linked into the scientific libraries. SCLS also includes a GCC recipe, so the <code>macos</code> flavor can build its own Fortran-capable compiler from source; the GCC runtime libraries are linked under the GCC Runtime Library Exception. GMP and MPFR are LGPL libraries that GCC and parts of the stack need; the public Linux flavors use the distribution's packages for them instead of shipping SCLS builds.</p>
     <div class="table-scroll">
     <table class="package-table">
         <thead>
@@ -465,7 +466,7 @@ cmake --build build</code></pre>
         </tr>
         </thead>
         <tbody>
-        {% for package in gpl3_packages %}
+        {% for package in build_tool_packages %}
         <tr>
             <td class="left">
                 {% if package.homepage %}

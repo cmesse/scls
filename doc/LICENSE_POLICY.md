@@ -25,70 +25,91 @@ The license policy therefore optimizes for:
 
 ## Practical Rules
 
+### Published Binaries
+
+Every package in a published binary flavor (`gcc`, `mkl`, `debug`: the RPM and DEB
+repositories) carries a license compatible with SCLS's own `BSD-3-Clause-LBNL`
+distribution. That means one of:
+
+- a permissive license (see *Permissive Libraries*);
+- a weak-copyleft license whose obligations attach to the library itself and leave
+  the license of code that links against it alone: LGPL, CeCILL-C, EPL-2.0 (see
+  *Weak-Copyleft Libraries*).
+
+**No GPL, in any version.** A GPL-licensed package is not part of a published binary
+flavor. The one place where the output of GPL code is linked into what ships is the
+GCC runtime (libgcc, libstdc++, libgfortran), which is covered by the GCC Runtime
+Library Exception.
+
+GPL is allowed in the build scripts, for build tools only (see *GPL Build Tools*).
+
 ### Permissive Libraries
 
 BSD, MIT, Apache, ISC, zlib, NetCDF-style, and similar permissive licenses are
 preferred for linkable libraries. They are usually suitable for all SCLS
 flavors, subject to normal notice preservation.
 
-### GPL-3 Linkable Libraries
+### GPL Linkable Libraries
 
-GPL-3 linkable libraries are not included in distributed binary flavors.
+GPL linkable libraries are not included in distributed binary flavors, GPL-2 and
+GPL-3 alike. The version of the GPL is not the deciding factor: what matters is
+whether SCLS ships the code as something downstream applications link against.
 
-This is a pragmatic scientific-computing decision. GPL-3 can be a reasonable
+This is a pragmatic scientific-computing decision. The GPL can be a reasonable
 license for some projects, but it is a poor fit for low-level numerical
 libraries intended to sit underneath many unrelated downstream applications.
-For a stack like SCLS, a GPL-3 library creates too much uncertainty for users
+For a stack like SCLS, a GPL library creates too much uncertainty for users
 who need to link mixed-license scientific software.
 
 FFTW is the canonical example of a technically excellent numerical library that
 is often avoided in binary stacks because its GPL licensing makes downstream
 linking policy difficult. SCLS should not put users in that position.
 
-### GPL-3 Build Tools
-
-GPL-3 build tools are acceptable when they are only executed during the build.
-
-Examples include tools such as Autoconf, Automake, Libtool, GNU Make, GNU sed,
-GNU m4, Texinfo, Bison, and Binutils. These tools do not become part of the
-delivered numerical libraries simply because they were used to build them.
-
-GCC is also acceptable as a compiler. Its runtime libraries, including libgcc
-and libstdc++, are distributed with the GCC Runtime Library Exception, which is
-designed to permit linking with non-GPL programs.
-
-### GPL-2 Libraries
-
-GPL-2 linkable libraries are **not** included in distributed binary flavors, on the
-same reasoning as GPL-3 above. The version of the GPL is not the deciding factor:
-what matters is whether SCLS ships the code as something downstream applications
-link against.
-
-**The only exception for GPL code is a build tool** — something executed during the
-build that does not become part of a delivered library (see *GPL-3 Build Tools*
-above). In practice those live on the `macos` and `lbl` flavors, where SCLS builds
-its own toolchain rather than using the distribution's. GCC is the single case where
-the output of GPL code is linked into what we ship, and that is covered by the GCC
-Runtime Library Exception, which exists precisely to permit it.
-
-SuiteSparse is the concrete case. It carries GPL-2.0-or-later components alongside
+SuiteSparse is the GPL-2 case. It carries GPL-2.0-or-later components alongside
 LGPL-2.1, BSD-3-Clause and Apache-2.0 ones, and it is therefore **not shipped as a
 binary**: `recipes/suitesparse.yaml` sets `include_flavors: []`, so it is never built
 by default and must be opted into explicitly via `extra_packages:` for local use.
 Source availability would not rescue it — the objection is to distributing the binary
 at all, not to the compliance paperwork.
 
-This supersedes an earlier version of this section, which said GPL-2-or-later
-libraries were "not automatically excluded" and named SuiteSparse as acceptable when
-packaged with complete source. That was never the practice: every GPL package in the
-recipe set is a build tool or GCC, and SuiteSparse has carried `include_flavors: []`
-throughout. Corrected 2026-09-23.
+History: before 2026-09-23 this document said GPL-2-or-later libraries were "not
+automatically excluded" and named SuiteSparse as acceptable when packaged with
+complete source. That was never the practice: every GPL package in the recipe set is
+a build tool or GCC, and SuiteSparse has carried `include_flavors: []` throughout.
+The rule was restated as "published binaries are BSD-3-compatible, no GPL; GPL only
+for build tools" on 2026-10-05 (Christian).
 
-### LGPL and CeCILL-C are separate
+### GPL Build Tools
 
-Neither is affected by the rule above. LGPL libraries follow the section below;
-CeCILL-C libraries (`mumps`, `scotch`) are LGPL-like and ship on all flavors. The
-GPL exclusion is specific to the GPL proper.
+GPL build tools, of any GPL version, are acceptable in the build scripts when they
+are only executed during the build. They exist in the recipe set because a source
+build needs them where the system does not provide them: on macOS, and on Unix
+systems for which SCLS publishes no binaries. In practice they are built on the
+`macos` and `lbl` flavors, where SCLS builds its own compiler and build tools
+rather than using the distribution's.
+
+Examples include tools such as Autoconf, Automake, Libtool, GNU Make, GNU sed,
+GNU m4, Texinfo, Bison, pkg-config, and Binutils. These tools do not become part
+of the delivered numerical libraries simply because they were used to build them.
+
+GCC is also acceptable as a compiler. Its runtime libraries, including libgcc
+and libstdc++, are distributed with the GCC Runtime Library Exception, which is
+designed to permit linking with non-GPL programs. GCC is the single case where
+the output of GPL code is linked into what we ship.
+
+### Weak-Copyleft Libraries
+
+LGPL, CeCILL-C and EPL-2.0 are not the GPL and are not affected by the GPL rule
+above. LGPL libraries follow *LGPL Libraries* below; CeCILL-C libraries (`mumps`,
+`scotch`) follow *CeCILL-C Libraries*; both CeCILL-C packages ship on all flavors.
+
+Ipopt is EPL-2.0 and ships on all flavors. EPL-2.0 is a weak-copyleft license: a
+work that only contains declarations and interfaces of the library in order to link
+to it or bind to it by name is not a "Modified Work" under EPL-2.0 section 1, so an
+application that calls an unmodified `libipopt` keeps its own license. Distributing
+the Ipopt binary still requires its source and license text, which the
+*Source Availability* section below covers. How this applies to a particular
+downstream product is a question for that product's counsel.
 
 ### LGPL Libraries
 
@@ -203,11 +224,13 @@ explicit decision (Christian, 2026-09-28).
 
 ## Current Policy Summary
 
+- Published binaries: BSD-3-Clause-compatible licenses only, no GPL of any version
+  (the GCC runtime is linked under the GCC Runtime Library Exception).
 - Allowed: permissive libraries.
-- Allowed: GPL-3 build tools used only during build.
-- Allowed with compliance review: GPL-2-or-later scientific libraries.
-- Allowed with compliance review: LGPL and CeCILL-C libraries.
-- Avoid in distributed binary flavors: GPL-3 linkable libraries.
+- Allowed with compliance review: weak-copyleft libraries (LGPL, CeCILL-C, EPL-2.0).
+- Not in distributed binary flavors: GPL linkable libraries, GPL-2 and GPL-3 alike.
+- Allowed in the build scripts: GPL build tools used only during the build
+  (macOS, Unix systems without SCLS binaries, the `lbl` toolchain).
 - Avoid as SCLS-owned Linux binary packages: GMP, MPFR, MPC.
 - Prefer system packages for: GMP, MPFR, MKL, and other libraries where the
   system or vendor package is the clean redistribution boundary.

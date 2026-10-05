@@ -11,6 +11,7 @@ from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 import argparse
 import ast
+import re
 
 
 def load_yaml(filepath):
@@ -43,7 +44,9 @@ def load_all_recipes(recipes_dir):
             }
             recipes.append(package_info)
         except Exception as e:
-            print(f"Warning: Failed to load {yaml_file}: {e}")
+            # Fatal: a recipe or flavor that is skipped would also be skipped
+            # by the license check in main().
+            raise SystemExit(f"ERROR: failed to load {yaml_file}: {e}")
 
     # Sort by name
     recipes.sort(key=lambda x: x['name'].lower())
@@ -73,8 +76,13 @@ def load_all_flavors(flavors_dir):
             }
             flavors.append(flavor_info)
         except Exception as e:
-            print(f"Warning: Failed to load {yaml_file}: {e}")
+            # Fatal: a recipe or flavor that is skipped would also be skipped
+            # by the license check in main().
+            raise SystemExit(f"ERROR: failed to load {yaml_file}: {e}")
 
+    missing = [n for n in PUBLIC_FLAVORS if n not in [f['name'] for f in flavors]]
+    if missing:
+        raise SystemExit(f"ERROR: public flavor(s) not found in {flavors_dir}: {', '.join(missing)}")
     flavors.sort(key=lambda x: PUBLIC_FLAVORS.index(x['name']))
     return flavors
 
@@ -134,29 +142,51 @@ def generate_flavor_descriptions(flavors):
     return descriptions
 
 
-def is_gpl3_license(license_str):
-    """Return True if the license string indicates a GPL-3 / LGPL-3 component."""
-    if not license_str:
-        return False
-    s = license_str.upper().replace(' ', '')
-    return 'GPL-3' in s or 'GPLV3' in s
+def _license_key(license_str):
+    return (license_str or '').upper().replace(' ', '')
 
 
-def split_packages(packages, flavor_names, gpl3_flavor_name='macos'):
-    """Split packages into the main binary-distribution table and the GPL-3 table.
+def is_gpl_family(license_str):
+    """True for any GPL-family license string: GPL, LGPL, AGPL, any version."""
+    return 'GPL' in _license_key(license_str)
 
-    - main: non-GPL-3 packages available for at least one of the listed flavors.
-    - gpl3: GPL-3 / LGPL-3 packages selected by the macOS Unix build flavor.
+
+def is_gpl_proper(license_str):
+    """True if the license string names the GPL itself (or AGPL), not only LGPL.
+
+    Lexical: an `or` alternative is not evaluated, so `LGPLv3+ or GPLv2+` counts
+    as GPL. That is intended (doc/LICENSE_POLICY.md keeps GMP out of the public
+    binary flavors anyway)."""
+    return re.search(r'(?<!L)GPL', _license_key(license_str)) is not None
+
+
+# Never SCLS-owned binaries on the public flavors, whatever the license string
+# says: the system *-devel packages are used there (doc/LICENSE_POLICY.md,
+# "LGPL Libraries").
+SYSTEM_PROVIDED_ON_PUBLIC_FLAVORS = ('gmp', 'mpfr', 'mpc')
+
+
+def split_packages(packages, flavor_names, source_flavor_name='macos'):
+    """Split packages into the binary-distribution table and the build-tools table.
+
+    - main: packages available for at least one of the listed public flavors.
+    - build_tools: GPL-family packages that no public flavor ships and that the
+      macOS source-build flavor selects (build tools, GCC and its prerequisites).
+    - violations: packages a public flavor would ship against
+      doc/LICENSE_POLICY.md (a GPL license, or GMP/MPFR/MPC). They are in
+      neither table; the caller must not render a page when this is non-empty.
     """
-    main, gpl3 = [], []
+    main, build_tools, violations = [], [], []
     for p in packages:
-        if is_gpl3_license(p.get('license', '')):
-            if package_available_for_flavor(p, gpl3_flavor_name):
-                gpl3.append(p)
-            continue
+        license_str = p.get('license', '')
         if any(package_available_for_flavor(p, name) for name in flavor_names):
-            main.append(p)
-    return main, gpl3
+            if is_gpl_proper(license_str) or p['name'] in SYSTEM_PROVIDED_ON_PUBLIC_FLAVORS:
+                violations.append(p)
+            else:
+                main.append(p)
+        elif is_gpl_family(license_str) and package_available_for_flavor(p, source_flavor_name):
+            build_tools.append(p)
+    return main, build_tools, violations
 
 
 
@@ -225,7 +255,17 @@ def main():
         sys.exit(1)
 
     flavor_names = [f['name'] for f in flavors]
-    main_packages, gpl3_packages = split_packages(packages, flavor_names)
+    main_packages, build_tool_packages, violations = split_packages(packages, flavor_names)
+    if violations:
+        print("ERROR: recipes enabled for a public binary flavor "
+              f"({', '.join(flavor_names)}) against doc/LICENSE_POLICY.md:", file=sys.stderr)
+        for p in violations:
+            reason = ('system package on the public flavors'
+                      if p['name'] in SYSTEM_PROVIDED_ON_PUBLIC_FLAVORS else 'GPL license')
+            print(f"  {p['name']}: {p['license']} ({reason})", file=sys.stderr)
+        print(f"{args.output} was not written. An existing copy is stale; do not deploy it.",
+              file=sys.stderr)
+        sys.exit(1)
     release_year = str(args.release_version).split('.', 1)[0]
     if not release_year.isdigit():
         release_year = datetime.now().strftime('%Y')
@@ -233,7 +273,7 @@ def main():
     # Prepare context
     context = {
         'packages': main_packages,
-        'gpl3_packages': gpl3_packages,
+        'build_tool_packages': build_tool_packages,
         'flavors': flavors,
         'flavor_groups': generate_flavor_descriptions(flavors),
         'release_version': args.release_version,
