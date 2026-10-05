@@ -81,6 +81,37 @@ under it is `todo/rebuild_campaign_20261004.md`.
   prefix, sundials 7.9.0-2. `petsc-baijmkl-decls.patch` context refreshed for 3.26.0.
   `patches/scotch/archive/scotch-shared-7.0.16.patch` kept for the day PETSc pins 7.0.16.
 
+## Follow-up, same day: `extra_packages:` on unix/deb, and NEVER_SHIP for subpackages
+
+Christian: "Go ahead and fix them now." Both were found on 2026-09-30 and had been deferred.
+Exchange: `tmp/ai_exchange/plan_extra_packages_never_ship.md`, `impl_extra_packages_never_ship.md`.
+
+- **B1.** `build_common.require_buildable()` is the one gate for rpm_builder, unix_builder and,
+  through it, deb_builder. A recipe excluded by its own flavor lists builds when `flavor.conf`
+  lists it under `extra_packages:`; until now only rpm_builder honoured that.
+  `UnixBuilder.check_dependencies` now requires a dependency that is itself only opted in.
+- **B2.** `scripts/stage_to_belfem.sh` reads `%{SOURCERPM}` from the rpmdb and excludes a binary
+  when its own name or its source package's is a NEVER_SHIP recipe. `scripts/deb_drop_select.py`
+  does the same from the `.dsc` `Binary:` map and from the recipe's `subpackages:` list.
+- **Plan round** (Codex gpt-5.6-terra/high, Grok grok-4.7/high, blind): both refuted the first DEB
+  design (`${source:Package}` from dpkg-query): SCLS .debs carry no `Source:` field
+  (`templates/default.control.j2`), so it would have returned the binary's own name. Both also
+  pointed out that `build next`/`all`/`order` still ignore `extra_packages:` (backlog).
+- **Gates on the dev host:** `UnixBuilder('zlib'|'suitesparse', 'macos')` raises without the
+  opt-in and constructs with it; `metis` unchanged. `--spec-only` for all 58 recipes × gcc, mkl,
+  debug: specs and output identical before and after. `never_ship_reason` (bash, extracted from
+  the script): 12 cases. `deb_drop_select.never_ship_table`/`never_ship_reason`: 10 cases.
+- **Not run:** `rpm -qa` on a real rpmdb, `dpkg-query`, the full staging script, a DebBuilder
+  build. The implementation audit round had not reported when `57c7621` was committed and
+  pushed, on Christian's instruction.
+- **Implementation round** (same auditors, blind): no P0, no P1. Four P2, three fixed in the
+  follow-up commit: `never_ship_table` read only mapping-form `subpackages:` and missed the list
+  form that petsc, slepc and sundials use (the fixture in the first test was a mapping, so it
+  passed); an unused import in rpm_builder; a subpackage whose rpmdb `SOURCERPM` is empty or
+  `(none)` was not excluded, so the loop now checks again with the artifact's own `SOURCERPM`.
+  The fourth is in the backlog: with `extra_packages: [gcc]` on unix/deb, `build next` cannot
+  schedule the gcc that `check_dependencies` now requires.
+
 ## Open
 
 Blockers: none. Everything deferred is in `todo/backlog.md`. Open by execution only, on the pilot

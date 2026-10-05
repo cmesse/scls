@@ -26,6 +26,8 @@ from build_common import (
     clean_libtool_files,
     check_no_triplet_programs,
     should_build_package,
+    read_extra_packages,
+    require_buildable,
     check_package_installed,
     write_registry_entry,
     paths_need_sudo, publish_needs_sudo, run_sudo,
@@ -90,9 +92,9 @@ class UnixBuilder:
         if self.platform not in supported_platforms:
             raise BuildError(f"Platform {self.platform} not supported. Use: {supported_platforms}")
 
-        # Check if package should be built
-        if not should_build_package(self.recipe, self.flavor):
-            raise BuildError(f"Package {package} not built for {flavor}")
+        # Check if package should be built; flavor.conf's extra_packages: can
+        # opt an excluded recipe in, as on the RPM path.
+        require_buildable(package, self.recipe, self.flavor, flavor)
 
         # Setup paths - mirror rpmbuild structure
         self.prefix = Path(self.flavor['prefix'])
@@ -1455,6 +1457,7 @@ class UnixBuilder:
 
         missing = []
         skipped_not_in_flavor = []
+        extra_packages = read_extra_packages(self.flavor_name)
         for dep in deps:
             # Is this dep actually part of the build set for the active flavor?
             try:
@@ -1464,7 +1467,11 @@ class UnixBuilder:
                 # skip the prefix-registry check.
                 skipped_not_in_flavor.append(dep)
                 continue
-            if not should_build_package(dep_recipe, self.flavor):
+            # A dependency outside the flavor's build set is host-provided,
+            # unless flavor.conf opts it in: then it is built into the prefix
+            # and must be installed like any other.
+            if not should_build_package(dep_recipe, self.flavor) \
+                    and dep not in extra_packages:
                 skipped_not_in_flavor.append(dep)
                 continue
             if not check_package_installed(self.prefix, dep):

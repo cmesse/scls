@@ -62,6 +62,39 @@ NEVER_SHIP_REASON = {
 }
 
 
+def never_ship_table(recipes_dir):
+    """Binary short name (dash form) -> reason, for each NEVER_SHIP recipe and every
+    subpackage its recipe declares. Read from the recipes, so it holds for an
+    installed binary whose .deb or source package is no longer on this host."""
+    table = {}
+    for recipe, reason in NEVER_SHIP_REASON.items():
+        table[recipe.replace('_', '-')] = reason
+        rfile = Path(recipes_dir) / f'{recipe}.yaml'
+        if rfile.is_file():
+            # Recipes write subpackages either as a mapping keyed by name (lapack)
+            # or as a list of {'name': ...} entries (petsc, slepc, sundials);
+            # build_common.get_subpackages_for_flavor accepts both.
+            subs = (yaml.safe_load(rfile.read_text()) or {}).get('subpackages') or {}
+            names = subs if isinstance(subs, dict) else \
+                [s.get('name') for s in subs if isinstance(s, dict)]
+            for sub in names:
+                if sub:
+                    table[str(sub).replace('_', '-')] = reason
+    return table
+
+
+def never_ship_reason(short, source, flavor, table):
+    """The reason if the binary (by its short name) or the source package that lists
+    it in its .dsc belongs to a NEVER_SHIP recipe, else None. A subpackage has its
+    own short name (suitesparse-devel), so the binary name alone is not enough."""
+    if short and short in table:
+        return table[short]
+    prefix = f'scls-{flavor}-'
+    if source and source.startswith(prefix):
+        return table.get(source[len(prefix):])
+    return None
+
+
 def stanzas(text):
     """Split a deb822 file into dicts; continuation lines are kept as a list."""
     out, cur, key = [], {}, None
@@ -125,6 +158,7 @@ def main():
          f'scls-{flavor}', f'scls-{flavor}-*', 'scls-archive-keyring'],
         capture_output=True, text=True).stdout.split('\n')
 
+    never_ship = never_ship_table(repo / 'recipes')
     shipped_src = set()
     for line in sorted(filter(None, installed)):
         name, ver, arch = line.split()
@@ -134,11 +168,16 @@ def main():
         generated = name in no_source_names(flavor)
         short = None if name in ('scls-archive-keyring', f'scls-{flavor}') \
             else name[len(f'scls-{flavor}-'):]
-        recipe = short.replace('-', '_') if short else None
 
-        # Licence exclusion first: it holds whether or not an artifact exists.
-        if recipe in NEVER_SHIP_REASON:
-            print(f'excluded\t{nva}  reason: {NEVER_SHIP_REASON[recipe]}')
+        # Licence exclusion first: it holds whether or not an artifact exists. Our
+        # .debs carry no Source: field, so the source name comes from the .dsc that
+        # lists this binary, and the recipe's own subpackage list covers the case
+        # where that .dsc is gone.
+        src_hit = by_binary.get((name, ver))
+        reason = never_ship_reason(short, src_hit[1]['Source'] if src_hit else None,
+                                   flavor, never_ship)
+        if reason:
+            print(f'excluded\t{nva}  reason: {reason}')
             continue
 
         deb = pkgs / f'{nva}.deb'

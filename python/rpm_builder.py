@@ -21,7 +21,6 @@ from build_common import (
     BuildError, load_recipe, load_flavor, load_description,
     TRIPLET_PROGRAM_ERE, TRIPLET_PROGRAM_DIRS,
     get_optimization_flags, download_source, detect_source_directory,
-    should_build_package,
     get_configure_args, get_cmake_args,
     check_package_installed,
     get_package_dependencies,
@@ -32,6 +31,7 @@ from build_common import (
     get_subpackage_dependencies,
     get_interface_args,
     read_extra_packages,
+    require_buildable,
     resolve_flavor_key,
     apply_flavor_overrides,
     resolve_gcc_runtime_lib,
@@ -424,19 +424,7 @@ class RPMBuilder:
         # building gcc/binutils for the gcc flavor on RHEL 8). Listing them in
         # extra_packages is the only supported override path — there is no
         # CLI flag, since the flavor.conf entry is trackable per-host.
-        is_extra = package in read_extra_packages(flavor)
-
-        # Check if package should be built
-        if not should_build_package(self.recipe, self.flavor):
-            if is_extra:
-                print(f"Note: {package} is not officially supported for "
-                      f"flavor {flavor}; building anyway because it is "
-                      f"listed in flavor.conf's extra_packages.")
-            else:
-                raise BuildError(
-                    f"Package {package} not built for {flavor}. "
-                    f"To override, add it to extra_packages: in flavor.conf."
-                )
+        require_buildable(package, self.recipe, self.flavor, flavor)
 
         # Check if this is a bootstrap package (needs system compilers before our GCC is built)
         self.is_bootstrap = self.recipe.get('bootstrap', False)

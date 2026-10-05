@@ -172,14 +172,44 @@ declare -A NEVER_SHIP_REASON=(
     [suitesparse]="licence — GPL-2 linkable, not shipped as a binary (doc/LICENSE_POLICY.md); recipe carries include_flavors: [] so it is never built by default"
 )
 
-while read -r n v r a; do
+# never_ship_reason <binary name> <SOURCERPM> — print the reason if the binary, or the
+# source package it was built from, belongs to a NEVER_SHIP recipe; print nothing
+# otherwise. The source name matters for subpackages: scls-<F>-suitesparse-devel has
+# the short name "suitesparse-devel", which is not a table key, but its SOURCERPM is
+# scls-<F>-suitesparse-<ver>-<rel>.src.rpm. SOURCERPM comes from the rpmdb, so this
+# holds without a local artifact. Version and release cannot contain "-", so
+# stripping the last two "-" fields leaves the source package name.
+never_ship_reason() {
+    local name="$1" srpm="${2:-}" short src_short=""
+    short="${name#scls-${FLAVOR}-}"
+    [ "$short" = "$name" ] && short="${name#scls-}"  # the bare meta-package
+    if [ -n "$short" ] && [ -n "${NEVER_SHIP_REASON[$short]:-}" ]; then
+        printf '%s' "${NEVER_SHIP_REASON[$short]}"
+        return 0
+    fi
+    case "$srpm" in
+        ''|'(none)') ;;
+        *.src.rpm)
+            src_short="${srpm%-*-*}"
+            # No meta fallback here: a source that is not scls-<F>-<recipe> is not a recipe.
+            case "$src_short" in
+                "scls-${FLAVOR}-"*) src_short="${src_short#scls-${FLAVOR}-}" ;;
+                *) src_short="" ;;
+            esac ;;
+    esac
+    if [ -n "$src_short" ] && [ -n "${NEVER_SHIP_REASON[$src_short]:-}" ]; then
+        printf '%s' "${NEVER_SHIP_REASON[$src_short]}"
+    fi
+    return 0
+}
+
+while read -r n v r a srpm; do
     [ -z "${n:-}" ] && continue
-    short="${n#scls-${FLAVOR}-}"
-    [ "$short" = "$n" ] && short="${n#scls-}"        # the bare meta-package
     # Licence exclusion first: it must hold regardless of whether an artifact or an
     # SRPM exists, so it is checked before anything that could `continue` past it.
-    if [ -n "${NEVER_SHIP_REASON[$short]:-}" ]; then
-        EXCLUDED+=("$n-$v-$r.$a  reason: ${NEVER_SHIP_REASON[$short]}")
+    reason=$(never_ship_reason "$n" "${srpm:-}")
+    if [ -n "$reason" ]; then
+        EXCLUDED+=("$n-$v-$r.$a  reason: $reason")
         continue
     fi
 
@@ -194,6 +224,13 @@ while read -r n v r a; do
 
     bin_nevra=$(nevra "$f")
     src=$(rpm -qp --qf '%{SOURCERPM}' "$f" 2>/dev/null)
+    # Second licence check, with the artifact's own SOURCERPM: the rpmdb field above
+    # can be empty or "(none)", and a subpackage must not get past on that.
+    reason=$(never_ship_reason "$n" "${src:-}")
+    if [ -n "$reason" ]; then
+        EXCLUDED+=("$bin_nevra  reason: $reason")
+        continue
+    fi
     srcpath="$REPO/rpmbuild/SRPMS/$src"
 
     if is_published "$bin_nevra"; then
@@ -224,7 +261,7 @@ while read -r n v r a; do
                 *) PAYLOAD_SRC+=("$srcpath") ;; esac
         fi
     fi
-done < <(rpm -qa --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH}\n' "scls-$FLAVOR-*" "scls-$FLAVOR" 2>/dev/null | sort -u)
+done < <(rpm -qa --qf '%{NAME} %{VERSION} %{RELEASE} %{ARCH} %{SOURCERPM}\n' "scls-$FLAVOR-*" "scls-$FLAVOR" 2>/dev/null | sort -u)
 
 # Drop anything whose installed NEVRA no longer matches its recipe.
 declare -a KEEP=()

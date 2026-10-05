@@ -632,6 +632,34 @@ def should_build_package(recipe: Dict, flavor: Dict) -> bool:
     return False
 
 
+def require_buildable(package: str, recipe: Dict, flavor: Dict, flavor_name: str) -> None:
+    """Raise unless the recipe builds for the flavor or flavor.conf opts it in.
+
+    The one gate all three builders use (rpm_builder, unix_builder and, through
+    it, deb_builder). A package whose own include_flavors/exclude_flavors
+    exclude the flavor builds only when flavor.conf lists it under
+    extra_packages: -- the single supported override, trackable per host.
+    Until 2026-10-04 only rpm_builder honoured it, so `./scls build <pkg>`
+    for an opted-in package failed on Ubuntu and macOS while the DEB
+    meta-package already depended on it.
+
+    This covers an explicit build of the named package. `build next`,
+    `build all` and `order` still follow build_order.py, which does not read
+    extra_packages on any builder.
+    """
+    if should_build_package(recipe, flavor):
+        return
+    if package in read_extra_packages(flavor_name):
+        print(f"Note: {package} is not officially supported for "
+              f"flavor {flavor_name}; building anyway because it is "
+              f"listed in flavor.conf's extra_packages.")
+        return
+    raise BuildError(
+        f"Package {package} not built for {flavor_name}. "
+        f"To override, add it to extra_packages: in flavor.conf."
+    )
+
+
 def get_configure_args(recipe: Dict, host: str, flavor: Dict, prefix: Path, install_prefix: Path) -> List[str]:
     """Get configure arguments for autotools packages"""
     # Determine compilers based on MPI feature
