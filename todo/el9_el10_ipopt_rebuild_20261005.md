@@ -125,8 +125,8 @@ the bytes that go. Do not commit between `--build` and the upload: the drop reco
 
 | | EL9 debug | EL9 gcc | EL9 mkl | EL10 debug | EL10 gcc | EL10 mkl |
 |---|---|---|---|---|---|---|
-| ipopt rebuilt and installed, G3 passes | [x] | [x] | n/a | [ ] | [ ] | n/a |
-| G2, new text | [x] | [x] | [x] | [ ] | [ ] | [ ] |
+| ipopt rebuilt and installed, G3 passes | [x] | [x] | n/a | [x] | [x] | n/a |
+| G2, new text | [x] | [x] | [x] | [x] | [x] | [x] |
 | replacement drop staged with `--build` | [x] | [x] | n/a | [ ] | [ ] | n/a |
 | uploaded, promoted | uploaded 2026-10-05, promotion pending | uploaded 2026-10-05, promotion pending | n/a | [ ] | [ ] | n/a |
 

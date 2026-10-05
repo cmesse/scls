@@ -109,6 +109,33 @@ the devlog commit, and uploaded after belfem's gcc promotion and size OK. Christ
 local commits pushed before that ("We can push now"); `origin/ipopt` was at `2faf7e1` for the mkl
 drop.
 
+## 6. ipopt on debug and gcc at the unchanged release; gate G2, new text
+
+Instruction: `todo/el9_el10_ipopt_rebuild_20261005.md` (Christian's override: the rebuilt package
+replaces a published RPM at the same NEVRA so the `%changelog` matches mkl). Built from the merge
+`36264aa` (local R10 docs commits + `origin/ipopt` at `5901986`); no recipe, manifest, patch or
+`python/` edit. AMZN and R9 were not building.
+
+| | debug | gcc |
+|---|---|---|
+| built | 2026-10-05 03:59 PDT | 2026-10-05 04:04 PDT |
+| `SHA256HEADER` before | `06e92da6…b438` | `70aa6c7d…efd8` |
+| `SHA256HEADER` after | `20444709…a9ab` | `68a16715…5f51` |
+| `PAYLOADDIGEST` before = after | `a6125ab6…b42e` | `58e7599a…1b0a` |
+| G3 (`ldd -r` loop, `mpirun`, hs071 with mumps and spral) | PASS | PASS |
+
+The payload digest is unchanged on both flavors and the header digest differs: the build is the
+same and the `%changelog` is new, as the instruction expects. `rpm -q --changelog` starts with
+the 2026-10-04 entry on both.
+
+G2, text of `11e38af`, run verbatim from the tracker: `G2 PASS` on debug, gcc and mkl, each with
+part (a) (six lookups: five `ParMETIS_*` in `libparmetis.so`, `SCOTCH_ParMETIS_V3_NodeND` in
+`libptscotchparmetisv3.so.7.0`) and part (b) (loader log present, no "no loader log" note).
+
+Standing gates on all three flavors: drift sweep empty, `scls-<F>` 2026-2, `check_mkl_linkage.sh`
+pass. `work/publish/published-el10.txt` (258 NEVRAs) is identical to belfem's public el10
+repodata fetched for this step, so it was not regenerated.
+
 ## Open
 
 - Blocker: none on EL10.

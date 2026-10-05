@@ -42,7 +42,7 @@ recipe, rebuilt because that dependency changed its SONAME.
 | 5 | 11 | slepc 3.25.2 → 3.26.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 6 | 11 | sundials 7.9.0-1 → -2 | casc (petsc) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 7 | — | mumps 5.9.1-2 → -3 | fix (MKL RUNPATH; added 2026-10-04) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | kept: build unchanged | kept: build unchanged | [x] | [x] (rebuilt 2026-10-05, same release) | [x] | kept: build unchanged | kept: build unchanged | [ ] | kept: build unchanged | kept: build unchanged | [ ] |
+| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | [x] (rebuilt 2026-10-05, same release) | [x] | kept: build unchanged | kept: build unchanged | [ ] | kept: build unchanged | kept: build unchanged | [ ] |
 
 6 packages × 14 cells = **84 builds**. petsc is the longest.
 
@@ -361,6 +361,13 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   PASS on part (a). Drift sweep empty, linkage pass on all three flavors. Replacement drops
   `R9-debug-20261005T1053Z` and `R9-gcc-20261005T1053Z` (2 files each, `replace_published: 2`):
   size approved by belfem, uploaded, script exit 0; arrival result and promotion pending.
+- 2026-10-05 — R10: ipopt 3.14.20-1 rebuilt and installed on debug and gcc at the unchanged release
+  (`todo/el9_el10_ipopt_rebuild_20261005.md`, Christian's override), from the merge `36264aa`.
+  `SHA256HEADER` differs from the published build on both, `PAYLOADDIGEST` is the same. G3 passes
+  on both. G2 with the text of `11e38af`: PASS on debug, gcc and mkl with both parts (the loader
+  survives `LD_BIND_NOW` on EL10). Drift sweep empty, `scls-<F>` 2026-2, linkage pass on all three
+  flavors. Details: `devlog/dl20261005_el10_math_campaign.md` §6. Not done: the two R10
+  replacement drops (staging, then upload on Christian's go-ahead per drop).
 
 ## Blockers
 
