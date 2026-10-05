@@ -42,7 +42,7 @@ recipe, rebuilt because that dependency changed its SONAME.
 | 5 | 11 | slepc 3.25.2 → 3.26.0 | up | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 6 | 11 | sundials 7.9.0-1 → -2 | casc (petsc) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
 | 7 | — | mumps 5.9.1-2 → -3 | fix (MKL RUNPATH; added 2026-10-04) | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | [x] (rebuilt 2026-10-05, same release) | [x] | kept: build unchanged | kept: build unchanged | [ ] | kept: build unchanged | kept: build unchanged | [ ] |
+| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | [x] (rebuilt 2026-10-05, same release) | [x] (rebuilt 2026-10-05, same release) | [x] | [x] (rebuilt 2026-10-05, same release) | [x] | [ ] | [ ] | [ ] | kept: build unchanged | kept: build unchanged | [ ] |
 
 6 packages × 14 cells = **84 builds**. petsc is the longest.
 
@@ -59,6 +59,16 @@ Gate G3 failed on R9 mkl because `libdmumps.so`, `libsmumps.so`, `libmumps_commo
   on deb, better safe than sorry. No version bump"). Check `readelf -d libsipopt.so` first and
   record what the published .deb had. The debug and gcc builds are unchanged everywhere.
 - After mumps and ipopt install on an MKL flavor, re-run G3.
+
+**Scope widened by Christian on 2026-10-05 (policy §1), before the U24 builds: +2 builds.**
+Row 8, ipopt 3.14.20-1 at the same release, is also rebuilt on U24 debug and U24 gcc (Christian:
+"I would prefer to rebuild ipopt anyways"; asked which flavors, he chose all three on U24). U24
+therefore builds 24 packages: rows 1–7 on three flavors and ipopt on three. The build commands on
+debug and gcc do not change; the published debug and gcc .debs are replaced at the same version
+(`stage_to_belfem.sh --replace`), as already ruled for mkl. Before the mkl rebuild the published
+U24 mkl `libsipopt.so`, `libipopt.so`, `libdmumps.so` and `libmumps_common.so` already carried
+`/opt/scls/mkl/lib:/opt/intel/oneapi/mkl/latest/lib/intel64:/opt/intel/oneapi/mkl/latest/lib` in
+RUNPATH and `ldd` reported nothing missing (read 2026-10-05 on U24). Other hosts are unchanged.
 
 **Why the cascade is one package.** Policy §6: consumers rebuild only when a dependency's SONAME,
 exported ABI, headers or installed file names change.
