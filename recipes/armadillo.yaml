@@ -1,8 +1,6 @@
 name: armadillo
-version: 15.6.0
-# release 2: MKL link line corrected -- armadillo's own FindMKL no longer adds
-# libmkl_rt alongside the layered libs (2026-09-25).
-release: 2
+version: 15.6.1
+release: 1
 summary: Fast C++ matrix library with syntax similar to MATLAB and Octave
 homepage: https://arma.sourceforge.net/
 license: Apache-2.0

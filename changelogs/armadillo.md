@@ -1,5 +1,10 @@
 # Armadillo Changelog
 
+## Version 15.6.1-1 - Sun Oct 04 2026
+- Updated to version 15.6.1
+- `armadillo-add-allow-mkl-option.patch` applies at fuzz 0 against 15.6.1. The MKL link-line fix
+  of 15.6.0-2 is recipe content and carries over; the release restarts at 1.
+
 ## Version 15.6.0-2 - Fri Sep 25 2026
 - **Stopped armadillo's own MKL detection from adding `libmkl_rt` — recipe content change.**
   `libarmadillo.so.15.6.0` linked `libmkl_rt.so.3` *and* the layered

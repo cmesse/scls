@@ -1,5 +1,13 @@
 # Hwloc Changelog
 
+## Version 2.15.0-1 - Sun Oct 04 2026
+- Updated to version 2.15.0, the version PETSc 3.26.0 pins (`doc/CAMPAIGN_POLICY.md` §9;
+  Christian, 2026-10-04). Source URL moved to the `v2.15` release-series directory.
+- SONAME unchanged: libtool version `25:3:10` → `25:4:10` in upstream `VERSION`, so still
+  `libhwloc.so.15`. pmix, openmpi and spral are therefore not rebuilt; petsc is rebuilt in the
+  same campaign anyway (`todo/rebuild_campaign_20261004.md`).
+- Carries the unpublished 2.14.0-2 change (tools under their plain names).
+
 ## Version 2.14.0-2 - Sat Oct 03 2026
 - Tools ship under their plain names (`lstopo`, `hwloc-bind`, ...). Since the builder's first
   commits it passed `--target=<host>` to every autotools configure, and hwloc's

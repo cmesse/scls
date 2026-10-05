@@ -1,6 +1,6 @@
 name: hwloc
-version: 2.14.0
-release: 2
+version: 2.15.0
+release: 1
 summary: Portable Hardware Locality
 homepage: https://www-lb.open-mpi.org/software/hwloc/
 license: BSD
@@ -12,7 +12,7 @@ exclude_flavors:
 source:
   # The vX.Y directory is the release series, not the full version, so it has
   # to be bumped together with version: above. There is no major.minor macro.
-  url: https://download.open-mpi.org/release/hwloc/v2.14/hwloc-%{version}.tar.bz2
+  url: https://download.open-mpi.org/release/hwloc/v2.15/hwloc-%{version}.tar.bz2
 
 update:
   strategy: github_tag

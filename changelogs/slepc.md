@@ -1,5 +1,10 @@
 # Slepc Changelog
 
+## Version 3.26.0-1 - Sun Oct 04 2026
+- Updated to version 3.26.0, for petsc 3.26.0.
+- `files/slepc.txt`: `lib/slepc/conf/modules/slepc/3.25.2` → `3.26.0`. New minor series; expect
+  a manifest refresh at the first Linux build.
+
 ## Version 3.25.2-1 - Tue Sep 22 2026
 - Updated to version 3.25.2
 - `files/slepc.txt`: `lib/slepc/conf/modules/slepc/3.25.1` → `3.25.2`.

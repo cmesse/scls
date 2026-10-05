@@ -1,5 +1,8 @@
 # Sundials Changelog
 
+## Version 7.9.0-2 - Sun Oct 04 2026
+- Release bump only, no recipe content change: rebuilt because petsc changed in the 2026-10-04 campaign (`todo/rebuild_campaign_20261004.md`): petsc 3.26.0 changes the SONAME to `libpetsc.so.3.26`. With `AutoReqProv: no` a rebuild at an unchanged NEVRA is invisible to dnf/apt, so the release is bumped.
+
 ## Version 7.9.0-1 - Tue Sep 22 2026
 - Updated to version 7.9.0
 - `sundials-use-system-gtest.patch` applies at fuzz 0 against 7.9.0. New minor series; expect a manifest refresh at the first Linux build.

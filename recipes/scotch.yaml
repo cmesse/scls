@@ -83,6 +83,16 @@ configure:
     - "-DBUILD_SHARED_LIBS=ON"
     - "-DBUILD_LIBESMUMPS=ON"
     - "-DBUILD_LIBSCOTCHMETIS=ON"
+    # Prefix the METIS/ParMETIS emulation (SCOTCH_METIS_*, SCOTCH_ParMETIS_*;
+    # Fortran scotchf*), as PETSc does for the Scotch it builds itself
+    # (config/BuildSystem/config/packages/PTSCOTCH.py). Without it,
+    # libptscotchparmetisv3 exports unprefixed ParMETIS_V3_* next to the real
+    # libparmetis, and libpetsc, which links both, bound ParMETIS_V3_PartKway
+    # and ParMETIS_V3_Mesh2Dual to Scotch's emulation (measured on the macOS
+    # install, 2026-10-04). The emulation library itself has to stay:
+    # PETSc's PT-Scotch check links it and its partitioner calls
+    # SCOTCH_ParMETIS_V3_NodeND. Christian, 2026-10-04; todo/scotch_metis_prefix.md.
+    - "-DSCOTCH_METIS_PREFIX=ON"
     - "-DBUILD_PTSCOTCH=ON"
     - "-DINSTALL_METIS_HEADERS=OFF"
     - "-DTHREADS=OFF"

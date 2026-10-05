@@ -1,5 +1,18 @@
 # Petsc Changelog
 
+## Version 3.26.0-1 - Sun Oct 04 2026
+- Updated to version 3.26.0 (new minor series: `libpetsc.so.3.26`; slepc and sundials are
+  rebuilt in the same campaign, `todo/rebuild_campaign_20261004.md`).
+- `petsc-baijmkl-decls.patch`: context refreshed for 3.26.0. Upstream rewrote the guard as
+  `#if PetscDefined(HAVE_MKL_SPARSE)` and moved the block to `include/petscmat.h:467`; the two
+  added lines are unchanged. The upstream mismatch is still there: the declarations sit under
+  `MKL_SPARSE`, `baij/{seq,mpi}/baijmkl/makefile` requires `MKL_SPARSE_OPTIMIZE`.
+- `files/petsc.txt`: `lib/petsc/conf/modules/petsc/3.25.5` → `3.26.0`. New minor series; expect
+  a manifest refresh at the first Linux build.
+- Dependencies follow PETSc 3.26.0's own pins (`doc/CAMPAIGN_POLICY.md` §9): scotch 7.0.15, now
+  built with `SCOTCH_METIS_PREFIX` as PETSc builds it, and superlu_dist 9.2.1. Not matching yet:
+  hwloc (2.14.0 against PETSc's 2.15.0) and hdf5 (1.14.6 against 2.2.0).
+
 ## Version 3.25.5-1 - Tue Sep 22 2026
 - Updated to version 3.25.5
 - `files/petsc.txt`: `lib/petsc/conf/modules/petsc/3.25.4` → `3.25.5`. `petsc-baijmkl-decls.patch` applies at fuzz 0.
