@@ -93,8 +93,8 @@ belfem (session "Server"): contract v1.7, RPM drops unchanged from v1.6; no NEVR
 | Drop | Files | Bytes | sha256(SHA256SUMS) | git_head | State |
 |---|---|---|---|---|---|
 | R10-debug-20261005T0641Z | 36 | 214186574 | `27aa94ef…6b7b` | `5e1b971` | uploaded; verified and promoted (belfem) |
-| R10-gcc-20261005T0702Z | 31 | 203019227 | `03999e4f…5398` | `4b57cbd` | uploaded; verified (belfem), with Christian for promotion |
-| R10-mkl-20261005T0846Z | 31 | 203057687 | `15eb48e6…3958` | `cc08a72` | staged with `--build`; not uploaded, to be restaged |
+| R10-gcc-20261005T0702Z | 31 | 203019227 | `03999e4f…5398` | `4b57cbd` | uploaded; verified and promoted (belfem) |
+| R10-mkl-20261005T0850Z | 31 | 203057687 | `15eb48e6…3958` | `2faf7e1` | uploaded, payload and READY rc 0; belfem's arrival result pending |
 
 Each payload is the table of hosts file §4 and nothing else; `excluded: 0` on all three
 (suitesparse is not installed on EL10); `scls-<F>-examples` is not in any payload.
@@ -103,15 +103,16 @@ Christian's approvals, in this session: "you can upload debug first and might wa
 first", "you can go on and upload gcc", "you are also approved to upload mkl when done". This
 releases EL10 ahead of the other hosts (policy §7). Each upload followed belfem's size OK.
 
-The mkl drop was staged as `R10-mkl-20261005T0846Z` at `cc08a72`. The belfem session went
-offline before the size request could be delivered, so the drop was not uploaded. It is restaged
-after the commit that adds this file, under a new timestamp and with the same payload; the
-upload gets its own Status line in the tracker.
+The mkl drop was first staged as `R10-mkl-20261005T0846Z` at `cc08a72`. The belfem session was
+unreachable then, so it was restaged as `…0850Z` at `2faf7e1` (same payload, same digest) after
+the devlog commit, and uploaded after belfem's gcc promotion and size OK. Christian had the four
+local commits pushed before that ("We can push now"); `origin/ipopt` was at `2faf7e1` for the mkl
+drop.
 
 ## Open
 
 - Blocker: none on EL10.
-- Not done: upload of the R10 mkl drop (waits for belfem's gcc promotion, slot and size OK).
+- Pending at belfem, not on this host: arrival check and promotion of the R10 mkl drop.
 - Backlog: one note added to the existing entry on gate G2 (`todo/backlog.md`): it runs as
   written on EL10 mkl.
 - AMZN shares the physical host and was told that EL10 has finished compiling.

@@ -290,6 +290,11 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   pending; mkl staged with `--build` (31 files, 203057687 bytes), not uploaded: the belfem session
   was offline. Details: `devlog/dl20261005_el10_math_campaign.md`. Not done: the R10 mkl upload;
   AMZN, U24, U26 (rows 1–8), and the Ubuntu ipopt replacement.
+- 2026-10-05 — R10 uploads (Christian released EL10 ahead of the other hosts, policy §7; one go per
+  drop). `R10-debug-20261005T0641Z` and `R10-gcc-20261005T0702Z` promoted. `R10-mkl-20261005T0850Z`
+  (31 files, 203057687 bytes, restaged at `2faf7e1` with the digest of the earlier `…0846Z`)
+  uploaded, script exit 0, size approved by belfem, arrival result pending. Not done: AMZN, U24,
+  U26 (rows 1–8), and the Ubuntu ipopt replacement.
 
 ## Blockers
 
