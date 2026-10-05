@@ -350,6 +350,13 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   gcc and their G2 re-run (`todo/el9_el10_ipopt_rebuild_20261005.md`); U24, U26 (rows 1–8), and
   the Ubuntu ipopt replacement.
 
+- 2026-10-05 — R9: ipopt 3.14.20-1 rebuilt and installed on debug and gcc at the unchanged release
+  (`todo/el9_el10_ipopt_rebuild_20261005.md`, Christian's override). G3 passes on both. G2 with the
+  text of `11e38af`: PASS on debug and gcc with both parts; on mkl the "no loader log" note and
+  PASS on part (a). Drift sweep empty, linkage pass on all three flavors. Replacement drops
+  `R9-debug-20261005T1053Z` and `R9-gcc-20261005T1053Z` (2 files each, `replace_published: 2`):
+  size approved by belfem, uploaded, script exit 0; arrival result and promotion pending.
+
 ## Blockers
 
 (none)
