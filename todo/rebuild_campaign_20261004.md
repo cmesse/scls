@@ -35,14 +35,30 @@ recipe, rebuilt because that dependency changed its SONAME.
 
 | # | G | Package | why | R9 DBG | R9 GCC | R9 MKL | R10 DBG | R10 GCC | R10 MKL | AMZN GCC | AMZN MKL | U24 DBG | U24 GCC | U24 MKL | U26 DBG | U26 GCC | U26 MKL |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 2 | hwloc 2.14.0-2 → 2.15.0-1 | up (PETSc pin) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 2 | 6 | scotch 7.0.15-2 → -3 | opt (`-DSCOTCH_METIS_PREFIX=ON`) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 3 | 8 | armadillo 15.6.0 → 15.6.1 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 4 | 10 | petsc 3.25.5 → 3.26.0 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 5 | 11 | slepc 3.25.2 → 3.26.0 | up | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| 6 | 11 | sundials 7.9.0-1 → -2 | casc (petsc) | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 1 | 2 | hwloc 2.14.0-2 → 2.15.0-1 | up (PETSc pin) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 2 | 6 | scotch 7.0.15-2 → -3 | opt (`-DSCOTCH_METIS_PREFIX=ON`) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 3 | 8 | armadillo 15.6.0 → 15.6.1 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 4 | 10 | petsc 3.25.5 → 3.26.0 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 5 | 11 | slepc 3.25.2 → 3.26.0 | up | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 6 | 11 | sundials 7.9.0-1 → -2 | casc (petsc) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 7 | — | mumps 5.9.1-2 → -3 | fix (MKL RUNPATH; added 2026-10-04) | [x] | [x] | [x] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| 8 | — | ipopt 3.14.20-1, same release | fix (MKL RUNPATH of `libsipopt`; added 2026-10-04) | kept: build unchanged | kept: build unchanged | [x] | kept: build unchanged | kept: build unchanged | [ ] | kept: build unchanged | [ ] | kept: build unchanged | kept: build unchanged | [ ] | kept: build unchanged | kept: build unchanged | [ ] |
 
 6 packages × 14 cells = **84 builds**. petsc is the longest.
+
+**Scope widened by Christian on 2026-10-04 (policy §1), during the R9 pilot: +19 builds.**
+Gate G3 failed on R9 mkl because `libdmumps.so`, `libsmumps.so`, `libmumps_common.so` and
+`libsipopt.so` NEED `libmkl_*` with only the prefix in RUNPATH (`0a256a1`).
+
+- Row 7, mumps 5.9.1-3: 14 cells. The build changes on MKL flavors only; the other flavors
+  rebuild for version parity (Christian: "Version parity would be nice"). No consumer rebuild.
+- Row 8, ipopt 3.14.20-1 at the same release: the 5 mkl cells. Christian: "we do not bump ipopt,
+  this is a manual override". On RPM hosts the mkl package was never published. On U24/U26 the
+  unix/deb build commands do not change, but the mkl package is rebuilt and the published one
+  replaced at the same version (`stage_to_belfem.sh --replace`; Christian: "We can rebuild ipopt
+  on deb, better safe than sorry. No version bump"). Check `readelf -d libsipopt.so` first and
+  record what the published .deb had. The debug and gcc builds are unchanged everywhere.
+- After mumps and ipopt install on an MKL flavor, re-run G3.
 
 **Why the cascade is one package.** Policy §6: consumers rebuild only when a dependency's SONAME,
 exported ABI, headers or installed file names change.
@@ -245,6 +261,19 @@ Per-host instructions (sync, state before the campaign, order, the combined drop
   were uploaded and promoted this evening (`devlog/dl20261004_u24_round2.md`,
   `dl20261004_u26_round2.md`), so scotch 7.0.15-2 and hwloc 2.14.0-2 are published there. scotch
   is therefore 7.0.15-3, not a same-release rebuild as first committed.
+
+- 2026-10-04 — R9: debug 7/7, gcc 7/7, mkl 8/8 built and installed (rows 1–7, and ipopt on mkl).
+  2 manifest fixes, class M: petsc `2594296` (4 files), slepc `58cc158` (2 headers); the other
+  hosts need both before they build. spral kept as changelog-only (`d908cfc`) on all three flavors.
+  Gates: G1 pass on all three. G3 pass on debug and gcc; on mkl it failed on the MUMPS RUNPATH,
+  fixed in `0a256a1` (review gate: two blind rounds, Codex gpt-5.6-terra/medium and Grok
+  grok-4.7/medium), and passes after mumps 5.9.1-3 and ipopt were rebuilt. G2 pass on debug and
+  gcc. **G2 does not run as written on mkl**: `LD_BIND_NOW=1` segfaults in the loader inside
+  `libmkl_gnu_thread` before libpetsc is bound. Substitute evidence on mkl, not the gate:
+  `dlsym(RTLD_DEFAULT)` + `dladdr` after `PetscInitialize` resolves the five `ParMETIS_*` symbols
+  libpetsc imports to `libparmetis.so` and `SCOTCH_ParMETIS_V3_NodeND` to
+  `libptscotchparmetisv3.so.7.0`. Gate not edited (backlog). Drops: R9-debug-20261005T0453Z
+  promoted; R9-gcc-20261005T0504Z uploaded and verified by belfem. Both predate mumps 5.9.1-3.
 
 ## Blockers
 

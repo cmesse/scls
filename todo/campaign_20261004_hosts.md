@@ -24,7 +24,7 @@ recipe commit by hash.
 |---|---|---|---|---|---|
 | §1 sync | [x] | [ ] | [ ] | [ ] | [ ] |
 | §2 state before the campaign | [x] | [ ] | [ ] | [ ] | [ ] |
-| §3 build the campaign, gates G1–G3 | [ ] | [ ] | [ ] | [ ] | [ ] |
+| §3 build the campaign, gates G1–G3 | [x] | [ ] | [ ] | [ ] | [ ] |
 | §4 standing gates, stage with `--build` | [ ] | [ ] | [ ] | [ ] | [ ] |
 | released for fan-out (Christian, commit hash) | pilot | pilot | [ ] | [ ] | [ ] |
 | §5 upload, per drop | [ ] | [ ] | [ ] | [ ] | [ ] |
@@ -119,7 +119,13 @@ which library each `ParMETIS_V3_*` symbol of `libpetsc.so` binds to. On the macO
 | 5 | slepc | 3.26.0-1 | — |
 | 6 | sundials | 7.9.0-2 | — |
 
-- pmix, openmpi, spral, mumps, strumpack and ipopt are **not** rebuilt. G3 is the check.
+- pmix, openmpi, spral and strumpack are **not** rebuilt. G3 is the check.
+- **Added 2026-10-04 (tracker rows 7 and 8, `0a256a1`):** after sundials, build and install
+  mumps 5.9.1-3 on every flavor, and ipopt 3.14.20-1 (same release) on mkl; then re-run G3 on
+  mkl. Ubuntu mkl: the published ipopt is replaced at the same version (tracker, scope note).
+- **G2 on mkl** segfaults under `LD_BIND_NOW=1` (seen on R9; tracker Status). Report it; do not
+  edit the gate. The `dlsym` + `dladdr` lookup in `devlog/dl20261004_r9_math_campaign.md` is the
+  substitute evidence.
 - Tick the cells in the tracker.
 
 ## 4. Standing gates and local staging (every host, per flavor)
@@ -139,6 +145,8 @@ Expected payload per flavor, and nothing else:
 | petsc | 3.26.0-1 | in the drop | in the drop |
 | slepc | 3.26.0-1 | in the drop | in the drop |
 | sundials | 7.9.0-2 | in the drop | in the drop |
+| mumps | 5.9.1-3 | in the drop | in the drop |
+| ipopt (mkl only) | 3.14.20-1, rebuilt | in the drop (round 2 row below) | replaces the published one |
 | environment | 2026-3 | in the drop (round 2) | already published |
 | libunwind | 1.8.3-3 | in the drop (round 2) | already published |
 | gperftools | 2.18.1-2 | in the drop (round 2) | already published |
