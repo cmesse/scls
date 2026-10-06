@@ -28,8 +28,9 @@
       "name": "SCLS (Scientific Core Library Stack)",
       "description": "A curated build and packaging system for scientific C++ and Fortran libraries. Produces a consistent, tested stack including BLAS/LAPACK, sparse solvers, nonlinear optimization (Ipopt), graph partitioners, MPI, and I/O libraries.",
       "applicationCategory": "DeveloperApplication",
-      "operatingSystem": "Linux, macOS",
+      "operatingSystem": "Enterprise Linux 9 and 10 (RHEL, Rocky Linux, AlmaLinux), Amazon Linux 2023, Ubuntu 24.04 LTS, Ubuntu 26.04 LTS, macOS (source build)",
       "softwareVersion": "{{ release_version }}",
+      "dateModified": "{{ generation_iso_date }}",
       "url": "https://belfem.lbl.gov/scls.html",
       "codeRepository": "https://github.com/cmesse/scls",
       "license": "https://spdx.org/licenses/BSD-3-Clause-LBNL.html",
@@ -44,7 +45,7 @@
         "name": "Lawrence Berkeley National Laboratory",
         "url": "https://www.lbl.gov/"
       },
-      "keywords": "scientific libraries, numerical computing, HPC, build system, RPM, DEB, PETSc, Ipopt, SPRAL, MUMPS, OpenMPI, HDF5, NetCDF, BLAS, LAPACK"
+      "keywords": "scientific libraries, numerical computing, HPC, build system, RPM, DEB, dnf, apt, sparse direct solvers, nonlinear optimization, Intel MKL, {{ seo_package_names | join(', ') }}"
     }
     </script>
 

@@ -55,6 +55,12 @@ def load_all_recipes(recipes_dir):
 
 PUBLIC_FLAVORS = ('gcc', 'mkl', 'debug')
 
+SITE_URL = 'https://belfem.lbl.gov'
+# Every page on the site, for sitemap.xml; the other pages are not generated here.
+SITE_PAGES = ('', 'scls.html', 'publications.html', 'contact.html', 'doc/')
+# Recipes that are packaging plumbing, not libraries a user searches for.
+SEO_EXCLUDED_PACKAGES = ('environment',)
+
 
 def load_all_flavors(flavors_dir):
     """Load flavor YAML files for the publicly distributed binary flavors."""
@@ -281,18 +287,37 @@ def main():
         'scls_release_pkg_version': scls_release_pkg_version,
         'scls_release_rpm_release': scls_release_rpm_release,
         'keyring_release': keyring_release,
+        'seo_package_names': [p['name'] for p in main_packages
+                              if p['name'] not in SEO_EXCLUDED_PACKAGES],
+        'generation_iso_date': datetime.now().strftime('%Y-%m-%d'),
         'generation_date': datetime.now().strftime('%B %d, %Y'),
         'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 
-    # Render template
     html_content = template.render(**context)
-
-    # Write output
     with open(args.output, 'w') as f:
         f.write(html_content)
-
     print(f"Generated {args.output}")
+
+    # Crawler files for the site root, written next to the page so one
+    # directory deploys as a unit.
+    out_dir = Path(args.output).resolve().parent
+    llms_txt = env.get_template('llms.txt.j2').render(**context)
+    (out_dir / 'llms.txt').write_text(llms_txt)
+    (out_dir / 'robots.txt').write_text(
+        "User-agent: *\n"
+        "Allow: /\n"
+        f"Sitemap: {SITE_URL}/sitemap.xml\n")
+    urls = ''.join(
+        f"  <url><loc>{SITE_URL}/{page}</loc>"
+        + (f"<lastmod>{context['generation_iso_date']}</lastmod>" if page == 'scls.html' else '')
+        + "</url>\n"
+        for page in SITE_PAGES)
+    (out_dir / 'sitemap.xml').write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{urls}</urlset>\n")
+    print(f"Generated llms.txt, robots.txt and sitemap.xml in {out_dir}")
 
 
 if __name__ == '__main__':

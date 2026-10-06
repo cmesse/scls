@@ -1,0 +1,78 @@
+# SCLS (Scientific Core Library Stack)
+
+> SCLS builds and packages a consistent stack of scientific libraries ({{ seo_package_names | join(', ') }}) for Linux and macOS. Every library in a flavor is built with the same compiler, MPI (Open MPI), BLAS/LAPACK and install prefix, so PETSc, MUMPS, STRUMPACK, SuperLU, Ipopt and HDF5 work together without manual compilation. Binary RPM repositories serve Enterprise Linux 9 and 10 and Amazon Linux 2023; binary DEB repositories serve Ubuntu 24.04 LTS and 26.04 LTS; macOS and other Unix systems build from source. Developed at Lawrence Berkeley National Laboratory, licensed BSD-3-Clause-LBNL.
+
+## Flavors
+
+A flavor fixes compiler, math backend, MPI and install prefix for the whole stack. Each public flavor installs into /opt/scls/<flavor>:
+
+{% for flavor in flavor_groups %}
+- {{ flavor.package }}: {{ flavor.label }}. {{ flavor.description | striptags }}
+{% endfor %}
+
+## Install on Enterprise Linux 9 / 10 or Amazon Linux 2023
+
+```
+# Enterprise Linux 9:
+sudo dnf install https://belfem.lbl.gov/scls/el9/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-{{ scls_release_rpm_release }}.el9.noarch.rpm
+# Enterprise Linux 10:
+sudo dnf install https://belfem.lbl.gov/scls/el10/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-{{ scls_release_rpm_release }}.el10.noarch.rpm
+# Amazon Linux 2023:
+sudo dnf install https://belfem.lbl.gov/scls/amzn2023/x86_64/Packages/scls-release-{{ scls_release_pkg_version }}-{{ scls_release_rpm_release }}.amzn2023.noarch.rpm
+
+sudo dnf install scls-<flavor>
+source /opt/scls/<flavor>/share/scls/activate
+```
+
+## Install on Ubuntu 24.04 or 26.04
+
+```
+# Ubuntu 26.04 (resolute):
+wget https://belfem.lbl.gov/scls/ubuntu/resolute/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-{{ keyring_release['resolute'] }}_all.deb
+sudo apt install ./scls-archive-keyring_{{ scls_release_pkg_version }}-{{ keyring_release['resolute'] }}_all.deb
+# Ubuntu 24.04 (noble):
+wget https://belfem.lbl.gov/scls/ubuntu/noble/pool/main/s/scls-archive-keyring/scls-archive-keyring_{{ scls_release_pkg_version }}-{{ keyring_release['noble'] }}_all.deb
+sudo apt install ./scls-archive-keyring_{{ scls_release_pkg_version }}-{{ keyring_release['noble'] }}_all.deb
+
+sudo apt update
+sudo apt install scls-<flavor>
+source /opt/scls/<flavor>/share/scls/activate
+```
+
+## Build from source (macOS, other Unix)
+
+```
+git clone https://github.com/cmesse/scls.git
+cd scls
+echo "flavor: macos" > flavor.conf    # "flavor: gcc" on Linux
+./scls build all
+source /opt/scls/share/scls/activate  # macOS; /opt/scls/<flavor>/share/scls/activate on Linux
+```
+
+## Use the stack
+
+```
+source /opt/scls/gcc/share/scls/activate
+mpicc myapp.c -o myapp $(pkg-config --cflags --libs petsc)
+cmake -S . -B build -DCMAKE_PREFIX_PATH="$SCLS"
+```
+
+Activation sets PATH, PKG_CONFIG_PATH, CMAKE_PREFIX_PATH, SCLS and SCLS_FLAVOR, plus PETSC_DIR, SLEPC_DIR and MPI_HOME when installed. LD_LIBRARY_PATH is not modified; libraries use rpaths.
+
+## Ipopt and HSL
+
+Ipopt uses the MPI build of MUMPS (the default linear_solver) and SPRAL's SSIDS on every flavor, plus MKL Pardiso on the MKL flavors. SSIDS needs OMP_CANCELLATION=TRUE. The proprietary HSL solvers are not shipped; `./scls build hsl` and `./scls install hsl` build a user-supplied Coin-HSL tarball into a library the packaged Ipopt loads at runtime.
+
+## Packages
+
+{% for package in packages if package.name in seo_package_names %}
+- {{ package.name }} {{ package.version }}: {{ package.summary }} (flavors: {% for flavor in flavors if package|package_available(flavor.name) %}{{ flavor.name }}{{ ", " if not loop.last }}{% endfor %})
+{% endfor %}
+
+## Links
+
+- [SCLS website](https://belfem.lbl.gov/scls.html): full documentation, package and license tables
+- [Source repository](https://github.com/cmesse/scls): recipes, flavors, build scripts, issues
+- [HSL build guide](https://github.com/cmesse/scls/blob/main/doc/HSL_BUILD.md)
+- [macOS build guide](https://github.com/cmesse/scls/blob/main/doc/MACOS_BUILD.md)
+- [BELFEM](https://belfem.lbl.gov/): the finite element framework SCLS was built for

@@ -25,6 +25,9 @@ libcoinhsl.*
 libhsl.*
 
 scls.html
+llms.txt
+robots.txt
+sitemap.xml
 
 # Prerequisites
 *.d
