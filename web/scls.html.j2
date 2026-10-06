@@ -445,10 +445,8 @@ cmake --build build</code></pre>
         </tbody>
     </table>
     </div>
-    <p>Ipopt is built against the stack's own linear solvers: the MPI build of MUMPS (the default <code>linear_solver</code>) and SPRAL's SSIDS on every flavor, plus MKL Pardiso on the MKL flavors. Users select a solver in <code>ipopt.opt</code>; SSIDS additionally needs <code>OMP_CANCELLATION=TRUE</code> in the environment of the program that uses it.</p>
-
-    <h3>Coin-HSL for Ipopt</h3>
-    <p>The HSL linear solvers (MA27, MA57, HSL_MA77, HSL_MA86, HSL_MA97) are proprietary, and SCLS ships neither their source nor a binary. What SCLS provides is the build scripts: <code>./scls build hsl</code> and <code>./scls install hsl</code> turn your own Coin-HSL source tarball into a private library linked against the stack's METIS and BLAS/LAPACK. The packaged Ipopt loads that library at runtime. You must bring your own sources and your own HSL license, obtained from <a href="https://licences.stfc.ac.uk">STFC</a>. See <a href="https://github.com/cmesse/scls/blob/main/doc/HSL_BUILD.md">HSL_BUILD.md</a> for the details.</p>
+    <h3>Using IPOPT and HSL</h3>
+    <p>The SCLS build of Ipopt uses the stack's linear solvers: the MPI build of MUMPS (the default <code>linear_solver</code>) and SPRAL's SSIDS on every flavor, plus MKL Pardiso on the MKL flavors. Users choose a solver in <code>ipopt.opt</code>; SSIDS also requires <code>OMP_CANCELLATION=TRUE</code> in the environment of the program that uses it. The HSL solvers (MA27, MA57, HSL_MA77, HSL_MA86, HSL_MA97) are proprietary, so SCLS ships neither their source nor a binary. SCLS provides build scripts: <code>./scls build hsl</code> and <code>./scls install hsl</code> turn your own Coin-HSL source tarball into a private library linked against the stack's METIS and BLAS/LAPACK. The packaged Ipopt loads that library at runtime. You must provide your own sources and HSL license, obtained from <a href="https://licences.stfc.ac.uk">STFC</a>; see <a href="https://github.com/cmesse/scls/blob/main/doc/HSL_BUILD.md">HSL_BUILD.md</a> for details.</p>
 
 </section>
 
