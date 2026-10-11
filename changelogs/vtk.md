@@ -1,5 +1,8 @@
 # Vtk Changelog
 
+## Version 9.7.1-1 - Sat Oct 10 2026
+- Updated to version 9.7.1
+
 ## Version 9.7.0-1 - Tue Aug 18 2026
 - 2026-09-10: the macos flavor's `-isystem` paths for the SCLS libstdc++ are
   now derived from the installed GCC via the new gcc_version and gcc_machine
