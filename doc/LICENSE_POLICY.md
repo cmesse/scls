@@ -72,13 +72,6 @@ by default and must be opted into explicitly via `extra_packages:` for local use
 Source availability would not rescue it — the objection is to distributing the binary
 at all, not to the compliance paperwork.
 
-History: before 2026-09-23 this document said GPL-2-or-later libraries were "not
-automatically excluded" and named SuiteSparse as acceptable when packaged with
-complete source. That was never the practice: every GPL package in the recipe set is
-a build tool or GCC, and SuiteSparse has carried `include_flavors: []` throughout.
-The rule was restated as "published binaries are BSD-3-compatible, no GPL; GPL only
-for build tools" on 2026-10-05 (Christian).
-
 ### GPL Build Tools
 
 GPL build tools, of any GPL version, are acceptable in the build scripts when they
